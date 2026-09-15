@@ -31,3 +31,9 @@ python manage.py import_localities data/raw/japanese-addresses-latest.csv
 ```
 
 The station ZIP and locality CSV are intentionally ignored by Git. Run imports against the production `DATABASE_URL`; do not commit source data or database credentials. The locality CSV is downloaded from Geolonia japanese-addresses and attributed in the application under CC BY 4.0.
+
+## Local Development
+
+Create a local `.env` from `.env.example` and set `DATABASE_URL` to the Neon connection string. `runserver`, migrations, and management commands then use the same database as the deployed application.
+
+`python manage.py test` always uses an in-memory SQLite database, even when `.env` contains `DATABASE_URL`. Test data never reaches Neon.
