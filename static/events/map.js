@@ -231,9 +231,9 @@ function currentLocationErrorMessage(error) {
     return '現在地の利用が許可されていません。ブラウザのサイト設定から位置情報を許可してください。';
   }
   if (error.code === 3) {
-    return '現在地の取得が時間切れになりました。通信状況を確認してもう一度お試しください。';
+    return '現在地を取得できませんでした。端末またはブラウザの位置情報設定を確認して、もう一度お試しください。';
   }
-  return '現在地を取得できませんでした。もう一度お試しください。';
+  return '現在地を取得できませんでした。端末またはブラウザの位置情報設定を確認して、もう一度お試しください。';
 }
 
 function centerOnCurrentLocation(showStatus = false) {
