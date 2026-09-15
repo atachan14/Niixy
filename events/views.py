@@ -1,5 +1,8 @@
+import uuid
+
 from django.contrib import messages
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -27,6 +30,7 @@ def map_view(request):
             'events': events,
             'event_markers': event_markers,
             'geolonia_api_key': settings.GEOLONIA_API_KEY,
+            'event_submission_id': uuid.uuid4(),
         },
     )
 
@@ -39,9 +43,20 @@ def event_create(request):
     if request.method != 'POST':
         return redirect('events:map')
 
+    try:
+        submission_id = uuid.UUID(request.POST.get('submission_id', ''))
+    except (TypeError, ValueError):
+        submission_id = uuid.uuid4()
+
     form = EventForm(request.POST)
     if form.is_valid():
-        form.save()
+        event = form.save(commit=False)
+        event.submission_id = submission_id
+        try:
+            with transaction.atomic():
+                event.save()
+        except IntegrityError:
+            Event.objects.get(submission_id=submission_id)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'redirect_url': reverse('events:map')})
         messages.success(request, 'Eventを投稿しました。')

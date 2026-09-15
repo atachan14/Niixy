@@ -60,6 +60,7 @@
     </div>
     <form id="event-create-form" class="map-event-form" method="post" action="{% url 'events:create' %}" novalidate hidden>
       {% csrf_token %}
+      <input type="hidden" name="submission_id" value="{{ event_submission_id }}">
       <input id="event-latitude" type="hidden" name="latitude">
       <input id="event-longitude" type="hidden" name="longitude">
       <p id="event-location-status" class="event-location-status">地図上の地点を選択してください。</p>
@@ -84,7 +85,7 @@
         <label for="event-description">Event詳細</label>
         <textarea id="event-description" name="description" rows="4"></textarea>
       </div>
-      <button class="button primary" type="submit">投稿する</button>
+      <button id="event-submit-button" class="button primary" type="submit">投稿する</button>
     </form>
   </div>
   <aside id="event-panel" class="event-panel" aria-label="Event list">

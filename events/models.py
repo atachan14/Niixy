@@ -1,8 +1,11 @@
+import uuid
+
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
 class Event(models.Model):
+    submission_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     title = models.CharField('Event名', max_length=120)
     description = models.TextField('Event詳細', blank=True)
     capacity = models.PositiveIntegerField(

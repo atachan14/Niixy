@@ -1,4 +1,5 @@
 from datetime import timedelta
+from uuid import uuid4
 
 from django.test import TestCase
 from django.urls import reverse
@@ -50,6 +51,33 @@ class EventViewTests(TestCase):
         self.assertRedirects(response, reverse('events:map'))
         self.assertEqual(event.title, '週末のマーケット')
         self.assertEqual(event.capacity, 12)
+
+    def test_duplicate_submission_id_creates_only_one_event(self):
+        starts_at = timezone.localtime(timezone.now()).replace(microsecond=0)
+        payload = {
+            'submission_id': str(uuid4()),
+            'title': '重複しないEvent',
+            'capacity': '4',
+            'starts_at': starts_at.strftime('%Y-%m-%dT%H:%M'),
+            'ends_at': '',
+            'latitude': '35.681236',
+            'longitude': '139.767125',
+        }
+
+        first_response = self.client.post(
+            reverse('events:create'),
+            payload,
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        second_response = self.client.post(
+            reverse('events:create'),
+            payload,
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(Event.objects.count(), 1)
 
     def test_invalid_event_returns_json_errors_for_map_form(self):
         starts_at = timezone.localtime(timezone.now()).replace(microsecond=0)

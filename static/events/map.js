@@ -9,6 +9,7 @@ const currentLocationTrigger = document.getElementById('current-location-trigger
 const createTrigger = document.getElementById('event-create-trigger');
 const createCancel = document.getElementById('event-create-cancel');
 const createForm = document.getElementById('event-create-form');
+const eventSubmitButton = document.getElementById('event-submit-button');
 const eventPanel = document.getElementById('event-panel');
 const eventPanelTitle = document.getElementById('event-panel-title');
 const eventLatitude = document.getElementById('event-latitude');
@@ -30,6 +31,7 @@ let userLocationMarker;
 let isCreatingEvent = false;
 let isMapLoaded = false;
 let pendingUserLocation;
+let isSubmittingEvent = false;
 const eventMapMarkers = new Map();
 const mapViewStorageKey = 'niimap:map-view';
 
@@ -371,6 +373,12 @@ currentLocationTrigger.addEventListener('click', () => centerOnCurrentLocation(t
 
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (isSubmittingEvent) return;
+
+  let wasSubmitted = false;
+  isSubmittingEvent = true;
+  eventSubmitButton.disabled = true;
+  eventSubmitButton.textContent = '投稿中…';
   clearFormErrors();
 
   try {
@@ -384,6 +392,7 @@ createForm.addEventListener('submit', async (event) => {
 
     if (response.ok) {
       saveMapView();
+      wasSubmitted = true;
       window.location.assign(data.redirect_url);
       return;
     }
@@ -392,6 +401,11 @@ createForm.addEventListener('submit', async (event) => {
   } catch (error) {
     eventFormError.textContent = '投稿できませんでした。時間をおいて再度お試しください。';
     eventFormError.hidden = false;
+  } finally {
+    if (wasSubmitted) return;
+    isSubmittingEvent = false;
+    eventSubmitButton.disabled = false;
+    eventSubmitButton.textContent = '投稿する';
   }
 });
 
