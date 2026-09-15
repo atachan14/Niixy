@@ -452,7 +452,7 @@ function selectSearchResult(place) {
     .addTo(map)
     .togglePopup();
 
-  map.flyTo({ center: coordinates, zoom: 16, essential: true });
+  map.easeTo({ center: coordinates, zoom: 16, duration: 700, essential: true });
   searchStatus.textContent = `${place.name} / ${place.detail}`;
   clearSearchResults();
 }
