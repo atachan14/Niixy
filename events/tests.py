@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Event
+from .models import Event, Locality, Station
 
 
 class EventViewTests(TestCase):
@@ -70,3 +70,31 @@ class EventViewTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('ends_at', response.json()['errors'])
+
+    def test_location_search_includes_stations_and_localities(self):
+        Station.objects.create(
+            station_code='test-station',
+            group_code='test-group',
+            name='Test Station',
+            line_name='Test Line',
+            operator_name='Test Railway',
+            latitude=35.681236,
+            longitude=139.767125,
+        )
+        Locality.objects.create(
+            source_key='test-locality',
+            name='Test Town',
+            full_name='Test Prefecture Test City Test Town',
+            detail='Test Prefecture Test City',
+            kind='town',
+            latitude=35.681236,
+            longitude=139.767125,
+        )
+
+        response = self.client.get(reverse('events:location-search'), {'q': 'Test'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {location['name'] for location in response.json()['locations']},
+            {'Test Station', 'Test Town'},
+        )

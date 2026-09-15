@@ -47,3 +47,19 @@ class Station(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.line_name})'
+
+
+class Locality(models.Model):
+    source_key = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=160, db_index=True)
+    full_name = models.CharField(max_length=255, db_index=True)
+    detail = models.CharField(max_length=255)
+    kind = models.CharField(max_length=16)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+
+    class Meta:
+        ordering = ['kind', 'full_name']
+
+    def __str__(self):
+        return self.full_name

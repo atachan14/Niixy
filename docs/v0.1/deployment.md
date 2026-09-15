@@ -2,44 +2,32 @@
 
 ## Target Architecture
 
-* Koyeb: Django application hosting
+* Vercel: Django application hosting
 * Neon: PostgreSQL database
 * Geolonia: Map display
 
 ## Production Settings
 
-Set these environment variables in Koyeb. Do not commit their values.
+Set these environment variables in Vercel. Do not commit their values.
 
 * `DJANGO_SECRET_KEY`: a long, random secret
 * `DJANGO_DEBUG`: `False`
-* `DJANGO_ALLOWED_HOSTS`: `{{ KOYEB_PUBLIC_DOMAIN }}`
-* `DJANGO_CSRF_TRUSTED_ORIGINS`: `https://{{ KOYEB_PUBLIC_DOMAIN }}`
+* `DJANGO_ALLOWED_HOSTS`: `.vercel.app`
 * `DATABASE_URL`: Neon connection string, including its SSL options
-* `GEOLONIA_API_KEY`: production API key with the Koyeb domain allowed
+* `GEOLONIA_API_KEY`: production API key with the Vercel domain allowed
 
-## Koyeb Commands
+## Vercel Commands
 
-Build command:
-
-```text
-pip install -r requirements.txt && python manage.py collectstatic --noinput
-```
-
-Run command:
-
-```text
-python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
-```
-
-Configure Koyeb's health check to use `/healthz/`.
+Vercel detects `manage.py`, serves static files automatically, and runs the production migration command defined in `vercel.json`.
 
 ## First Database Setup
 
-After the first deployment, apply migrations, create an Admin user, and import the station master into Neon.
+After the first deployment, create an Admin user and import the location masters into Neon.
 
 ```text
 python manage.py createsuperuser
 python manage.py import_stations data/raw/N02-25_GML.zip
+python manage.py import_localities data/raw/japanese-addresses-latest.csv
 ```
 
-The station ZIP is intentionally ignored by Git. Run the import against the production `DATABASE_URL`; do not commit the source ZIP or database credentials.
+The station ZIP and locality CSV are intentionally ignored by Git. Run imports against the production `DATABASE_URL`; do not commit source data or database credentials. The locality CSV is downloaded from Geolonia japanese-addresses and attributed in the application under CC BY 4.0.

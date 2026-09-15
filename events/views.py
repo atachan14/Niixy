@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from .forms import EventForm
-from .models import Event, Station
+from .models import Event, Locality, Station
 
 
 def map_view(request):
@@ -72,6 +72,7 @@ def location_search(request):
         return JsonResponse({'locations': []})
 
     stations = Station.objects.filter(name__icontains=query)[:10]
+    localities = Locality.objects.filter(full_name__icontains=query)[:10]
     locations = [
         {
             'name': station.name,
@@ -81,4 +82,13 @@ def location_search(request):
         }
         for station in stations
     ]
-    return JsonResponse({'locations': locations})
+    locations.extend(
+        {
+            'name': locality.name,
+            'detail': locality.detail,
+            'latitude': float(locality.latitude),
+            'longitude': float(locality.longitude),
+        }
+        for locality in localities
+    )
+    return JsonResponse({'locations': locations[:10]})
