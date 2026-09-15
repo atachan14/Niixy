@@ -267,7 +267,7 @@ function centerOnCurrentLocation(showStatus = false) {
     {
       enableHighAccuracy: false,
       maximumAge: 300000,
-      timeout: 6000,
+      timeout: 15000,
     },
   );
 }
