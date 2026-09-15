@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}NiiMap{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'events/styles.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand" aria-label="Niixy / NiiMap">
+      <a class="parent-brand" href="/">Niixy</a>
+      <span aria-hidden="true">/</span>
+      <a class="service-brand" href="{% url 'events:map' %}">NiiMap</a>
+    </div>
+    <nav class="nav"></nav>
+  </header>
+
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <p class="message">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

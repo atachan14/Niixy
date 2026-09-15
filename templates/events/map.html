@@ -1,0 +1,127 @@
+{% extends 'events/base.html' %}
+{% load static %}
+
+{% block title %}NiiMap{% endblock %}
+
+{% block content %}
+<section class="map-layout">
+  <div class="map-frame">
+    <div
+      id="map"
+      class="map"
+      aria-label="Event map"
+      data-lat="35.681236"
+      data-lng="139.767125"
+      data-zoom="11"
+      data-marker="off"
+      data-style="geolonia/basic-v2"
+      data-navigation-control="off"
+    ></div>
+    <div class="map-controls">
+      <div class="location-search">
+      <form id="location-search-form" class="location-search-form" role="search">
+        <label class="sr-only" for="location-search-input">地点を検索</label>
+        <input
+          id="location-search-input"
+          name="q"
+          type="search"
+          placeholder="駅名を検索"
+          autocomplete="off"
+          minlength="2"
+          required
+        >
+        <button type="submit">検索</button>
+      </form>
+      <p id="location-search-status" class="location-search-status" aria-live="polite"></p>
+      <ul id="location-search-results" class="location-search-results"></ul>
+      </div>
+      <details class="map-filter">
+      <summary>絞り込み</summary>
+      <div class="map-filter-content">
+        <label class="filter-toggle">
+          <input id="filter-range-enabled" type="checkbox" checked>
+          期間を指定
+        </label>
+        <div class="filter-range-fields">
+          <label for="filter-starts-after">開始日時</label>
+          <input id="filter-starts-after" type="datetime-local">
+          <label for="filter-ends-before">終了日時</label>
+          <input id="filter-ends-before" type="datetime-local">
+        </div>
+        <div class="filter-statuses">
+          <label><input id="filter-today" type="checkbox"> 今日</label>
+          <label><input id="filter-tomorrow" type="checkbox"> 明日</label>
+          <label><input id="filter-ongoing" type="checkbox"> 真っ最中</label>
+          <label><input id="filter-ended" type="checkbox"> 終了済み</label>
+        </div>
+      </div>
+      </details>
+    </div>
+    <form id="event-create-form" class="map-event-form" method="post" action="{% url 'events:create' %}" novalidate hidden>
+      {% csrf_token %}
+      <input id="event-latitude" type="hidden" name="latitude">
+      <input id="event-longitude" type="hidden" name="longitude">
+      <p id="event-location-status" class="event-location-status">地図上の地点を選択してください。</p>
+      <p id="event-form-error" class="event-form-error" aria-live="polite" hidden></p>
+      <div class="field">
+        <label for="event-title">Event名</label>
+        <input id="event-title" name="title" maxlength="120" required>
+      </div>
+      <div class="field">
+        <label for="event-starts-at">開始日時</label>
+        <input id="event-starts-at" name="starts_at" type="datetime-local" required>
+      </div>
+      <div class="field">
+        <label for="event-ends-at">終了日時</label>
+        <input id="event-ends-at" name="ends_at" type="datetime-local">
+      </div>
+      <div class="field">
+        <label for="event-capacity">募集人数</label>
+        <input id="event-capacity" name="capacity" type="number" min="1" value="1" required>
+      </div>
+      <div class="field">
+        <label for="event-description">Event詳細</label>
+        <textarea id="event-description" name="description" rows="4"></textarea>
+      </div>
+      <button class="button primary" type="submit">投稿する</button>
+    </form>
+  </div>
+  <aside id="event-panel" class="event-panel" aria-label="Event list">
+    <div class="event-panel-header">
+      <h2 id="event-panel-title">Event一覧</h2>
+      <div id="event-panel-actions" class="event-panel-actions">
+        <button id="event-create-trigger" class="event-create-button" type="button">＋ Event投稿</button>
+        <button id="event-create-cancel" class="event-cancel-button" type="button" hidden>キャンセル</button>
+      </div>
+    </div>
+    <div class="event-list">
+      {% for event in events %}
+        <article class="event-item" data-event-id="{{ event.pk }}">
+          <button class="event-summary" type="button" aria-controls="event-body-{{ event.pk }}" aria-expanded="false">
+            <time datetime="{{ event.starts_at|date:'c' }}">
+              {{ event.starts_at|date:'Y/m/d H:i' }}{% if event.ends_at %} ~ {{ event.ends_at|date:'Y/m/d H:i' }}{% endif %}
+            </time>
+            <span class="event-title">{{ event.title }}</span>
+            <span class="event-toggle" aria-hidden="true"></span>
+          </button>
+          <div id="event-body-{{ event.pk }}" class="event-body" hidden>
+            <p class="event-meta">投稿者：ゲスト</p>
+            <p class="event-meta">募集人数：0/{{ event.capacity }}</p>
+            <p class="event-description">詳細：{{ event.description|default:'未設定' }}</p>
+          </div>
+        </article>
+      {% empty %}
+        <p class="empty">まだEventはありません。</p>
+      {% endfor %}
+      <p id="filtered-events-empty" class="empty" hidden>条件に一致するEventはありません。</p>
+    </div>
+  </aside>
+</section>
+
+{{ event_markers|json_script:'event-markers' }}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script>
+<script src="{% static 'events/map.js' %}"></script>
+{% endblock %}
