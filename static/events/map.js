@@ -27,7 +27,10 @@ let searchMarker;
 let draftMarker;
 let userLocationMarker;
 let isCreatingEvent = false;
+let isMapLoaded = false;
+let pendingUserLocation;
 const eventMapMarkers = new Map();
+const mapViewStorageKey = 'niimap:map-view';
 
 eventPanel.append(createForm);
 
@@ -38,6 +41,38 @@ function escapeHtml(value) {
 }
 
 const map = new geolonia.Map('#map');
+
+function saveMapView() {
+  const center = map.getCenter();
+  const view = {
+    latitude: center.lat,
+    longitude: center.lng,
+    zoom: map.getZoom(),
+  };
+
+  sessionStorage.setItem(mapViewStorageKey, JSON.stringify(view));
+}
+
+function restoreMapView() {
+  const storedView = sessionStorage.getItem(mapViewStorageKey);
+  sessionStorage.removeItem(mapViewStorageKey);
+  if (!storedView) return false;
+
+  try {
+    const view = JSON.parse(storedView);
+    if (![view.latitude, view.longitude, view.zoom].every(Number.isFinite)) {
+      return false;
+    }
+    map.jumpTo({ center: [view.longitude, view.latitude], zoom: view.zoom });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function hasStoredMapView() {
+  return sessionStorage.getItem(mapViewStorageKey) !== null;
+}
 
 function toDatetimeLocalValue(date) {
   const timezoneOffset = date.getTimezoneOffset() * 60 * 1000;
@@ -168,8 +203,7 @@ function sortEventListByDistance() {
     .forEach((item) => eventList.append(item));
 }
 
-function showCurrentLocation(position) {
-  const coordinates = [position.coords.longitude, position.coords.latitude];
+function setCurrentLocation(coordinates) {
   const markerElement = document.createElement('div');
   markerElement.className = 'user-location-marker';
   markerElement.setAttribute('aria-label', '現在地');
@@ -181,7 +215,14 @@ function showCurrentLocation(position) {
   userLocationMarker = new geolonia.Marker({ element: markerElement })
     .setLngLat(coordinates)
     .addTo(map);
-  map.flyTo({ center: coordinates, zoom: 13, essential: true });
+  map.jumpTo({ center: coordinates, zoom: 13 });
+}
+
+function showCurrentLocation(position) {
+  pendingUserLocation = [position.coords.longitude, position.coords.latitude];
+  if (isMapLoaded) {
+    setCurrentLocation(pendingUserLocation);
+  }
 }
 
 function centerOnCurrentLocation() {
@@ -194,6 +235,10 @@ function centerOnCurrentLocation() {
     maximumAge: 300000,
     timeout: 6000,
   });
+}
+
+if (!hasStoredMapView()) {
+  centerOnCurrentLocation();
 }
 
 function setCreateMode(enabled) {
@@ -302,6 +347,7 @@ createForm.addEventListener('submit', async (event) => {
     const data = await response.json();
 
     if (response.ok) {
+      saveMapView();
       window.location.assign(data.redirect_url);
       return;
     }
@@ -417,6 +463,9 @@ searchForm.addEventListener('submit', async (event) => {
 });
 
 map.on('load', () => {
+  isMapLoaded = true;
+  const restoredMapView = restoreMapView();
+
   markers.forEach((event) => {
     const coordinates = [event.longitude, event.latitude];
     const marker = new geolonia.Marker({ color: '#0f766e' })
@@ -429,5 +478,11 @@ map.on('load', () => {
   sortEventListByDistance();
   map.on('moveend', sortEventListByDistance);
   initializeTimeFilters();
-  centerOnCurrentLocation();
+  if (restoredMapView) {
+    return;
+  }
+
+  if (pendingUserLocation) {
+    setCurrentLocation(pendingUserLocation);
+  }
 });
