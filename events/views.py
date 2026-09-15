@@ -71,8 +71,8 @@ def location_search(request):
     if len(query) < 2:
         return JsonResponse({'locations': []})
 
-    stations = Station.objects.filter(name__icontains=query)[:10]
-    localities = Locality.objects.filter(full_name__icontains=query)[:10]
+    stations = Station.objects.filter(name__icontains=query)[:5]
+    localities = Locality.objects.filter(full_name__icontains=query)[:5]
     locations = [
         {
             'name': station.name,
@@ -91,4 +91,4 @@ def location_search(request):
         }
         for locality in localities
     )
-    return JsonResponse({'locations': locations[:10]})
+    return JsonResponse({'locations': locations})

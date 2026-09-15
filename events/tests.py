@@ -72,15 +72,16 @@ class EventViewTests(TestCase):
         self.assertIn('ends_at', response.json()['errors'])
 
     def test_location_search_includes_stations_and_localities(self):
-        Station.objects.create(
-            station_code='test-station',
-            group_code='test-group',
-            name='Test Station',
-            line_name='Test Line',
-            operator_name='Test Railway',
-            latitude=35.681236,
-            longitude=139.767125,
-        )
+        for index in range(6):
+            Station.objects.create(
+                station_code=f'test-station-{index}',
+                group_code=f'test-group-{index}',
+                name=f'Test Station {index}',
+                line_name='Test Line',
+                operator_name='Test Railway',
+                latitude=35.681236,
+                longitude=139.767125,
+            )
         Locality.objects.create(
             source_key='test-locality',
             name='Test Town',
@@ -96,5 +97,12 @@ class EventViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             {location['name'] for location in response.json()['locations']},
-            {'Test Station', 'Test Town'},
+            {
+                'Test Station 0',
+                'Test Station 1',
+                'Test Station 2',
+                'Test Station 3',
+                'Test Station 4',
+                'Test Town',
+            },
         )
