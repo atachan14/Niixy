@@ -36,7 +36,7 @@ if not SECRET_KEY:
     else:
         raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DEBUG is False.')
 
-# These defaults are for local development only. Production values come from Koyeb.
+# These defaults are for local development only. Production values come from environment variables.
 ALLOWED_HOSTS = os.environ.get(
     'DJANGO_ALLOWED_HOSTS',
     'localhost,127.0.0.1,[::1]',
