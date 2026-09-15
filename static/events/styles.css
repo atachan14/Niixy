@@ -281,6 +281,22 @@ a {
   min-width: 58px;
 }
 
+.location-search-form .current-location-button {
+  background: #fff;
+  border-left: 1px solid var(--line);
+  color: var(--accent-dark);
+  min-width: 70px;
+}
+
+.location-search-form .current-location-button:hover:not(:disabled) {
+  background: #eef6f4;
+}
+
+.location-search-form .current-location-button:disabled {
+  color: var(--muted);
+  cursor: wait;
+}
+
 .location-search-status,
 .location-search-attribution {
   background: rgba(255, 255, 255, 0.94);

@@ -5,6 +5,7 @@ const searchForm = document.getElementById('location-search-form');
 const searchInput = document.getElementById('location-search-input');
 const searchStatus = document.getElementById('location-search-status');
 const searchResults = document.getElementById('location-search-results');
+const currentLocationTrigger = document.getElementById('current-location-trigger');
 const createTrigger = document.getElementById('event-create-trigger');
 const createCancel = document.getElementById('event-create-cancel');
 const createForm = document.getElementById('event-create-form');
@@ -225,16 +226,50 @@ function showCurrentLocation(position) {
   }
 }
 
-function centerOnCurrentLocation() {
+function currentLocationErrorMessage(error) {
+  if (error.code === 1) {
+    return '現在地の利用が許可されていません。ブラウザのサイト設定から位置情報を許可してください。';
+  }
+  if (error.code === 3) {
+    return '現在地の取得が時間切れになりました。通信状況を確認してもう一度お試しください。';
+  }
+  return '現在地を取得できませんでした。もう一度お試しください。';
+}
+
+function centerOnCurrentLocation(showStatus = false) {
   if (!navigator.geolocation) {
+    if (showStatus) {
+      searchStatus.textContent = 'このブラウザは現在地の取得に対応していません。';
+    }
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(showCurrentLocation, () => {}, {
-    enableHighAccuracy: false,
-    maximumAge: 300000,
-    timeout: 6000,
-  });
+  if (showStatus) {
+    currentLocationTrigger.disabled = true;
+    searchStatus.textContent = '現在地を取得中…';
+    clearSearchResults();
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      showCurrentLocation(position);
+      if (showStatus) {
+        currentLocationTrigger.disabled = false;
+        searchStatus.textContent = '現在地を表示しました。';
+      }
+    },
+    (error) => {
+      if (showStatus) {
+        currentLocationTrigger.disabled = false;
+        searchStatus.textContent = currentLocationErrorMessage(error);
+      }
+    },
+    {
+      enableHighAccuracy: false,
+      maximumAge: 300000,
+      timeout: 6000,
+    },
+  );
 }
 
 if (!hasStoredMapView()) {
@@ -332,6 +367,7 @@ document.querySelectorAll('.event-summary').forEach((summary) => {
 
 createTrigger.addEventListener('click', () => setCreateMode(true));
 createCancel.addEventListener('click', () => setCreateMode(false));
+currentLocationTrigger.addEventListener('click', () => centerOnCurrentLocation(true));
 
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
