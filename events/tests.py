@@ -4,8 +4,9 @@ from uuid import uuid4
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
-from .models import Event, Locality, Station
+from .models import Event, Locality, NiiMapFilterPreference, Station
 
 
 class EventViewTests(TestCase):
@@ -78,6 +79,134 @@ class EventViewTests(TestCase):
         self.assertEqual(first_response.status_code, 200)
         self.assertEqual(second_response.status_code, 200)
         self.assertEqual(Event.objects.count(), 1)
+
+    def test_logged_in_user_is_saved_as_event_creator(self):
+        user = get_user_model().objects.create_user('niixy_user', password='eightchars')
+        self.client.force_login(user)
+        starts_at = timezone.localtime(timezone.now()).replace(microsecond=0)
+
+        self.client.post(
+            reverse('events:create'),
+            {
+                'title': 'Account Event',
+                'capacity': '4',
+                'starts_at': starts_at.strftime('%Y-%m-%dT%H:%M'),
+                'ends_at': '',
+                'latitude': '35.681236',
+                'longitude': '139.767125',
+            },
+        )
+
+        self.assertEqual(Event.objects.get().creator, user)
+
+    def test_filter_preferences_default_to_guests_for_guest_visitors(self):
+        response = self.client.get(reverse('events:map'))
+
+        self.assertTrue(response.context['filter_preferences']['show_guest_events'])
+        self.assertFalse(response.context['filter_preferences']['account_ids_enabled'])
+
+    def test_logged_in_user_can_save_filter_preferences(self):
+        user = get_user_model().objects.create_user('niixy_user', password='eightchars')
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse('events:filter-preferences'),
+            {
+                'range_filter_enabled': 'true',
+                'show_ongoing': 'true',
+                'show_today': 'false',
+                'show_tomorrow': 'true',
+                'show_ended': 'false',
+                'show_guest_events': 'true',
+                'account_ids_enabled': 'true',
+                'datetime_section_open': 'true',
+                'account_section_open': 'false',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        preference = NiiMapFilterPreference.objects.get(user=user)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(preference.show_ongoing)
+        self.assertTrue(preference.show_tomorrow)
+        self.assertTrue(preference.show_guest_events)
+        self.assertTrue(preference.account_ids_enabled)
+        self.assertTrue(preference.datetime_section_open)
+        self.assertFalse(preference.account_section_open)
+        self.assertFalse(preference.show_today)
+
+    def test_event_creator_can_update_event(self):
+        user = get_user_model().objects.create_user('niixy_user', password='eightchars')
+        event = Event.objects.create(
+            title='Before update',
+            creator=user,
+            capacity=4,
+            starts_at=timezone.now(),
+            latitude=35.681236,
+            longitude=139.767125,
+        )
+        self.client.force_login(user)
+        starts_at = timezone.localtime(event.starts_at).replace(microsecond=0)
+
+        response = self.client.post(
+            reverse('events:update', args=[event.pk]),
+            {
+                'title': 'After update',
+                'description': 'Updated details',
+                'capacity': '8',
+                'starts_at': starts_at.strftime('%Y-%m-%dT%H:%M'),
+                'ends_at': '',
+                'latitude': '34.693725',
+                'longitude': '135.502253',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        event.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(event.title, 'After update')
+        self.assertEqual(event.capacity, 8)
+        self.assertEqual(event.creator, user)
+
+    def test_only_creator_can_update_or_delete_event(self):
+        creator = get_user_model().objects.create_user('creator', password='eightchars')
+        other_user = get_user_model().objects.create_user('other_user', password='eightchars')
+        event = Event.objects.create(
+            title='Protected Event',
+            creator=creator,
+            capacity=4,
+            starts_at=timezone.now(),
+            latitude=35.681236,
+            longitude=139.767125,
+        )
+        self.client.force_login(other_user)
+
+        update_response = self.client.post(reverse('events:update', args=[event.pk]))
+        delete_response = self.client.post(reverse('events:delete', args=[event.pk]))
+
+        self.assertEqual(update_response.status_code, 403)
+        self.assertEqual(delete_response.status_code, 403)
+        self.assertTrue(Event.objects.filter(pk=event.pk).exists())
+
+    def test_event_creator_can_delete_event(self):
+        user = get_user_model().objects.create_user('niixy_user', password='eightchars')
+        event = Event.objects.create(
+            title='Deletable Event',
+            creator=user,
+            capacity=4,
+            starts_at=timezone.now(),
+            latitude=35.681236,
+            longitude=139.767125,
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse('events:delete', args=[event.pk]),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Event.objects.filter(pk=event.pk).exists())
 
     def test_invalid_event_returns_json_errors_for_map_form(self):
         starts_at = timezone.localtime(timezone.now()).replace(microsecond=0)

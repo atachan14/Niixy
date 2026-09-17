@@ -55,6 +55,7 @@ GEOLONIA_API_KEY = os.environ.get('GEOLONIA_API_KEY', 'YOUR-API-KEY')
 # Application definition
 
 INSTALLED_APPS = [
+    'accounts',
     'events',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -127,18 +128,14 @@ else:
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        'OPTIONS': {'min_length': 8},
     },
 ]
+
+# Keep signed-in users logged in for 30 days from their latest visit.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
+SESSION_SAVE_EVERY_REQUEST = True
 
 
 # Internationalization

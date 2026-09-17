@@ -15,7 +15,20 @@
       <span aria-hidden="true">/</span>
       <a class="service-brand" href="{% url 'events:map' %}">NiiMap</a>
     </div>
-    <nav class="nav"></nav>
+    <nav class="nav" aria-label="Account">
+      {% if user.is_authenticated %}
+        <details class="account-menu">
+          <summary>{{ user.username }}</summary>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit">ログアウト</button>
+          </form>
+        </details>
+      {% else %}
+        <button class="nav-button secondary" type="button" data-auth-mode="signup">新規登録</button>
+        <button class="nav-button" type="button" data-auth-mode="login">ログイン</button>
+      {% endif %}
+    </nav>
   </header>
 
   {% if messages %}
@@ -34,6 +47,13 @@
     地名データ: <a href="https://geolonia.github.io/japanese-addresses/">Geolonia 住所データ</a> (CC BY 4.0)
   </footer>
 
+  {% if not user.is_authenticated %}
+    {% include 'accounts/auth_modal.html' %}
+  {% endif %}
+
   {% block scripts %}{% endblock %}
+  {% if not user.is_authenticated %}
+    <script src="{% static 'accounts/auth.js' %}"></script>
+  {% endif %}
 </body>
 </html>

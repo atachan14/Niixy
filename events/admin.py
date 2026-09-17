@@ -5,7 +5,7 @@ from .models import Event, Locality, Station
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('title', 'starts_at', 'capacity', 'created_at')
+    list_display = ('title', 'creator', 'starts_at', 'capacity', 'created_at')
     list_filter = ('starts_at', 'created_at')
     search_fields = ('title', 'description')
     ordering = ('starts_at',)

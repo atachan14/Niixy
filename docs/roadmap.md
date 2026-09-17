@@ -2,6 +2,8 @@
 
 ## v0.1 - NiiMap / Event
 
+Status: Complete
+
 最初のVersionでは、NiiMapの最小構成を完成させる。
 
 Account登録やLoginを必要とせずMapを利用でき、Eventを閲覧・投稿できる状態を目指す。
@@ -14,6 +16,21 @@ Account登録やLoginを必要とせずMapを利用でき、Eventを閲覧・投
 * GuestとしてEvent投稿
 * Database保存
 * Admin管理
+
+---
+
+## v0.2 - Account Core
+
+Niixy IDとPasswordによるAccount登録・Loginを追加し、Loginした利用者が自身のEventを管理できる状態を完成させる。
+
+主な対象:
+
+* Niixy ID / PasswordによるAccount登録
+* Login / Logout
+* LoginしたAccountとEventの紐付け
+* 作成者表示
+* 自身が作成したEventの編集・削除
+* 自身が作成したEventでのNiiMap Filter
 
 ---
 
@@ -35,11 +52,11 @@ v0.1以降のVersion番号や実装順序は固定しない。
 
 ### Account
 
-* Niixy Account
-* Login / Logout
+* Account Profile
 * Account情報管理
-* AccountによるEvent管理
-* Event管理
+* Password Recovery
+* Social Login
+* My Page
 
 ### Interface
 

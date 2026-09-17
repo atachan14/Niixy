@@ -14,6 +14,11 @@ const eventPanel = document.getElementById('event-panel');
 const eventPanelTitle = document.getElementById('event-panel-title');
 const eventLatitude = document.getElementById('event-latitude');
 const eventLongitude = document.getElementById('event-longitude');
+const eventTitleInput = document.getElementById('event-title');
+const eventDescriptionInput = document.getElementById('event-description');
+const eventCapacityInput = document.getElementById('event-capacity');
+const eventStartsAtInput = document.getElementById('event-starts-at');
+const eventEndsAtInput = document.getElementById('event-ends-at');
 const eventLocationStatus = document.getElementById('event-location-status');
 const eventFormError = document.getElementById('event-form-error');
 const eventList = document.querySelector('.event-list');
@@ -25,6 +30,12 @@ const ongoingFilter = document.getElementById('filter-ongoing');
 const todayFilter = document.getElementById('filter-today');
 const tomorrowFilter = document.getElementById('filter-tomorrow');
 const endedFilter = document.getElementById('filter-ended');
+const showGuestsFilter = document.getElementById('filter-show-guests');
+const accountIdsFilterEnabled = document.getElementById('filter-account-ids-enabled');
+const accountIdsFilter = document.getElementById('filter-account-ids');
+const mapFilter = document.querySelector('.map-filter');
+const datetimeFilterSection = document.getElementById('filter-datetime-section');
+const accountFilterSection = document.getElementById('filter-account-section');
 let searchMarker;
 let draftMarker;
 let userLocationMarker;
@@ -32,6 +43,7 @@ let isCreatingEvent = false;
 let isMapLoaded = false;
 let pendingUserLocation;
 let isSubmittingEvent = false;
+let filterPreferencesSaveTimeout;
 const eventMapMarkers = new Map();
 const mapViewStorageKey = 'niimap:map-view';
 
@@ -128,10 +140,67 @@ function eventMatchesTimeFilters(event, now) {
   return matches.some(Boolean);
 }
 
+function selectedAccountIds() {
+  return new Set(
+    accountIdsFilter.value
+      .toLowerCase()
+      .split(/[\s,]+/)
+      .filter(Boolean),
+  );
+}
+
+function eventMatchesAccountFilters(event) {
+  if (accountIdsFilterEnabled.checked) {
+    return Boolean(event.creator_id) && selectedAccountIds().has(event.creator_id.toLowerCase());
+  }
+  if (!event.creator_id) {
+    return showGuestsFilter.checked;
+  }
+  return true;
+}
+
 function updateRangeFilterFields() {
   const disabled = !rangeFilterEnabled.checked;
   startsAfterFilter.disabled = disabled;
   endsBeforeFilter.disabled = disabled;
+}
+
+function updateAccountFilterFields() {
+  const accountIdsEnabled = accountIdsFilterEnabled.checked;
+  accountIdsFilter.disabled = !accountIdsEnabled;
+  showGuestsFilter.disabled = accountIdsEnabled;
+}
+
+function saveFilterPreferences() {
+  if (mapFilter.dataset.isAuthenticated !== 'true') return;
+
+  clearTimeout(filterPreferencesSaveTimeout);
+  filterPreferencesSaveTimeout = setTimeout(async () => {
+    const data = new FormData();
+    const fields = {
+      range_filter_enabled: rangeFilterEnabled,
+      show_ongoing: ongoingFilter,
+      show_today: todayFilter,
+      show_tomorrow: tomorrowFilter,
+      show_ended: endedFilter,
+      show_guest_events: showGuestsFilter,
+      account_ids_enabled: accountIdsFilterEnabled,
+      datetime_section_open: datetimeFilterSection,
+      account_section_open: accountFilterSection,
+    };
+    Object.entries(fields).forEach(([name, input]) => data.append(name, input.open ?? input.checked));
+
+    try {
+      await fetch(mapFilter.dataset.preferencesUrl, {
+        method: 'POST',
+        body: data,
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+    } catch (error) {
+      // Filtering remains usable even when saving a future default fails.
+    }
+  }, 250);
 }
 
 function applyTimeFilters() {
@@ -141,7 +210,7 @@ function applyTimeFilters() {
 
   eventItems.forEach((item) => {
     const event = eventsById.get(item.dataset.eventId);
-    const isVisible = eventMatchesTimeFilters(event, now);
+    const isVisible = eventMatchesTimeFilters(event, now) && eventMatchesAccountFilters(event);
     const marker = eventMapMarkers.get(item.dataset.eventId);
 
     item.hidden = !isVisible;
@@ -162,6 +231,7 @@ function applyTimeFilters() {
 function initializeTimeFilters() {
   startsAfterFilter.value = toDatetimeLocalValue(new Date());
   updateRangeFilterFields();
+  updateAccountFilterFields();
 
   [
     rangeFilterEnabled,
@@ -171,11 +241,20 @@ function initializeTimeFilters() {
     todayFilter,
     tomorrowFilter,
     endedFilter,
+    showGuestsFilter,
+    accountIdsFilterEnabled,
   ].forEach((input) => {
     input.addEventListener('change', () => {
       updateRangeFilterFields();
+      updateAccountFilterFields();
       applyTimeFilters();
+      saveFilterPreferences();
     });
+  });
+
+  accountIdsFilter.addEventListener('input', applyTimeFilters);
+  [datetimeFilterSection, accountFilterSection].forEach((section) => {
+    section.addEventListener('toggle', saveFilterPreferences);
   });
 
   applyTimeFilters();
@@ -287,6 +366,8 @@ function setCreateMode(enabled) {
   createForm.hidden = !enabled;
   eventPanel.classList.toggle('is-creating', enabled);
   eventPanelTitle.textContent = enabled ? 'Event投稿' : 'Event一覧';
+  createForm.action = createForm.dataset.createAction;
+  eventSubmitButton.textContent = '投稿する';
   map.getContainer().classList.toggle('is-creating-event', enabled);
 
   if (enabled) {
@@ -304,6 +385,38 @@ function setCreateMode(enabled) {
     clearFormErrors();
     eventLocationStatus.textContent = '地図上の地点を選択してください。';
   }
+}
+
+function setEditMode(event) {
+  if (!event) {
+    window.alert('Event情報を読み込めませんでした。画面を更新してから、もう一度お試しください。');
+    return;
+  }
+
+  isCreatingEvent = true;
+  createTrigger.hidden = true;
+  createCancel.hidden = false;
+  createForm.hidden = false;
+  eventPanel.classList.add('is-creating');
+  eventPanelTitle.textContent = 'Event編集';
+  map.getContainer().classList.add('is-creating-event');
+  map.dragPan.disable();
+  createForm.action = `/events/${event.id}/edit/`;
+  eventSubmitButton.textContent = '更新する';
+  eventTitleInput.value = event.title;
+  eventDescriptionInput.value = event.description;
+  eventCapacityInput.value = event.capacity;
+  eventStartsAtInput.value = toDatetimeLocalValue(eventStartsAt(event));
+  eventEndsAtInput.value = event.ends_at ? toDatetimeLocalValue(eventEndsAt(event)) : '';
+  eventLatitude.value = Number(event.latitude).toFixed(6);
+  eventLongitude.value = Number(event.longitude).toFixed(6);
+  eventLocationStatus.textContent = '現在の地点を読み込みました。Mapをクリックすると変更できます。';
+  clearFormErrors();
+
+  if (draftMarker) draftMarker.remove();
+  draftMarker = new geolonia.Marker({ color: '#d05b32' })
+    .setLngLat([event.longitude, event.latitude])
+    .addTo(map);
 }
 
 function clearFormErrors() {
@@ -394,6 +507,35 @@ document.querySelectorAll('.event-summary').forEach((summary) => {
 createTrigger.addEventListener('click', () => setCreateMode(true));
 createCancel.addEventListener('click', () => setCreateMode(false));
 currentLocationTrigger.addEventListener('click', () => centerOnCurrentLocation(true));
+
+document.querySelectorAll('[data-event-edit]').forEach((button) => {
+  button.addEventListener('click', () => setEditMode(eventsById.get(button.dataset.eventEdit)));
+});
+
+document.querySelectorAll('.event-delete-form').forEach((form) => {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!window.confirm('このEventを削除しますか？')) return;
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        saveMapView();
+        window.location.assign(data.redirect_url);
+        return;
+      }
+      window.alert(data.error || 'Eventを削除できませんでした。');
+    } catch (error) {
+      window.alert('Eventを削除できませんでした。時間をおいて再度お試しください。');
+    }
+  });
+});
 
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();

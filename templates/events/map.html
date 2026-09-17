@@ -36,29 +36,60 @@
       <p id="location-search-status" class="location-search-status" aria-live="polite"></p>
       <ul id="location-search-results" class="location-search-results"></ul>
       </div>
-      <details class="map-filter">
+      <details
+        class="map-filter"
+        data-preferences-url="{% url 'events:filter-preferences' %}"
+        data-is-authenticated="{{ user.is_authenticated|yesno:'true,false' }}"
+      >
       <summary>絞り込み</summary>
       <div class="map-filter-content">
-        <label class="filter-toggle">
-          <input id="filter-range-enabled" type="checkbox" checked>
-          期間を指定
-        </label>
-        <div class="filter-range-fields">
-          <label for="filter-starts-after">開始日時</label>
-          <input id="filter-starts-after" type="datetime-local">
-          <label for="filter-ends-before">終了日時</label>
-          <input id="filter-ends-before" type="datetime-local">
+        <details id="filter-datetime-section" class="filter-section" {% if filter_preferences.datetime_section_open %}open{% endif %}>
+          <summary>日時</summary>
+          <div class="filter-section-content">
+            <label class="filter-toggle">
+              <input id="filter-range-enabled" type="checkbox" {% if filter_preferences.range_filter_enabled %}checked{% endif %}>
+              期間を指定
+            </label>
+            <div class="filter-range-fields">
+              <label for="filter-starts-after">開始日時</label>
+              <input id="filter-starts-after" type="datetime-local">
+              <label for="filter-ends-before">終了日時</label>
+              <input id="filter-ends-before" type="datetime-local">
+            </div>
+            <div class="filter-statuses">
+              <label><input id="filter-today" type="checkbox" {% if filter_preferences.show_today %}checked{% endif %}> 今日</label>
+              <label><input id="filter-tomorrow" type="checkbox" {% if filter_preferences.show_tomorrow %}checked{% endif %}> 明日</label>
+              <label><input id="filter-ongoing" type="checkbox" {% if filter_preferences.show_ongoing %}checked{% endif %}> 真っ最中</label>
+              <label><input id="filter-ended" type="checkbox" {% if filter_preferences.show_ended %}checked{% endif %}> 終了済み</label>
+            </div>
+          </div>
+        </details>
+        <details id="filter-account-section" class="filter-section" {% if filter_preferences.account_section_open %}open{% endif %}>
+          <summary>アカウント</summary>
+          <div class="filter-section-content">
+            <label class="filter-toggle">
+              <input id="filter-show-guests" type="checkbox" {% if filter_preferences.show_guest_events %}checked{% endif %}>
+              ゲストの投稿を表示
+            </label>
+            <label class="filter-toggle">
+              <input id="filter-account-ids-enabled" type="checkbox" {% if filter_preferences.account_ids_enabled %}checked{% endif %}>
+              投稿者を指定
+            </label>
+            <label class="sr-only" for="filter-account-ids">Niixy ID</label>
+            <input
+              id="filter-account-ids"
+              class="filter-account-ids"
+              type="text"
+              value="{{ default_account_filter_id }}"
+              placeholder="Niixy ID"
+              autocomplete="off"
+            >
+          </div>
+        </details>
         </div>
-        <div class="filter-statuses">
-          <label><input id="filter-today" type="checkbox"> 今日</label>
-          <label><input id="filter-tomorrow" type="checkbox"> 明日</label>
-          <label><input id="filter-ongoing" type="checkbox"> 真っ最中</label>
-          <label><input id="filter-ended" type="checkbox"> 終了済み</label>
-        </div>
-      </div>
       </details>
     </div>
-    <form id="event-create-form" class="map-event-form" method="post" action="{% url 'events:create' %}" novalidate hidden>
+    <form id="event-create-form" class="map-event-form" method="post" action="{% url 'events:create' %}" data-create-action="{% url 'events:create' %}" novalidate hidden>
       {% csrf_token %}
       <input type="hidden" name="submission_id" value="{{ event_submission_id }}">
       <input id="event-latitude" type="hidden" name="latitude">
@@ -107,9 +138,18 @@
             <span class="event-toggle" aria-hidden="true"></span>
           </button>
           <div id="event-body-{{ event.pk }}" class="event-body" hidden>
-            <p class="event-meta">投稿者：ゲスト</p>
+            <p class="event-meta">投稿者：{% if event.creator %}{{ event.creator.username }}{% else %}ゲスト{% endif %}</p>
             <p class="event-meta">募集人数：0/{{ event.capacity }}</p>
             <p class="event-description">詳細：{{ event.description|default:'未設定' }}</p>
+            {% if user.is_authenticated and event.creator_id == user.id %}
+              <div class="event-owner-actions">
+                <button class="event-edit-button" type="button" data-event-edit="{{ event.pk }}">編集</button>
+                <form class="event-delete-form" method="post" action="{% url 'events:delete' event.pk %}">
+                  {% csrf_token %}
+                  <button class="event-delete-button" type="submit">削除</button>
+                </form>
+              </div>
+            {% endif %}
           </div>
         </article>
       {% empty %}
