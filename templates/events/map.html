@@ -96,7 +96,7 @@
         <button id="event-create-cancel" class="event-cancel-button" type="button" hidden>キャンセル</button>
       </div>
     </div>
-    <div class="event-list">
+    <div class="event-list is-loading" aria-busy="true">
       {% for event in events %}
         <article class="event-item" data-event-id="{{ event.pk }}">
           <button class="event-summary" type="button" aria-controls="event-body-{{ event.pk }}" aria-expanded="false">
@@ -116,6 +116,7 @@
         <p class="empty">まだEventはありません。</p>
       {% endfor %}
       <p id="filtered-events-empty" class="empty" hidden>条件に一致するEventはありません。</p>
+      <p id="event-list-loading" class="empty">Eventを読み込んでいます…</p>
     </div>
   </aside>
 </section>

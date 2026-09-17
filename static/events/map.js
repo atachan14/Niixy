@@ -155,6 +155,8 @@ function applyTimeFilters() {
 
   filteredEventsEmpty.hidden = eventItems.length === 0 || visibleCount !== 0;
   sortEventListByDistance();
+  eventList.classList.remove('is-loading');
+  eventList.setAttribute('aria-busy', 'false');
 }
 
 function initializeTimeFilters() {
@@ -342,6 +344,22 @@ function setEventOpen(item, isOpen) {
   item.classList.toggle('is-open', isOpen);
 }
 
+function highlightEventMarker(eventId) {
+  eventMapMarkers.forEach((marker, markerEventId) => {
+    marker.getElement().classList.toggle('is-highlighted', markerEventId === String(eventId));
+  });
+}
+
+function showEventMarkerOnMap(eventId) {
+  const event = eventsById.get(String(eventId));
+  const coordinates = [event.longitude, event.latitude];
+  if (map.getBounds().contains(coordinates)) return;
+
+  const bounds = map.getBounds();
+  bounds.extend(coordinates);
+  map.fitBounds(bounds, { padding: 48, duration: 700, essential: true });
+}
+
 document.querySelectorAll('.event-body').forEach((body) => {
   body.hidden = false;
   body.setAttribute('aria-hidden', 'true');
@@ -352,6 +370,8 @@ function openEventItem(eventId, shouldScroll) {
   const selectedItem = items.find((item) => item.dataset.eventId === String(eventId));
   if (!selectedItem) return;
   items.forEach((item) => setEventOpen(item, item === selectedItem));
+  highlightEventMarker(eventId);
+  showEventMarkerOnMap(eventId);
   if (shouldScroll) {
     const block = window.matchMedia('(max-width: 780px)').matches ? 'nearest' : 'start';
     selectedItem.scrollIntoView({ behavior: 'smooth', block });
@@ -362,8 +382,12 @@ document.querySelectorAll('.event-summary').forEach((summary) => {
   summary.addEventListener('click', () => {
     const item = summary.closest('[data-event-id]');
     const isOpen = summary.getAttribute('aria-expanded') === 'true';
-    document.querySelectorAll('[data-event-id]').forEach((eventItem) => setEventOpen(eventItem, false));
-    if (!isOpen) setEventOpen(item, true);
+    if (isOpen) {
+      document.querySelectorAll('[data-event-id]').forEach((eventItem) => setEventOpen(eventItem, false));
+      highlightEventMarker();
+      return;
+    }
+    openEventItem(item.dataset.eventId, false);
   });
 });
 
@@ -521,6 +545,7 @@ map.on('load', () => {
     const marker = new geolonia.Marker({ color: '#0f766e' })
       .setLngLat(coordinates)
       .addTo(map);
+    marker.getElement().classList.add('event-map-marker');
     marker.getElement().addEventListener('click', () => openEventItem(event.id, true));
     eventMapMarkers.set(String(event.id), marker);
   });
