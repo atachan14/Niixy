@@ -1,705 +1,220 @@
-const markersElement = document.getElementById('event-markers');
-const markers = markersElement ? JSON.parse(markersElement.textContent) : [];
-const eventsById = new Map(markers.map((event) => [String(event.id), event]));
-const searchForm = document.getElementById('location-search-form');
-const searchInput = document.getElementById('location-search-input');
-const searchStatus = document.getElementById('location-search-status');
-const searchResults = document.getElementById('location-search-results');
-const currentLocationTrigger = document.getElementById('current-location-trigger');
-const createTrigger = document.getElementById('event-create-trigger');
-const createCancel = document.getElementById('event-create-cancel');
-const createForm = document.getElementById('event-create-form');
-const eventSubmitButton = document.getElementById('event-submit-button');
-const eventPanel = document.getElementById('event-panel');
-const eventPanelTitle = document.getElementById('event-panel-title');
-const eventLatitude = document.getElementById('event-latitude');
-const eventLongitude = document.getElementById('event-longitude');
-const eventTitleInput = document.getElementById('event-title');
-const eventDescriptionInput = document.getElementById('event-description');
-const eventCapacityInput = document.getElementById('event-capacity');
-const eventStartsAtInput = document.getElementById('event-starts-at');
-const eventEndsAtInput = document.getElementById('event-ends-at');
-const eventLocationStatus = document.getElementById('event-location-status');
-const eventFormError = document.getElementById('event-form-error');
-const eventList = document.querySelector('.event-list');
-const filteredEventsEmpty = document.getElementById('filtered-events-empty');
-const rangeFilterEnabled = document.getElementById('filter-range-enabled');
-const startsAfterFilter = document.getElementById('filter-starts-after');
-const endsBeforeFilter = document.getElementById('filter-ends-before');
-const ongoingFilter = document.getElementById('filter-ongoing');
-const todayFilter = document.getElementById('filter-today');
-const tomorrowFilter = document.getElementById('filter-tomorrow');
-const endedFilter = document.getElementById('filter-ended');
-const showGuestsFilter = document.getElementById('filter-show-guests');
-const accountIdsFilterEnabled = document.getElementById('filter-account-ids-enabled');
-const accountIdsFilter = document.getElementById('filter-account-ids');
-const mapFilter = document.querySelector('.map-filter');
-const datetimeFilterSection = document.getElementById('filter-datetime-section');
-const accountFilterSection = document.getElementById('filter-account-section');
-let searchMarker;
-let draftMarker;
-let userLocationMarker;
-let isCreatingEvent = false;
-let isMapLoaded = false;
-let pendingUserLocation;
-let isSubmittingEvent = false;
-let filterPreferencesSaveTimeout;
-const eventMapMarkers = new Map();
-const mapViewStorageKey = 'niimap:map-view';
-
-eventPanel.append(createForm);
-
-function escapeHtml(value) {
-  const element = document.createElement('span');
-  element.textContent = value;
-  return element.innerHTML;
-}
-
+const markers = JSON.parse(document.getElementById('thread-markers').textContent);
+const workspace = document.querySelector('.thread-workspace');
+const list = document.getElementById('thread-list');
+const createForm = document.getElementById('thread-create-form');
+const createTrigger = document.getElementById('thread-create-trigger');
+const createCancel = document.getElementById('thread-create-cancel');
+const ruleDialog = document.getElementById('thread-rule-dialog');
 const map = new geolonia.Map('#map');
+const markerById = new Map();
+const openThreadStorageKey = 'niimap:open-thread';
+let draftMarker;
+let creating = false;
+let activeRuleCapability;
 
-function saveMapView() {
+const restoredThreadId = sessionStorage.getItem(openThreadStorageKey);
+const restoredThreadPane = restoredThreadId && document.querySelector(`[data-thread-detail-pane="${restoredThreadId}"]`);
+const detailTitle = document.getElementById('thread-detail-title');
+if (restoredThreadPane) {
+  workspace.classList.add('is-detail-open');
+  workspace.classList.add('is-restoring-detail');
+  restoredThreadPane.hidden = false;
+  detailTitle.textContent = `${restoredThreadPane.dataset.threadTitle} (${restoredThreadPane.dataset.threadPostCount})`;
+} else {
+  sessionStorage.removeItem(openThreadStorageKey);
+}
+document.documentElement.classList.remove('has-restored-thread-detail');
+if (restoredThreadPane) {
+  requestAnimationFrame(() => requestAnimationFrame(() => workspace.classList.remove('is-restoring-detail')));
+}
+
+document.getElementById('niimap-home-link')?.addEventListener('click', () => {
+  sessionStorage.removeItem(openThreadStorageKey);
+});
+
+function csrf(form) { return new FormData(form); }
+function addRule(capability, audience) {
+  const list = document.querySelector(`.thread-rule[data-capability="${capability}"] .thread-rule-list`);
+  if (list.querySelector(`[data-audience="${audience}"]`)) return;
+  const item = document.createElement('span');
+  item.className = 'thread-rule-item';
+  item.dataset.audience = audience;
+  item.textContent = audience === 'guest' ? 'Guest' : 'NiixyAccount';
+  const remove = document.createElement('button');
+  remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', `${item.textContent}を削除`);
+  remove.addEventListener('click', () => item.remove());
+  item.append(remove); list.append(item);
+}
+document.querySelectorAll('.thread-rule').forEach((rule) => {
+  const capability = rule.dataset.capability;
+  addRule(capability, 'guest'); addRule(capability, 'account');
+  rule.querySelector('.thread-rule-add').addEventListener('click', () => { activeRuleCapability = capability; ruleDialog.showModal(); });
+});
+ruleDialog.querySelectorAll('[data-audience]').forEach((button) => button.addEventListener('click', () => {
+  addRule(activeRuleCapability, button.dataset.audience); ruleDialog.close();
+}));
+function createFormData() {
+  const data = csrf(createForm);
+  document.querySelectorAll('.thread-rule').forEach((rule) => {
+    rule.querySelectorAll('.thread-rule-item').forEach((item) => data.append(`${rule.dataset.capability}_${item.dataset.audience}`, 'true'));
+  });
+  return data;
+}
+function accountIds() { return new Set(document.getElementById('filter-account-ids').value.toLowerCase().split(/[\s,]+/).filter(Boolean)); }
+function applyFilters() {
+  const guests = document.getElementById('filter-show-guests').checked;
+  const enabled = document.getElementById('filter-account-ids-enabled').checked;
+  const ids = accountIds();
+  list.querySelectorAll('.thread-item').forEach((item) => {
+    const creator = item.dataset.creatorId.toLowerCase();
+    const visible = enabled ? Boolean(creator) && ids.has(creator) : Boolean(creator) || guests;
+    item.hidden = !visible;
+    const marker = markerById.get(item.dataset.threadId);
+    if (marker) marker.getElement().hidden = !visible;
+  });
+  sortByDistance();
+}
+function sortByDistance() {
   const center = map.getCenter();
-  const view = {
-    latitude: center.lat,
-    longitude: center.lng,
-    zoom: map.getZoom(),
-  };
-
-  sessionStorage.setItem(mapViewStorageKey, JSON.stringify(view));
+  const distance = (thread) => (thread.latitude - center.lat) ** 2 + (thread.longitude - center.lng) ** 2;
+  Array.from(list.querySelectorAll('.thread-item')).sort((first, second) => {
+    const firstThread = markers.find((thread) => String(thread.id) === first.dataset.threadId);
+    const secondThread = markers.find((thread) => String(thread.id) === second.dataset.threadId);
+    return distance(firstThread) - distance(secondThread);
+  }).forEach((item) => list.append(item));
 }
-
-function restoreMapView() {
-  const storedView = sessionStorage.getItem(mapViewStorageKey);
-  sessionStorage.removeItem(mapViewStorageKey);
-  if (!storedView) return false;
-
-  try {
-    const view = JSON.parse(storedView);
-    if (![view.latitude, view.longitude, view.zoom].every(Number.isFinite)) {
-      return false;
-    }
-    map.jumpTo({ center: [view.longitude, view.latitude], zoom: view.zoom });
-    return true;
-  } catch {
-    return false;
-  }
+function savePreferences() {
+  if (workspace.dataset.authenticated !== 'true') return;
+  const data = new FormData();
+  data.append('show_guest_threads', document.getElementById('filter-show-guests').checked);
+  data.append('account_ids_enabled', document.getElementById('filter-account-ids-enabled').checked);
+  data.append('account_section_open', document.getElementById('filter-account-section').open);
+  fetch(workspace.dataset.preferencesUrl, {method: 'POST', body: data, credentials: 'same-origin'});
 }
-
-function hasStoredMapView() {
-  return sessionStorage.getItem(mapViewStorageKey) !== null;
-}
-
-function toDatetimeLocalValue(date) {
-  const timezoneOffset = date.getTimezoneOffset() * 60 * 1000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
-}
-
-function eventStartsAt(event) {
-  return new Date(event.starts_at);
-}
-
-function eventEndsAt(event) {
-  return event.ends_at ? new Date(event.ends_at) : eventStartsAt(event);
-}
-
-function eventOverlapsDay(event, dayOffset, now) {
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  return eventStartsAt(event) < dayEnd && eventEndsAt(event) >= dayStart;
-}
-
-function eventMatchesTimeFilters(event, now) {
-  const matches = [];
-  const startsAt = eventStartsAt(event);
-  const endsAt = eventEndsAt(event);
-
-  if (rangeFilterEnabled.checked) {
-    const startsAfter = startsAfterFilter.value ? new Date(startsAfterFilter.value) : null;
-    const endsBefore = endsBeforeFilter.value ? new Date(endsBeforeFilter.value) : null;
-    if (startsAfter || endsBefore) {
-      matches.push(
-        (!startsAfter || startsAt >= startsAfter) && (!endsBefore || endsAt <= endsBefore),
-      );
-    }
-  }
-
-  if (ongoingFilter.checked) {
-    matches.push(startsAt <= now && endsAt >= now);
-  }
-  if (todayFilter.checked) {
-    matches.push(eventOverlapsDay(event, 0, now));
-  }
-  if (tomorrowFilter.checked) {
-    matches.push(eventOverlapsDay(event, 1, now));
-  }
-  if (endedFilter.checked) {
-    matches.push(endsAt < now);
-  }
-
-  return matches.some(Boolean);
-}
-
-function selectedAccountIds() {
-  return new Set(
-    accountIdsFilter.value
-      .toLowerCase()
-      .split(/[\s,]+/)
-      .filter(Boolean),
-  );
-}
-
-function eventMatchesAccountFilters(event) {
-  if (accountIdsFilterEnabled.checked) {
-    return Boolean(event.creator_id) && selectedAccountIds().has(event.creator_id.toLowerCase());
-  }
-  if (!event.creator_id) {
-    return showGuestsFilter.checked;
-  }
-  return true;
-}
-
-function updateRangeFilterFields() {
-  const disabled = !rangeFilterEnabled.checked;
-  startsAfterFilter.disabled = disabled;
-  endsBeforeFilter.disabled = disabled;
-}
-
-function updateAccountFilterFields() {
-  const accountIdsEnabled = accountIdsFilterEnabled.checked;
-  accountIdsFilter.disabled = !accountIdsEnabled;
-  showGuestsFilter.disabled = accountIdsEnabled;
-}
-
-function saveFilterPreferences() {
-  if (mapFilter.dataset.isAuthenticated !== 'true') return;
-
-  clearTimeout(filterPreferencesSaveTimeout);
-  filterPreferencesSaveTimeout = setTimeout(async () => {
-    const data = new FormData();
-    const fields = {
-      range_filter_enabled: rangeFilterEnabled,
-      show_ongoing: ongoingFilter,
-      show_today: todayFilter,
-      show_tomorrow: tomorrowFilter,
-      show_ended: endedFilter,
-      show_guest_events: showGuestsFilter,
-      account_ids_enabled: accountIdsFilterEnabled,
-      datetime_section_open: datetimeFilterSection,
-      account_section_open: accountFilterSection,
-    };
-    Object.entries(fields).forEach(([name, input]) => data.append(name, input.open ?? input.checked));
-
-    try {
-      await fetch(mapFilter.dataset.preferencesUrl, {
-        method: 'POST',
-        body: data,
-        credentials: 'same-origin',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      });
-    } catch (error) {
-      // Filtering remains usable even when saving a future default fails.
-    }
-  }, 250);
-}
-
-function applyTimeFilters() {
-  const now = new Date();
-  let visibleCount = 0;
-  const eventItems = eventList.querySelectorAll('[data-event-id]');
-
-  eventItems.forEach((item) => {
-    const event = eventsById.get(item.dataset.eventId);
-    const isVisible = eventMatchesTimeFilters(event, now) && eventMatchesAccountFilters(event);
-    const marker = eventMapMarkers.get(item.dataset.eventId);
-
-    item.hidden = !isVisible;
-    if (marker) {
-      marker.getElement().hidden = !isVisible;
-    }
-    if (isVisible) {
-      visibleCount += 1;
-    }
+function selectThread(id, scroll = false) {
+  list.querySelectorAll('.thread-item').forEach((item) => {
+    const selected = item.dataset.threadId === String(id);
+    item.classList.toggle('is-open', selected);
+    setThreadPreview(item.querySelector('.thread-preview'), selected);
   });
-
-  filteredEventsEmpty.hidden = eventItems.length === 0 || visibleCount !== 0;
-  sortEventListByDistance();
-  eventList.classList.remove('is-loading');
-  eventList.setAttribute('aria-busy', 'false');
+  markerById.forEach((marker, markerId) => marker.getElement().classList.toggle('is-highlighted', markerId === String(id)));
+  showThreadMarker(id);
+  const item = list.querySelector(`[data-thread-id="${id}"]`);
+  if (scroll && item) item.scrollIntoView({block: 'nearest'});
 }
-
-function initializeTimeFilters() {
-  startsAfterFilter.value = toDatetimeLocalValue(new Date());
-  updateRangeFilterFields();
-  updateAccountFilterFields();
-
-  [
-    rangeFilterEnabled,
-    startsAfterFilter,
-    endsBeforeFilter,
-    ongoingFilter,
-    todayFilter,
-    tomorrowFilter,
-    endedFilter,
-    showGuestsFilter,
-    accountIdsFilterEnabled,
-  ].forEach((input) => {
-    input.addEventListener('change', () => {
-      updateRangeFilterFields();
-      updateAccountFilterFields();
-      applyTimeFilters();
-      saveFilterPreferences();
-    });
-  });
-
-  accountIdsFilter.addEventListener('input', applyTimeFilters);
-  [datetimeFilterSection, accountFilterSection].forEach((section) => {
-    section.addEventListener('toggle', saveFilterPreferences);
-  });
-
-  applyTimeFilters();
-  window.setInterval(applyTimeFilters, 60000);
-}
-
-function distanceFromMapCenter(event) {
-  const center = map.getCenter();
-  const toRadians = (value) => (value * Math.PI) / 180;
-  const latitudeDelta = toRadians(event.latitude - center.lat);
-  const longitudeDelta = toRadians(event.longitude - center.lng);
-  const latitude = toRadians(center.lat);
-  const eventLatitude = toRadians(event.latitude);
-  const haversine =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(latitude) * Math.cos(eventLatitude) * Math.sin(longitudeDelta / 2) ** 2;
-
-  return 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-}
-
-function sortEventListByDistance() {
-  const items = Array.from(eventList.querySelectorAll('[data-event-id]'));
-
-  items
-    .sort((first, second) => {
-      const firstEvent = eventsById.get(first.dataset.eventId);
-      const secondEvent = eventsById.get(second.dataset.eventId);
-      return distanceFromMapCenter(firstEvent) - distanceFromMapCenter(secondEvent);
-    })
-    .forEach((item) => eventList.append(item));
-}
-
-function setCurrentLocation(coordinates) {
-  const markerElement = document.createElement('div');
-  markerElement.className = 'user-location-marker';
-  markerElement.setAttribute('aria-label', '現在地');
-
-  if (userLocationMarker) {
-    userLocationMarker.remove();
-  }
-
-  userLocationMarker = new geolonia.Marker({ element: markerElement })
-    .setLngLat(coordinates)
-    .addTo(map);
-  map.jumpTo({ center: coordinates, zoom: 13 });
-}
-
-function showCurrentLocation(position) {
-  pendingUserLocation = [position.coords.longitude, position.coords.latitude];
-  if (isMapLoaded) {
-    setCurrentLocation(pendingUserLocation);
-  }
-}
-
-function currentLocationErrorMessage(error) {
-  if (error.code === 1) {
-    return '現在地の利用が許可されていません。ブラウザのサイト設定から位置情報を許可してください。';
-  }
-  if (error.code === 3) {
-    return '現在地を取得できませんでした。端末またはブラウザの位置情報設定を確認して、もう一度お試しください。';
-  }
-  return '現在地を取得できませんでした。端末またはブラウザの位置情報設定を確認して、もう一度お試しください。';
-}
-
-function centerOnCurrentLocation(showStatus = false) {
-  if (!navigator.geolocation) {
-    if (showStatus) {
-      searchStatus.textContent = 'このブラウザは現在地の取得に対応していません。';
-    }
+function setThreadPreview(preview, isOpen) {
+  if (isOpen) {
+    preview.hidden = false;
+    requestAnimationFrame(() => preview.classList.add('is-open'));
     return;
   }
 
-  if (showStatus) {
-    currentLocationTrigger.disabled = true;
-    searchStatus.textContent = '現在地を取得中…';
-    clearSearchResults();
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      showCurrentLocation(position);
-      if (showStatus) {
-        currentLocationTrigger.disabled = false;
-        searchStatus.textContent = '現在地を表示しました。';
-      }
-    },
-    (error) => {
-      if (showStatus) {
-        currentLocationTrigger.disabled = false;
-        searchStatus.textContent = currentLocationErrorMessage(error);
-      }
-    },
-    {
-      enableHighAccuracy: false,
-      maximumAge: 300000,
-      timeout: 15000,
-    },
-  );
+  preview.classList.remove('is-open');
+  preview.addEventListener('transitionend', () => {
+    if (!preview.classList.contains('is-open')) preview.hidden = true;
+  }, {once: true});
 }
+function showThreadMarker(id) {
+  const thread = markers.find((item) => String(item.id) === String(id));
+  if (!thread) return;
 
-if (!hasStoredMapView()) {
-  centerOnCurrentLocation();
-}
-
-function setCreateMode(enabled) {
-  isCreatingEvent = enabled;
-  createTrigger.hidden = enabled;
-  createCancel.hidden = !enabled;
-  createForm.hidden = !enabled;
-  eventPanel.classList.toggle('is-creating', enabled);
-  eventPanelTitle.textContent = enabled ? 'Event投稿' : 'Event一覧';
-  createForm.action = createForm.dataset.createAction;
-  eventSubmitButton.textContent = '投稿する';
-  map.getContainer().classList.toggle('is-creating-event', enabled);
-
-  if (enabled) {
-    map.dragPan.disable();
-  } else {
-    map.dragPan.enable();
-  }
-
-  if (!enabled) {
-    if (draftMarker) {
-      draftMarker.remove();
-      draftMarker = undefined;
-    }
-    createForm.reset();
-    clearFormErrors();
-    eventLocationStatus.textContent = '地図上の地点を選択してください。';
-  }
-}
-
-function setEditMode(event) {
-  if (!event) {
-    window.alert('Event情報を読み込めませんでした。画面を更新してから、もう一度お試しください。');
-    return;
-  }
-
-  isCreatingEvent = true;
-  createTrigger.hidden = true;
-  createCancel.hidden = false;
-  createForm.hidden = false;
-  eventPanel.classList.add('is-creating');
-  eventPanelTitle.textContent = 'Event編集';
-  map.getContainer().classList.add('is-creating-event');
-  map.dragPan.disable();
-  createForm.action = `/events/${event.id}/edit/`;
-  eventSubmitButton.textContent = '更新する';
-  eventTitleInput.value = event.title;
-  eventDescriptionInput.value = event.description;
-  eventCapacityInput.value = event.capacity;
-  eventStartsAtInput.value = toDatetimeLocalValue(eventStartsAt(event));
-  eventEndsAtInput.value = event.ends_at ? toDatetimeLocalValue(eventEndsAt(event)) : '';
-  eventLatitude.value = Number(event.latitude).toFixed(6);
-  eventLongitude.value = Number(event.longitude).toFixed(6);
-  eventLocationStatus.textContent = '現在の地点を読み込みました。Mapをクリックすると変更できます。';
-  clearFormErrors();
-
-  if (draftMarker) draftMarker.remove();
-  draftMarker = new geolonia.Marker({ color: '#d05b32' })
-    .setLngLat([event.longitude, event.latitude])
-    .addTo(map);
-}
-
-function clearFormErrors() {
-  createForm.querySelectorAll('.field-error').forEach((error) => error.remove());
-  eventFormError.hidden = true;
-  eventFormError.textContent = '';
-}
-
-function showFormErrors(errors) {
-  clearFormErrors();
-
-  Object.entries(errors).forEach(([fieldName, messages]) => {
-    const message = messages.join(' ');
-    if (fieldName === 'latitude' || fieldName === 'longitude') {
-      eventLocationStatus.textContent = '地図上で地点を選択してください。';
-      return;
-    }
-
-    const input = createForm.elements.namedItem(fieldName);
-    const field = input && input.closest('.field');
-    if (!field) {
-      eventFormError.textContent = message;
-      eventFormError.hidden = false;
-      return;
-    }
-
-    const error = document.createElement('p');
-    error.className = 'field-error';
-    error.textContent = message;
-    field.append(error);
-  });
-}
-
-function setEventOpen(item, isOpen) {
-  item.querySelector('.event-summary').setAttribute('aria-expanded', String(isOpen));
-  const body = item.querySelector('.event-body');
-  body.setAttribute('aria-hidden', String(!isOpen));
-  item.classList.toggle('is-open', isOpen);
-}
-
-function highlightEventMarker(eventId) {
-  eventMapMarkers.forEach((marker, markerEventId) => {
-    marker.getElement().classList.toggle('is-highlighted', markerEventId === String(eventId));
-  });
-}
-
-function showEventMarkerOnMap(eventId) {
-  const event = eventsById.get(String(eventId));
-  const coordinates = [event.longitude, event.latitude];
+  const coordinates = [thread.longitude, thread.latitude];
   if (map.getBounds().contains(coordinates)) return;
 
   const bounds = map.getBounds();
   bounds.extend(coordinates);
-  map.fitBounds(bounds, { padding: 48, duration: 700, essential: true });
-}
-
-document.querySelectorAll('.event-body').forEach((body) => {
-  body.hidden = false;
-  body.setAttribute('aria-hidden', 'true');
-});
-
-function openEventItem(eventId, shouldScroll) {
-  const items = Array.from(document.querySelectorAll('[data-event-id]'));
-  const selectedItem = items.find((item) => item.dataset.eventId === String(eventId));
-  if (!selectedItem) return;
-  items.forEach((item) => setEventOpen(item, item === selectedItem));
-  highlightEventMarker(eventId);
-  showEventMarkerOnMap(eventId);
-  if (shouldScroll) {
-    const block = window.matchMedia('(max-width: 780px)').matches ? 'nearest' : 'start';
-    selectedItem.scrollIntoView({ behavior: 'smooth', block });
-  }
-}
-
-document.querySelectorAll('.event-summary').forEach((summary) => {
-  summary.addEventListener('click', () => {
-    const item = summary.closest('[data-event-id]');
-    const isOpen = summary.getAttribute('aria-expanded') === 'true';
-    if (isOpen) {
-      document.querySelectorAll('[data-event-id]').forEach((eventItem) => setEventOpen(eventItem, false));
-      highlightEventMarker();
-      return;
-    }
-    openEventItem(item.dataset.eventId, false);
+  map.fitBounds(bounds, {
+    duration: 500,
+    maxZoom: map.getZoom(),
+    padding: 48,
   });
-});
-
-createTrigger.addEventListener('click', () => setCreateMode(true));
-createCancel.addEventListener('click', () => setCreateMode(false));
-currentLocationTrigger.addEventListener('click', () => centerOnCurrentLocation(true));
-
-document.querySelectorAll('[data-event-edit]').forEach((button) => {
-  button.addEventListener('click', () => setEditMode(eventsById.get(button.dataset.eventEdit)));
-});
-
-document.querySelectorAll('.event-delete-form').forEach((form) => {
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!window.confirm('このEventを削除しますか？')) return;
-
-    try {
-      const response = await fetch(form.action, {
-        method: 'POST',
-        body: new FormData(form),
-        credentials: 'same-origin',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        saveMapView();
-        window.location.assign(data.redirect_url);
-        return;
-      }
-      window.alert(data.error || 'Eventを削除できませんでした。');
-    } catch (error) {
-      window.alert('Eventを削除できませんでした。時間をおいて再度お試しください。');
-    }
+}
+function openDetail(id) {
+  workspace.classList.add('is-detail-open');
+  document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => {
+    const selected = pane.dataset.threadDetailPane === String(id);
+    pane.hidden = !selected;
+    if (selected) detailTitle.textContent = `${pane.dataset.threadTitle} (${pane.dataset.threadPostCount})`;
   });
+  sessionStorage.setItem(openThreadStorageKey, String(id));
+}
+createTrigger.addEventListener('click', () => {
+  workspace.classList.remove('is-detail-open');
+  sessionStorage.removeItem(openThreadStorageKey);
+  creating = true;
+  createForm.hidden = false;
+  list.hidden = true;
+  createTrigger.hidden = true;
 });
-
+createCancel.addEventListener('click', () => { creating = false; createForm.hidden = true; list.hidden = false; createTrigger.hidden = false; draftMarker?.remove(); draftMarker = undefined; });
+document.getElementById('close-thread-detail').addEventListener('click', () => {
+  workspace.classList.remove('is-detail-open');
+  sessionStorage.removeItem(openThreadStorageKey);
+});
+list.addEventListener('click', (event) => {
+  const summary = event.target.closest('.thread-summary');
+  if (summary) selectThread(summary.closest('.thread-item').dataset.threadId);
+  const detail = event.target.closest('[data-thread-detail]');
+  if (detail) openDetail(detail.dataset.threadDetail);
+});
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (isSubmittingEvent) return;
-
-  let wasSubmitted = false;
-  isSubmittingEvent = true;
-  eventSubmitButton.disabled = true;
-  eventSubmitButton.textContent = '投稿中…';
-  clearFormErrors();
-
+  const button = createForm.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = '投稿中...';
   try {
-    const response = await fetch(createForm.action, {
-      method: 'POST',
-      body: new FormData(createForm),
-      credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    });
+    const response = await fetch(createForm.action, {method: 'POST', body: createFormData(), headers: {'X-Requested-With': 'XMLHttpRequest'}});
     const data = await response.json();
-
-    if (response.ok) {
-      saveMapView();
-      wasSubmitted = true;
-      window.location.assign(data.redirect_url);
-      return;
-    }
-
-    showFormErrors(data.errors || {});
-  } catch (error) {
-    eventFormError.textContent = '投稿できませんでした。時間をおいて再度お試しください。';
-    eventFormError.hidden = false;
-  } finally {
-    if (wasSubmitted) return;
-    isSubmittingEvent = false;
-    eventSubmitButton.disabled = false;
-    eventSubmitButton.textContent = '投稿する';
-  }
+    if (response.ok) location.assign(data.redirect_url); else document.getElementById('thread-form-error').textContent = Object.values(data.errors || {}).flat().join(' ');
+  } finally { button.disabled = false; button.textContent = '作成する'; }
 });
-
-if (new URLSearchParams(window.location.search).get('mode') === 'create') {
-  setCreateMode(true);
-}
-
-map.on('click', (event) => {
-  if (!isCreatingEvent) {
-    return;
-  }
-
-  const coordinates = [event.lngLat.lng, event.lngLat.lat];
-  if (draftMarker) {
-    draftMarker.remove();
-  }
-
-  draftMarker = new geolonia.Marker({ color: '#d05b32' })
-    .setLngLat(coordinates)
-    .addTo(map);
-  eventLatitude.value = event.lngLat.lat.toFixed(6);
-  eventLongitude.value = event.lngLat.lng.toFixed(6);
-  eventLocationStatus.textContent = '地点を選択しました。もう一度タップすると移動できます。';
-});
-
-function clearSearchResults() {
-  searchResults.replaceChildren();
-}
-
-function selectSearchResult(place) {
-  const coordinates = [place.longitude, place.latitude];
-
-  if (searchMarker) {
-    searchMarker.remove();
-  }
-
-  const popup = new geolonia.Popup({ offset: 24 }).setHTML(
-    `<strong>${escapeHtml(place.name)}</strong><br>${escapeHtml(place.detail)}`,
+document.querySelectorAll('.thread-reply-form').forEach((form) => form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = form.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = '送信中...';
+  const data = csrf(form);
+  form.dataset.submissionId ||= crypto.randomUUID();
+  data.append('submission_id', form.dataset.submissionId);
+  try { const response = await fetch(form.action, {method: 'POST', body: data}); const result = await response.json(); if (response.ok) location.assign(result.redirect_url); } finally { button.disabled = false; button.textContent = '送信'; }
+}));
+['filter-show-guests', 'filter-account-ids-enabled'].forEach((id) => document.getElementById(id).addEventListener('change', () => { applyFilters(); savePreferences(); }));
+document.getElementById('filter-account-ids').addEventListener('input', applyFilters);
+document.getElementById('filter-account-section').addEventListener('toggle', savePreferences);
+document.getElementById('current-location-trigger').addEventListener('click', () => {
+  navigator.geolocation?.getCurrentPosition(
+    (position) => map.jumpTo({center: [position.coords.longitude, position.coords.latitude], zoom: 13}),
+    () => window.alert('現在地を取得できませんでした。端末またはブラウザの位置情報設定を確認して、もう一度お試しください。'),
+    {timeout: 10000, enableHighAccuracy: false},
   );
-
-  searchMarker = new geolonia.Marker({ color: '#d05b32' })
-    .setLngLat(coordinates)
-    .setPopup(popup)
-    .addTo(map)
-    .togglePopup();
-
-  map.easeTo({ center: coordinates, zoom: 16, duration: 700, essential: true });
-  searchStatus.textContent = `${place.name} / ${place.detail}`;
-  clearSearchResults();
-}
-
-function showSearchResults(places) {
-  clearSearchResults();
-
-  if (!places.length) {
-    searchStatus.textContent = '見つかりませんでした。';
-    return;
+});
+document.getElementById('location-search-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const query = document.getElementById('location-search-input').value.trim();
+  if (query.length < 2) return;
+  const response = await fetch(`/api/locations/?q=${encodeURIComponent(query)}`);
+  const {locations} = await response.json();
+  const results = document.getElementById('location-search-results');
+  results.replaceChildren();
+  if (!locations.length) {
+    const item = document.createElement('li'); item.textContent = '見つかりませんでした。'; results.append(item); return;
   }
-
-  searchStatus.textContent = `${places.length}件の候補`;
-
-  places.forEach((place) => {
+  locations.forEach((place) => {
     const item = document.createElement('li');
     const button = document.createElement('button');
-    const name = document.createElement('strong');
-    const detail = document.createElement('span');
-
-    button.type = 'button';
-    name.textContent = place.name;
-    detail.textContent = place.detail;
-    button.append(name, detail);
-    button.addEventListener('click', () => selectSearchResult(place));
-    item.append(button);
-    searchResults.append(item);
+    button.type = 'button'; button.textContent = `${place.name} / ${place.detail}`;
+    button.addEventListener('click', () => { map.easeTo({center: [place.longitude, place.latitude], zoom: 15, duration: 700, essential: true}); results.replaceChildren(); });
+    item.append(button); results.append(item);
   });
-}
-
-async function searchLocation(query) {
-  searchStatus.textContent = '検索中…';
-  clearSearchResults();
-  const response = await fetch(`/api/locations/?q=${encodeURIComponent(query)}`);
-
-  if (!response.ok) {
-    throw new Error('Location search failed');
-  }
-
-  const { locations } = await response.json();
-  showSearchResults(locations);
-}
-
-searchForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const query = searchInput.value.trim();
-
-  if (query.length < 2) {
-    searchStatus.textContent = '2文字以上で検索してください。';
-    return;
-  }
-
-  try {
-    await searchLocation(query);
-  } catch (error) {
-    searchStatus.textContent = '検索できませんでした。時間をおいて再度お試しください。';
-  }
 });
-
+map.on('click', (event) => {
+  if (!creating) return;
+  const coordinates = [event.lngLat.lng, event.lngLat.lat]; draftMarker?.remove(); draftMarker = new geolonia.Marker({color: '#d05b32'}).setLngLat(coordinates).addTo(map);
+  document.getElementById('thread-latitude').value = event.lngLat.lat.toFixed(6); document.getElementById('thread-longitude').value = event.lngLat.lng.toFixed(6); document.getElementById('thread-location-status').textContent = '地点を選択しました。';
+});
 map.on('load', () => {
-  isMapLoaded = true;
-  const restoredMapView = restoreMapView();
-
-  markers.forEach((event) => {
-    const coordinates = [event.longitude, event.latitude];
-    const marker = new geolonia.Marker({ color: '#0f766e' })
-      .setLngLat(coordinates)
-      .addTo(map);
-    marker.getElement().classList.add('event-map-marker');
-    marker.getElement().addEventListener('click', () => openEventItem(event.id, true));
-    eventMapMarkers.set(String(event.id), marker);
-  });
-
-  sortEventListByDistance();
-  map.on('moveend', sortEventListByDistance);
-  initializeTimeFilters();
-  if (restoredMapView) {
-    return;
-  }
-
-  if (pendingUserLocation) {
-    setCurrentLocation(pendingUserLocation);
-  }
+  markers.forEach((thread) => { const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map); marker.getElement().classList.add('event-map-marker'); marker.getElement().addEventListener('click', () => selectThread(thread.id, true)); markerById.set(String(thread.id), marker); });
+  applyFilters();
+  map.on('moveend', sortByDistance);
+  if (restoredThreadPane) selectThread(restoredThreadId);
 });

@@ -13,7 +13,7 @@
     <div class="brand" aria-label="Niixy / NiiMap">
       <a class="parent-brand" href="/">Niixy</a>
       <span aria-hidden="true">/</span>
-      <a class="service-brand" href="{% url 'events:map' %}">NiiMap</a>
+      <a id="niimap-home-link" class="service-brand" href="{% url 'events:map' %}">NiiMap</a>
     </div>
     <nav class="nav" aria-label="Account">
       {% if user.is_authenticated %}

@@ -812,3 +812,52 @@ a {
   }
 
 }
+
+/* v0.3 Thread workspace */
+.thread-workspace { height: calc(100dvh - var(--header-height) - var(--footer-height)); overflow: hidden; }
+.thread-track { --list-width: 360px; display: grid; grid-template-columns: minmax(0, calc(100vw - var(--list-width))) var(--list-width) minmax(0, calc(100vw - var(--list-width))); height: 100%; transition: transform 260ms ease; width: calc(200vw - var(--list-width)); }
+.thread-workspace.is-detail-open .thread-track { transform: translateX(calc(-100vw + var(--list-width))); }
+html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100vw + var(--list-width))); transition: none; }
+.thread-workspace.is-restoring-detail .thread-track { transition: none; }
+.thread-list-pane { background: var(--panel); overflow-y: auto; padding: 20px; }
+.thread-detail-pane { background: var(--panel); overflow-y: auto; padding: 0 20px 20px; }
+.thread-list-pane { border-left: 1px solid var(--line); }
+.thread-detail-pane { border-left: 1px solid var(--line); position: relative; }
+.thread-pane-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 40px; }
+.thread-pane-header h2, .thread-detail-header h2 { font-size: 18px; margin: 0; }
+.thread-list { margin-top: 12px; }
+.thread-item { border-bottom: 1px solid var(--line); }
+.thread-summary { background: transparent; border: 0; cursor: pointer; display: flex; justify-content: space-between; padding: 14px 0; text-align: left; width: 100%; }
+.thread-summary span { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-summary small { color: var(--muted); font-weight: 400; }
+.thread-preview { max-height: 0; opacity: 0; overflow: hidden; padding: 0; transition: max-height 240ms ease, opacity 180ms ease, padding 240ms ease; }
+.thread-preview.is-open { max-height: 1400px; opacity: 1; padding: 0 0 16px; }
+.thread-preview[hidden] { display: none; }
+.thread-preview p { line-height: 1.6; white-space: pre-wrap; }
+.thread-detail-trigger { background: #fff; border: 1px solid var(--accent); border-radius: 6px; color: var(--accent-dark); cursor: pointer; font: inherit; padding: 7px 10px; }
+.thread-detail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 60px; position: sticky; top: 0; z-index: 2; }
+.thread-detail { display: grid; gap: 16px; }
+.thread-detail[hidden] { display: none !important; }
+.thread-post { border-bottom: 1px solid var(--line); display: grid; gap: 12px; grid-template-columns: clamp(56px, 12%, 96px) minmax(0, 1fr); padding: 14px 0; }
+.thread-thumbnail { aspect-ratio: 1; background: #e7e4df; border: 1px solid var(--line); border-radius: 6px; }
+.thread-post-info { align-items: center; display: flex; gap: 8px; font-size: 14px; font-weight: 700; }
+.thread-post-info time { color: var(--muted); font-weight: 400; margin-left: auto; }
+.thread-post-body { line-height: 1.7; margin-top: 8px; white-space: pre-wrap; }
+.thread-reply-form { display: grid; gap: 10px; }
+.thread-reply-form textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; min-height: 110px; padding: 10px; resize: vertical; }
+.thread-reply-form .button { justify-self: end; }
+.thread-rules { display: grid; gap: 10px; padding: 12px 0; }
+.thread-rule { display: grid; gap: 8px; }
+.thread-rule-list { display: grid; gap: 6px; }
+.thread-rule-item { align-items: center; background: #eef6f4; border: 1px solid #b8ddd6; display: flex; justify-content: space-between; padding: 7px 8px; }
+.thread-rule-item button, .thread-rule-add, .thread-rule-candidates button { background: #fff; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; padding: 6px 8px; }
+.thread-rule-item button { border: 0; background: transparent; font-size: 18px; line-height: 1; padding: 0 2px; }
+.thread-rule-add { color: var(--accent-dark); justify-self: start; }
+.thread-rule-dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 18px; width: min(360px, calc(100vw - 32px)); }
+.thread-rule-dialog::backdrop { background: rgba(36, 33, 29, 0.42); }
+.thread-rule-dialog form { display: grid; gap: 16px; }
+.thread-rule-dialog-header { align-items: center; display: flex; justify-content: space-between; }
+.thread-rule-dialog-header h2 { font-size: 18px; margin: 0; }
+.thread-rule-candidates { display: grid; gap: 8px; }
+.thread-rule-candidates button { text-align: left; }
+@media (max-width: 780px) { .thread-workspace { height: auto; overflow: visible; } .thread-track { --list-width: 100vw; display: flex; flex-wrap: wrap; height: auto; transform: none !important; width: 200vw; } .thread-track > .map-frame { flex: 0 0 100vw; height: 56vh; min-height: 360px; } .thread-list-pane, .thread-detail-pane { flex: 0 0 100vw; min-height: 44vh; } .thread-workspace.is-detail-open .thread-list-pane { margin-left: -100vw; } }

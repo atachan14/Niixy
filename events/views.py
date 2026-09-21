@@ -1,189 +1,146 @@
 import uuid
 
-from django.contrib import messages
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.db.models import Max, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .forms import EventForm
-from .models import Event, Locality, NiiMapFilterPreference, Station
+from .forms import ThreadCreateForm, ThreadPostForm
+from .idempotency import run_once, submission_id_from
+from .models import Locality, NiiMapFilterPreference, Station, Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
+
+
+CAPABILITIES = (ThreadAccessRule.DISCOVER, ThreadAccessRule.VIEW, ThreadAccessRule.WRITE)
 
 
 def map_view(request):
-    events = Event.objects.select_related('creator')
-    filter_preferences = {
-        'range_filter_enabled': True,
-        'show_ongoing': False,
-        'show_today': False,
-        'show_tomorrow': False,
-        'show_ended': False,
-        'show_guest_events': True,
-        'account_ids_enabled': False,
-        'datetime_section_open': False,
-        'account_section_open': False,
-    }
+    threads = list(
+        Thread.objects.select_related('creator')
+        .prefetch_related(
+            'access_rules',
+            Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
+            Prefetch('posts', queryset=ThreadPost.objects.select_related('creator')),
+        )
+    )
+    threads = [thread for thread in threads if thread.allows(request.user, ThreadAccessRule.DISCOVER)]
+    for thread in threads:
+        thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
+        thread.can_write = thread.allows(request.user, ThreadAccessRule.WRITE)
+
+    preferences = {'show_guest_threads': True, 'account_ids_enabled': False, 'account_section_open': False}
     if request.user.is_authenticated:
         preference, _ = NiiMapFilterPreference.objects.get_or_create(user=request.user)
-        filter_preferences = {
-            'range_filter_enabled': preference.range_filter_enabled,
-            'show_ongoing': preference.show_ongoing,
-            'show_today': preference.show_today,
-            'show_tomorrow': preference.show_tomorrow,
-            'show_ended': preference.show_ended,
-            'show_guest_events': preference.show_guest_events,
+        preferences = {
+            'show_guest_threads': preference.show_guest_threads,
             'account_ids_enabled': preference.account_ids_enabled,
-            'datetime_section_open': preference.datetime_section_open,
             'account_section_open': preference.account_section_open,
         }
-    event_markers = [
-        {
-            'id': event.pk,
-            'starts_at': event.starts_at.isoformat(),
-            'ends_at': event.ends_at.isoformat() if event.ends_at else None,
-            'title': event.title,
-            'description': event.description,
-            'capacity': event.capacity,
-            'creator_id': event.creator.username if event.creator else None,
-            'latitude': float(event.latitude),
-            'longitude': float(event.longitude),
-        }
-        for event in events
-    ]
-    return render(
-        request,
-        'events/map.html',
-        {
-            'events': events,
-            'event_markers': event_markers,
-            'filter_preferences': filter_preferences,
-            'default_account_filter_id': request.user.username if request.user.is_authenticated else '',
-            'geolonia_api_key': settings.GEOLONIA_API_KEY,
-            'event_submission_id': uuid.uuid4(),
-        },
-    )
+
+    markers = []
+    for thread in threads:
+        for placement in thread.placements.all():
+            markers.append({
+                'id': thread.pk,
+                'title': thread.title,
+                'creator_id': thread.creator.username if thread.creator else None,
+                'latitude': float(placement.latitude),
+                'longitude': float(placement.longitude),
+            })
+
+    return render(request, 'events/map.html', {
+        'threads': threads,
+        'thread_markers': markers,
+        'filter_preferences': preferences,
+        'default_account_filter_id': request.user.username if request.user.is_authenticated else '',
+        'geolonia_api_key': settings.GEOLONIA_API_KEY,
+        'thread_submission_id': uuid.uuid4(),
+        'rule_capabilities': [
+            (ThreadAccessRule.DISCOVER, '発見制限'),
+            (ThreadAccessRule.VIEW, '閲覧制限'),
+            (ThreadAccessRule.WRITE, '書込制限'),
+        ],
+    })
 
 
 def healthcheck(request):
     return HttpResponse('ok', content_type='text/plain')
 
 
-def event_create(request):
-    if request.method != 'POST':
-        return redirect('events:map')
+def rules_from_request(request):
+    rules = []
+    for capability in CAPABILITIES:
+        for audience in (ThreadAccessRule.GUEST, ThreadAccessRule.ACCOUNT):
+            if request.POST.get(f'{capability}_{audience}') == 'true':
+                rules.append(ThreadAccessRule(capability=capability, audience=audience))
+    return rules
 
-    try:
-        submission_id = uuid.UUID(request.POST.get('submission_id', ''))
-    except (TypeError, ValueError):
-        submission_id = uuid.uuid4()
 
-    form = EventForm(request.POST)
-    if form.is_valid():
-        event = form.save(commit=False)
-        event.submission_id = submission_id
-        if request.user.is_authenticated:
-            event.creator = request.user
-        try:
-            with transaction.atomic():
-                event.save()
-        except IntegrityError:
-            Event.objects.get(submission_id=submission_id)
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'redirect_url': reverse('events:map')})
-        messages.success(request, 'Eventを投稿しました。')
-        return redirect('events:map')
+@require_POST
+def thread_create(request):
+    submission_id = submission_id_from(request.POST.get('submission_id'))
 
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse(
-            {
-                'errors': {
-                    field_name: list(errors)
-                    for field_name, errors in form.errors.items()
-                },
-            },
-            status=400,
+    form = ThreadCreateForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
+
+    def create_thread():
+        thread = Thread.objects.create(
+                submission_id=submission_id,
+                creator=request.user if request.user.is_authenticated else None,
+                title=form.cleaned_data['title'],
         )
-
-    for field_name, errors in form.errors.items():
-        label = form.fields[field_name].label if field_name in form.fields else ''
-        for error in errors:
-            messages.error(request, f'{label}：{error}' if label else error)
-
-    return redirect(f"{reverse('events:map')}?mode=create")
-
-
-def event_owner_or_error(request, event_id):
-    event = get_object_or_404(Event, pk=event_id)
-    if request.user.is_authenticated and event.creator_id == request.user.id:
-        return event, None
-    return None, JsonResponse({'error': 'このEventを管理する権限がありません。'}, status=403)
-
-
-def event_update(request, event_id):
-    if request.method != 'POST':
-        return redirect('events:map')
-
-    event, error_response = event_owner_or_error(request, event_id)
-    if error_response:
-        return error_response
-
-    form = EventForm(request.POST, instance=event)
-    if form.is_valid():
-        form.save()
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'redirect_url': reverse('events:map')})
-        messages.success(request, 'Eventを更新しました。')
-        return redirect('events:map')
-
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse(
-            {'errors': {field_name: list(errors) for field_name, errors in form.errors.items()}},
-            status=400,
+        ThreadPost.objects.create(thread=thread, number=1, creator=thread.creator, body=form.cleaned_data['body'])
+        ThreadPlacement.objects.create(
+                thread=thread,
+                latitude=form.cleaned_data['latitude'],
+                longitude=form.cleaned_data['longitude'],
         )
+        ThreadAccessRule.objects.bulk_create([
+                ThreadAccessRule(thread=thread, capability=rule.capability, audience=rule.audience)
+                for rule in rules_from_request(request)
+        ])
+        return thread
 
-    for field_name, errors in form.errors.items():
-        label = form.fields[field_name].label if field_name in form.fields else ''
-        for error in errors:
-            messages.error(request, f'{label}: {error}' if label else error)
-    return redirect('events:map')
+    thread, _ = run_once(Thread, submission_id, create_thread)
+
+    return JsonResponse({'redirect_url': reverse('events:map'), 'thread_id': thread.pk})
 
 
-def event_delete(request, event_id):
-    if request.method != 'POST':
-        return redirect('events:map')
+@require_POST
+def thread_post_create(request, thread_id):
+    thread = get_object_or_404(Thread.objects.prefetch_related('access_rules'), pk=thread_id)
+    if not thread.allows(request.user, ThreadAccessRule.VIEW):
+        return JsonResponse({'error': 'このThreadは閲覧できません。'}, status=403)
+    if not thread.allows(request.user, ThreadAccessRule.WRITE):
+        return JsonResponse({'error': 'このThreadには書き込めません。'}, status=403)
 
-    event, error_response = event_owner_or_error(request, event_id)
-    if error_response:
-        return error_response
+    form = ThreadPostForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
 
-    event.delete()
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'redirect_url': reverse('events:map')})
-    messages.success(request, 'Eventを削除しました。')
-    return redirect('events:map')
+    submission_id = submission_id_from(request.POST.get('submission_id'))
+
+    def create_post():
+        locked_thread = Thread.objects.select_for_update().get(pk=thread_id)
+        number = (locked_thread.posts.aggregate(max_number=Max('number'))['max_number'] or 0) + 1
+        post = ThreadPost.objects.create(submission_id=submission_id, thread=locked_thread, number=number, creator=request.user if request.user.is_authenticated else None, body=form.cleaned_data['body'])
+        locked_thread.save(update_fields=['last_activity_at', 'updated_at'])
+        return post
+
+    run_once(ThreadPost, submission_id, create_post)
+    return JsonResponse({'redirect_url': reverse('events:map')})
 
 
 @require_POST
 def filter_preferences_update(request):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'ログインが必要です。'}, status=401)
-
     preference, _ = NiiMapFilterPreference.objects.get_or_create(user=request.user)
-    fields = [
-        'range_filter_enabled',
-        'show_ongoing',
-        'show_today',
-        'show_tomorrow',
-        'show_ended',
-        'show_guest_events',
-        'account_ids_enabled',
-        'datetime_section_open',
-        'account_section_open',
-    ]
-    for field_name in fields:
-        setattr(preference, field_name, request.POST.get(field_name) == 'true')
+    fields = ['show_guest_threads', 'account_ids_enabled', 'account_section_open']
+    for field in fields:
+        setattr(preference, field, request.POST.get(field) == 'true')
     preference.save(update_fields=fields)
     return JsonResponse({'ok': True})
 
@@ -192,25 +149,14 @@ def location_search(request):
     query = request.GET.get('q', '').strip()
     if len(query) < 2:
         return JsonResponse({'locations': []})
-
     stations = Station.objects.filter(name__icontains=query)[:5]
     localities = Locality.objects.filter(full_name__icontains=query)[:5]
     locations = [
-        {
-            'name': station.name,
-            'detail': f'{station.line_name} / {station.operator_name}',
-            'latitude': float(station.latitude),
-            'longitude': float(station.longitude),
-        }
+        {'name': station.name, 'detail': f'{station.line_name} / {station.operator_name}', 'latitude': float(station.latitude), 'longitude': float(station.longitude)}
         for station in stations
     ]
     locations.extend(
-        {
-            'name': locality.name,
-            'detail': locality.detail,
-            'latitude': float(locality.latitude),
-            'longitude': float(locality.longitude),
-        }
+        {'name': locality.name, 'detail': locality.detail, 'latitude': float(locality.latitude), 'longitude': float(locality.longitude)}
         for locality in localities
     )
     return JsonResponse({'locations': locations})

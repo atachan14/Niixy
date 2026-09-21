@@ -1,32 +1,12 @@
 from django import forms
 
-from .models import Event
+
+class ThreadCreateForm(forms.Form):
+    title = forms.CharField(max_length=120)
+    body = forms.CharField(widget=forms.Textarea, max_length=10000)
+    latitude = forms.DecimalField(max_digits=9, decimal_places=6, min_value=-90, max_value=90)
+    longitude = forms.DecimalField(max_digits=9, decimal_places=6, min_value=-180, max_value=180)
 
 
-class EventForm(forms.ModelForm):
-    class Meta:
-        model = Event
-        fields = [
-            'title',
-            'description',
-            'capacity',
-            'starts_at',
-            'ends_at',
-            'latitude',
-            'longitude',
-        ]
-        widgets = {
-            'starts_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'ends_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'description': forms.Textarea(attrs={'rows': 5}),
-        }
-
-    def clean(self):
-        cleaned_data = super().clean()
-        starts_at = cleaned_data.get('starts_at')
-        ends_at = cleaned_data.get('ends_at')
-
-        if starts_at and ends_at and ends_at < starts_at:
-            self.add_error('ends_at', '終了日時は開始日時以降にしてください。')
-
-        return cleaned_data
+class ThreadPostForm(forms.Form):
+    body = forms.CharField(widget=forms.Textarea, max_length=10000)
