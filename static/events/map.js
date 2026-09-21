@@ -137,6 +137,7 @@ function openDetail(id) {
     if (selected) detailTitle.textContent = `${pane.dataset.threadTitle} (${pane.dataset.threadPostCount})`;
   });
   sessionStorage.setItem(openThreadStorageKey, String(id));
+  document.querySelector('.thread-detail-pane').scrollTo({top: 0});
 }
 createTrigger.addEventListener('click', () => {
   workspace.classList.remove('is-detail-open');
