@@ -73,11 +73,19 @@ docs/
 ├─ structure.md
 │
 ├─ vision/
-│  ├─ niimap.md
-│  ├─ community.md
-│  ├─ interface.md
-│  ├─ account.md
-│  └─ guest.md
+│  ├─ README.md
+│  ├─ content-model.md
+│  ├─ room-and-niimap.md
+│  ├─ access-policy.md
+│  ├─ interfaces.md
+│  ├─ account-and-history.md
+│  ├─ decisions.md
+│  └─ archive/
+│     ├─ niimap.md
+│     ├─ community.md
+│     ├─ interface.md
+│     ├─ account.md
+│     └─ guest.md
 │
 ├─ memo/
 │  └─ inbox.md
@@ -86,6 +94,9 @@ docs/
    ├─ requirements.md
    ├─ decisions.md
    └─ backlog.md
+
+└─ v0.3/
+   └─ requirements.md
 ```
 
 ---
@@ -107,6 +118,8 @@ Niixy全体のConceptと基本思想を管理する。
 Repository StructureとNaming Policyを管理する。
 
 ### vision/
+
+`README.md` is the entry point for the canonical Niixy Vision. The authoritative documents are `content-model.md`, `room-and-niimap.md`, `access-policy.md`, `interfaces.md`, `account-and-history.md`, and `decisions.md`. Older Event-centered vision files remain historical references only.
 
 将来的に実現したいConceptやServiceごとのVisionを管理する。
 

@@ -21,6 +21,8 @@ Account登録やLoginを必要とせずMapを利用でき、Eventを閲覧・投
 
 ## v0.2 - Account Core
 
+Status: Complete
+
 Niixy IDとPasswordによるAccount登録・Loginを追加し、Loginした利用者が自身のEventを管理できる状態を完成させる。
 
 主な対象:
@@ -31,6 +33,12 @@ Niixy IDとPasswordによるAccount登録・Loginを追加し、Loginした利�
 * 作成者表示
 * 自身が作成したEventの編集・削除
 * 自身が作成したEventでのNiiMap Filter
+
+---
+
+## v0.3 - Thread Foundation
+
+暫定的な Event モデルを、`docs/vision/` で定義する Thread / ThreadPost の基盤へ置き換える。NiiMap に配置する Thread、時系列の返信、Guest / NiixyAccount による最小の制限を対象にする。
 
 ---
 
