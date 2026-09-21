@@ -163,21 +163,40 @@ createForm.addEventListener('submit', async (event) => {
   const button = createForm.querySelector('button[type="submit"]');
   if (button.disabled) return;
   button.disabled = true; button.textContent = '投稿中...';
+  let created = false;
   try {
     const response = await fetch(createForm.action, {method: 'POST', body: createFormData(), headers: {'X-Requested-With': 'XMLHttpRequest'}});
     const data = await response.json();
-    if (response.ok) location.assign(data.redirect_url); else document.getElementById('thread-form-error').textContent = Object.values(data.errors || {}).flat().join(' ');
-  } finally { button.disabled = false; button.textContent = '作成する'; }
+    if (response.ok) {
+      created = true;
+      location.assign(data.redirect_url);
+      return;
+    }
+    document.getElementById('thread-form-error').textContent = Object.values(data.errors || {}).flat().join(' ');
+  } finally {
+    if (!created) { button.disabled = false; button.textContent = '作成する'; }
+  }
 });
 document.querySelectorAll('.thread-reply-form').forEach((form) => form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const button = form.querySelector('button[type="submit"]');
   if (button.disabled) return;
   button.disabled = true; button.textContent = '送信中...';
+  let sent = false;
   const data = csrf(form);
   form.dataset.submissionId ||= crypto.randomUUID();
   data.append('submission_id', form.dataset.submissionId);
-  try { const response = await fetch(form.action, {method: 'POST', body: data}); const result = await response.json(); if (response.ok) location.assign(result.redirect_url); } finally { button.disabled = false; button.textContent = '送信'; }
+  try {
+    const response = await fetch(form.action, {method: 'POST', body: data});
+    const result = await response.json();
+    if (response.ok) {
+      sent = true;
+      location.assign(result.redirect_url);
+      return;
+    }
+  } finally {
+    if (!sent) { button.disabled = false; button.textContent = '送信'; }
+  }
 }));
 ['filter-show-guests', 'filter-account-ids-enabled'].forEach((id) => document.getElementById(id).addEventListener('change', () => { applyFilters(); savePreferences(); }));
 document.getElementById('filter-account-ids').addEventListener('input', applyFilters);
