@@ -132,9 +132,12 @@ function setThreadPreview(preview, isOpen) {
   }
 
   preview.classList.remove('is-open');
-  preview.addEventListener('transitionend', () => {
+  const hideWhenClosed = (event) => {
+    if (event.target !== preview || event.propertyName !== 'grid-template-rows') return;
+    preview.removeEventListener('transitionend', hideWhenClosed);
     if (!preview.classList.contains('is-open')) preview.hidden = true;
-  }, {once: true});
+  };
+  preview.addEventListener('transitionend', hideWhenClosed);
 }
 function showThreadMarker(id) {
   const thread = markers.find((item) => String(item.id) === String(id));
