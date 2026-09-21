@@ -8,6 +8,7 @@ const ruleDialog = document.getElementById('thread-rule-dialog');
 const map = new geolonia.Map('#map');
 const markerById = new Map();
 const openThreadStorageKey = 'niimap:open-thread';
+const mapViewStorageKey = 'niimap:map-view';
 let draftMarker;
 let creating = false;
 let activeRuleCapability;
@@ -33,6 +34,27 @@ document.getElementById('niimap-home-link')?.addEventListener('click', () => {
 });
 
 function csrf(form) { return new FormData(form); }
+function saveMapView() {
+  const center = map.getCenter();
+  sessionStorage.setItem(mapViewStorageKey, JSON.stringify({
+    latitude: center.lat,
+    longitude: center.lng,
+    zoom: map.getZoom(),
+  }));
+}
+function restoreMapView() {
+  const storedView = sessionStorage.getItem(mapViewStorageKey);
+  if (!storedView) return false;
+
+  try {
+    const view = JSON.parse(storedView);
+    if (![view.latitude, view.longitude, view.zoom].every(Number.isFinite)) return false;
+    map.jumpTo({center: [view.longitude, view.latitude], zoom: view.zoom});
+    return true;
+  } catch {
+    return false;
+  }
+}
 function addRule(capability, audience) {
   const list = document.querySelector(`.thread-rule[data-capability="${capability}"] .thread-rule-list`);
   if (list.querySelector(`[data-audience="${audience}"]`)) return;
@@ -169,6 +191,7 @@ createForm.addEventListener('submit', async (event) => {
     const data = await response.json();
     if (response.ok) {
       created = true;
+      saveMapView();
       location.assign(data.redirect_url);
       return;
     }
@@ -191,6 +214,7 @@ document.querySelectorAll('.thread-reply-form').forEach((form) => form.addEventL
     const result = await response.json();
     if (response.ok) {
       sent = true;
+      saveMapView();
       location.assign(result.redirect_url);
       return;
     }
@@ -233,8 +257,12 @@ map.on('click', (event) => {
   document.getElementById('thread-latitude').value = event.lngLat.lat.toFixed(6); document.getElementById('thread-longitude').value = event.lngLat.lng.toFixed(6); document.getElementById('thread-location-status').textContent = '地点を選択しました。';
 });
 map.on('load', () => {
+  restoreMapView();
   markers.forEach((thread) => { const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map); marker.getElement().classList.add('event-map-marker'); marker.getElement().addEventListener('click', () => selectThread(thread.id, true)); markerById.set(String(thread.id), marker); });
   applyFilters();
-  map.on('moveend', sortByDistance);
+  map.on('moveend', () => {
+    sortByDistance();
+    saveMapView();
+  });
   if (restoredThreadPane) selectThread(restoredThreadId);
 });
