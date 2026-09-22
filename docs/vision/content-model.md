@@ -2,7 +2,7 @@
 
 ## Thread
 
-Thread は Niixy 上の会話の単位である。NiiMap に直接、または Room の中で作成できる。Thread は Event や Pin ではない。
+Thread は Niixy 上の会話の単位である。NiiMap に直接、または Room や Book の中で作成できる。Thread は Event や Pin ではない。
 
 Thread はタイトル、作成者、作成日時、更新日時、`last_activity_at`、必須の開始 ThreadPost（`#1`）を持つ。作成時にはタイトルと開始本文を同時に入力する。Thread Title は作成後に編集しない。
 
@@ -16,11 +16,19 @@ ThreadPost は開始投稿と返信の両方を表す。投稿は時系列順に
 
 ThreadPost の本文と ResponseInterface の実装値は、投稿後に編集しない。削除済みの返信は、投稿番号を維持したまま、当面は「削除されました」と表示する。削除済み表示のレイアウトや文言は将来の DisplayLayout と合わせて再検討する。
 
+## Book
+
+Book は Thread をテーマや用途ごとにまとめ、公開・購読できるコレクションである。日記、ブログ、料理レシピ、ゲームレビューなどは、独立した Note モデルではなく、Book に配置した Thread として表す。`#1` が記事本文、Response がコメントとして機能する。
+
+Book は作成者、タイトル、説明、公開条件、購読者、Book 内の Thread に適用する ThreadInterface と DisplayLayout を持つ。Book 内の Thread は同じ表示ルールを使う。初期方針では Book 作成者だけが Thread を追加できるものとし、共同投稿や投稿権限の拡張は後続で検討する。
+
+新規 Account には「日記」という空の Book を初期作成する。不要な場合は削除できる。Account の Book 一覧では、作成した Book と購読中の Book を区別して表示する。
+
 ## ThreadPlacement
 
-ThreadPlacement は Thread の掲載先または共有先を表す。主掲載先、Room への共有、掲載先の移動、掲載履歴を扱うため、Thread から独立したモデルにする。
+ThreadPlacement は Thread の掲載先または共有先を表す。主掲載先、Room や Book への共有、掲載先の移動、掲載履歴を扱うため、Thread から独立したモデルにする。
 
-NiiMap への配置は地図表示に必要な地点情報を持つ。Room への配置は Thread と Room を結ぶ。v0.3 は NiiMap への配置のみを実装し、Room 対応のためのモデル境界は維持する。
+NiiMap への配置は地図表示に必要な地点情報を持つ。Room や Book への配置は、それぞれのコンテナと Thread を結ぶ。v0.3 は NiiMap への配置のみを実装し、Room と Book に対応するためのモデル境界は維持する。
 
 ## 活動日時
 

@@ -79,6 +79,7 @@ docs/
 │  ├─ access-policy.md
 │  ├─ interfaces.md
 │  ├─ account-and-history.md
+│  ├─ presentation.md
 │  ├─ decisions.md
 │  └─ archive/
 │     ├─ niimap.md
@@ -90,12 +91,20 @@ docs/
 ├─ memo/
 │  └─ inbox.md
 │
-└─ v0.1/
+├─ v0.1/
    ├─ requirements.md
    ├─ decisions.md
    └─ backlog.md
 
-└─ v0.3/
+├─ v0.2/
+│  ├─ requirements.md
+│  ├─ decisions.md
+│  └─ backlog.md
+│
+├─ v0.3/
+│  └─ requirements.md
+│
+└─ v0.4/
    └─ requirements.md
 ```
 
@@ -119,7 +128,7 @@ Repository StructureとNaming Policyを管理する。
 
 ### vision/
 
-`README.md` is the entry point for the canonical Niixy Vision. The authoritative documents are `content-model.md`, `room-and-niimap.md`, `access-policy.md`, `interfaces.md`, `account-and-history.md`, and `decisions.md`. Older Event-centered vision files remain historical references only.
+`README.md` is the entry point for the canonical Niixy Vision. The authoritative documents are `content-model.md`, `room-and-niimap.md`, `access-policy.md`, `interfaces.md`, `account-and-history.md`, `presentation.md`, and `decisions.md`. Older Event-centered vision files remain historical references only.
 
 将来的に実現したいConceptやServiceごとのVisionを管理する。
 

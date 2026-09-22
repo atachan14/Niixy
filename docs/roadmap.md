@@ -38,7 +38,23 @@ Niixy IDとPasswordによるAccount登録・Loginを追加し、Loginした利�
 
 ## v0.3 - Thread Foundation
 
+Status: Complete
+
 暫定的な Event モデルを、`docs/vision/` で定義する Thread / ThreadPost の基盤へ置き換える。NiiMap に配置する Thread、時系列の返信、Guest / NiixyAccount による最小の制限を対象にする。
+
+---
+
+## v0.4 - AccountPage Foundation
+
+公開 AccountPage と、Account が作成・返信した Thread を閲覧する ThreadPane を追加する。Account の公開情報と活動履歴を載せる基盤を作り、NiiMap と共通する SummaryList / DetailPane の体験を Account 側へ広げる。
+
+主な対象:
+
+* Guest を含む AccountPage の公開閲覧
+* ThreadPost の投稿者から AccountPage への導線
+* 固定 AccountPageHeader
+* Account が作成・返信した Thread の一覧
+* Account 側の Thread 閲覧と返信
 
 ---
 

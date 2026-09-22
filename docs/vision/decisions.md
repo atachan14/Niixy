@@ -55,3 +55,33 @@ DisplayLayout は Header に限定せず、ThreadPost 全体の表示項目、�
 状態: 採用
 
 Account の Niixy ID とは別に、他者へ表示する名前は「表示名」と呼ぶ。v0.3 では表示名を実装せず、Account の投稿者表示には `@NiixyID`、Guest には `Guest` を使う。表示名を実装後は、投稿表示で `表示名 @NiixyID` の順に表示する。
+
+## 2026-09-22 - Note を独立した投稿形式にしない
+
+状態: 採用
+
+日記、ブログ、料理レシピ、ゲームレビューなどは、独立した Note モデルではなく、Thread と ThreadPost で表す。Thread の `#1` を記事本文、Response をコメントとして扱い、必要な属性は Interface で追加する。
+
+## 2026-09-22 - Book を Thread の公開コレクションにする
+
+状態: 採用
+
+Book は Thread をテーマごとにまとめ、公開・購読できるコレクションとする。Room が参加者同士の会話や活動の場であるのに対し、Book は作成者のコンテンツを整理して公開する場である。初期方針では Book 作成者だけが Thread を追加できる。Book 内の Thread は Book が定める ThreadInterface と DisplayLayout を使う。
+
+## 2026-09-22 - 共通の概要一覧を SummaryList と呼ぶ
+
+状態: 採用
+
+Thread、Room、Response、Tweet、Book などを詳細表示の前に要約して並べる共通の表示パターンを SummaryList、各要約表示を SummaryItem と呼ぶ。SummaryItem は現時点ではアコーディオンで概要を展開できるが、将来はクリック時に直接 DetailPane を開く形へ変更できる。共通化するのは表示・選択・詳細表示の体験であり、各コンテンツを同じドメインモデルへ統合することではない。
+
+## 2026-09-22 - Layout は Interface を参照して表示を定義する
+
+状態: 採用
+
+DisplayLayout を Layout の総称とし、ThreadLayout と ProfileLayout を設ける。Layout は必要な Interface と使用するフィールドを要件として宣言し、各項目の表示順、サイズ、配置を定義する。Interface はフィールド構造を、Account などによる Interface 実装は入力値を保持する。Layout がフィールド定義や入力値を持つ二重管理は行わない。
+
+## 2026-09-22 - AccountPageHeader で閲覧中の Account を固定表示する
+
+状態: 採用
+
+Account ページでは SiteHeader の直下に `表示名 @NiixyID` を表示する細い AccountPageHeader を固定する。Account 内の活動一覧や詳細Paneへ遷移しても、閲覧中の Account を継続して識別できるようにする。Account ページでは長いパンくずを使わず、SiteHeader は Niixy ロゴを中心とする。

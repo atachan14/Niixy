@@ -873,7 +873,7 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
   .thread-workspace { height: calc(100dvh - var(--header-height) - var(--footer-height)); overflow: hidden; }
   .thread-track { display: flex; height: 100%; transform: none; width: 200vw; }
   .thread-map-list-pane { display: block; flex: 0 0 100vw; height: 100%; overflow-y: auto; width: 100vw; }
-  .thread-track > .thread-map-list-pane > .map-frame { height: min(45dvh, 360px); min-height: 240px; width: 100vw; }
+  .thread-track > .thread-map-list-pane > .map-frame { height: min(62dvh, calc(100% - 120px)); min-height: 260px; width: 100vw; }
   .thread-list-pane { box-sizing: border-box; min-height: 0; min-width: 0; overflow: visible; width: 100vw; }
   .thread-detail-pane { box-sizing: border-box; flex: 0 0 100vw; min-height: 0; min-width: 0; overflow-y: auto; padding-bottom: calc(24px + env(safe-area-inset-bottom)); position: relative; transform: none; width: 100vw; z-index: auto; }
   .thread-detail-header { top: 0; }
