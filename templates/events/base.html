@@ -10,11 +10,13 @@
 </head>
 <body>
   <header class="site-header">
+    {% block site_brand %}
     <div class="brand" aria-label="Niixy / NiiMap">
       <a class="parent-brand" href="/">Niixy</a>
       <span aria-hidden="true">/</span>
       <a id="niimap-home-link" class="service-brand" href="{% url 'events:map' %}">NiiMap</a>
     </div>
+    {% endblock %}
     <nav class="nav" aria-label="Account">
       {% if user.is_authenticated %}
         <details class="account-menu">
@@ -39,13 +41,13 @@
     </div>
   {% endif %}
 
-  <main>
+  <main class="{% block main_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="site-footer">
+  {% block footer %}<footer class="site-footer">
     地名データ: <a href="https://geolonia.github.io/japanese-addresses/">Geolonia 住所データ</a> (CC BY 4.0)
-  </footer>
+  </footer>{% endblock %}
 
   {% if not user.is_authenticated %}
     {% include 'accounts/auth_modal.html' %}

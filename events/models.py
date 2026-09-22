@@ -35,6 +35,9 @@ class Thread(IdempotentSubmission):
         if user.is_authenticated and self.creator_id == user.id and capability == ThreadAccessRule.VIEW:
             return True
         audience = ThreadAccessRule.ACCOUNT if user.is_authenticated else ThreadAccessRule.GUEST
+        prefetched_rules = self._prefetched_objects_cache.get('access_rules')
+        if prefetched_rules is not None:
+            return any(rule.capability == capability and rule.audience == audience for rule in prefetched_rules)
         return self.access_rules.filter(capability=capability, audience=audience).exists()
 
 
