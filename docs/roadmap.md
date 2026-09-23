@@ -46,6 +46,8 @@ Status: Complete
 
 ## v0.4 - AccountPage Foundation
 
+Status: Complete
+
 公開 AccountPage と、Account が作成・返信した Thread を閲覧する ThreadPane を追加する。Account の公開情報と活動履歴を載せる基盤を作り、NiiMap と共通する SummaryList / DetailPane の体験を Account 側へ広げる。
 
 主な対象:
@@ -55,6 +57,18 @@ Status: Complete
 * 固定 AccountPageHeader
 * Account が作成・返信した Thread の一覧
 * Account 側の Thread 閲覧と返信
+
+---
+
+## v0.4.1 - MyPage / Account Basic Information
+
+本人用の最小 MyPage と、Account 基本情報としての表示名編集を追加する。
+
+主な対象:
+
+* MyPage と SiteHeader の Account メニュー
+* 表示名の保存と Validation
+* Profile、MyPage、ThreadPost 投稿者表示への反映
 
 ---
 

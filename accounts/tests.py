@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.models import AccountProfile
 from events.models import Thread, ThreadAccessRule, ThreadPost
 
 
@@ -80,14 +81,52 @@ class AccountPageTests(TestCase):
         self.assertEqual(list(response.context['created_page'].object_list), [visible])
         self.assertNotContains(response, '非公開Thread')
 
-    def test_replied_threads_are_unique_and_ordered_by_latest_reply(self):
+    def test_responses_are_listed_outside_the_thread_tabs(self):
         account = get_user_model().objects.create_user('reply_user', password='eightchars')
-        first = self.make_public_thread(None, '最初に返信したThread')
-        second = self.make_public_thread(None, '最後に返信したThread')
-        ThreadPost.objects.create(thread=first, number=2, creator=account, body='返信1')
-        ThreadPost.objects.create(thread=first, number=3, creator=account, body='返信2')
-        ThreadPost.objects.create(thread=second, number=2, creator=account, body='返信3')
+        thread = self.make_public_thread(None, '返信したThread')
+        ThreadPost.objects.create(thread=thread, number=2, creator=account, body='返信')
 
         response = self.client.get(reverse('accounts:detail', args=[account.username]))
 
-        self.assertEqual(list(response.context['replied_page'].object_list), [second, first])
+        self.assertContains(response, '返信したThread')
+        self.assertNotContains(response, 'data-thread-tab="replied"')
+
+
+class MyPageTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user('my_page_user', password='eightchars')
+
+    def test_guest_is_redirected_from_my_page(self):
+        response = self.client.get(reverse('mypage'))
+
+        self.assertRedirects(response, reverse('events:map'))
+
+    def test_display_name_is_saved_and_shown_on_profile(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse('mypage'), {'display_name': '山田 太郎'})
+
+        self.assertRedirects(response, reverse('mypage'))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.niixy_profile.display_name, '山田 太郎')
+        self.assertEqual(self.user.niixy_profile.display_label, '山田 太郎 @my_page_user')
+        profile_response = self.client.get(reverse('accounts:detail', args=[self.user.username]))
+        self.assertContains(profile_response, '山田 太郎 @my_page_user')
+
+    def test_display_name_rejects_emoji_and_excessive_width(self):
+        self.client.force_login(self.user)
+
+        emoji_response = self.client.post(reverse('mypage'), {'display_name': '山田😀'})
+        width_response = self.client.post(reverse('mypage'), {'display_name': 'あ' * 13})
+
+        self.assertContains(emoji_response, '絵文字は使えません。')
+        self.assertContains(width_response, '表示名は全角12文字、半角24文字相当までです。')
+        self.assertEqual(AccountProfile.objects.get(user=self.user).display_name, '')
+
+    def test_header_menu_includes_my_page_and_profile(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('events:map'))
+
+        self.assertContains(response, 'マイページ')
+        self.assertContains(response, 'プロフィール')

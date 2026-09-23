@@ -85,3 +85,9 @@ DisplayLayout を Layout の総称とし、ThreadLayout と ProfileLayout を設
 状態: 採用
 
 Account ページでは SiteHeader の直下に `表示名 @NiixyID` を表示する細い AccountPageHeader を固定する。Account 内の活動一覧や詳細Paneへ遷移しても、閲覧中の Account を継続して識別できるようにする。Account ページでは長いパンくずを使わず、SiteHeader は Niixy ロゴを中心とする。
+
+## 2026-09-23 - 公開 Account ページと MyPage の責務を分ける
+
+状態: 採用
+
+公開 Account ページは、本人を含む利用者が公開情報、Album、活動履歴を閲覧する場所とする。本人用の編集・管理は MyPage に集める。MyPage は将来、Album とサムネイル、AccountInterface、ProfileLayout の管理を担当する。対象の編集・削除などは、MyPage に複製した一覧ではなく、各コンテンツを開いた場所で削除権限に応じて提供する。

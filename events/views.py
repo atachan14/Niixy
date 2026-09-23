@@ -17,11 +17,11 @@ CAPABILITIES = (ThreadAccessRule.DISCOVER, ThreadAccessRule.VIEW, ThreadAccessRu
 
 def map_view(request):
     threads = list(
-        Thread.objects.select_related('creator')
+        Thread.objects.select_related('creator__niixy_profile')
         .prefetch_related(
             'access_rules',
             Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
-            Prefetch('posts', queryset=ThreadPost.objects.select_related('creator')),
+            Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
         )
     )
     threads = [thread for thread in threads if thread.allows(request.user, ThreadAccessRule.DISCOVER)]

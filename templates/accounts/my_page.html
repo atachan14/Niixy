@@ -1,0 +1,43 @@
+{% extends 'events/base.html' %}
+{% load static %}
+
+{% block title %}{{ account.niixy_profile.display_label }} のマイページ | Niixy{% endblock %}
+{% block main_class %}mypage-main{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/mypage.css' %}">{% endblock %}
+{% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block content %}
+<section class="mypage{% if show_basic_info %} is-basic-info-open{% endif %}">
+  <header class="mypage-header"><h1><button id="mypage-identity" type="button"{% if not show_basic_info %} disabled{% endif %}>{{ account.niixy_profile.display_label }} のマイページ</button><span id="mypage-context"{% if not show_basic_info %} hidden{% endif %}> &gt; 基本情報</span></h1></header>
+  <div class="mypage-workspace">
+    <section class="mypage-overview" aria-label="マイページ概要">
+      <div class="mypage-overview-content">
+        <div class="mypage-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
+        <div class="mypage-actions" aria-label="マイページ機能">
+          <button id="open-basic-info" class="is-active" type="button">基本情報</button>
+          <button type="button" disabled>Album</button>
+          <button type="button" disabled>Interface</button>
+          <button type="button" disabled>Layout</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="basic-info-pane" aria-label="基本情報">
+      <header class="basic-info-header"><h2>基本情報</h2><button id="close-basic-info" class="icon-button" type="button" aria-label="マイページ概要に戻る">×</button></header>
+      <form class="basic-info-form" method="post" novalidate>
+        {% csrf_token %}
+        <div class="field">
+          <label for="{{ form.display_name.id_for_label }}">表示名</label>
+          {{ form.display_name }}
+          <p class="field-help">空欄可。全角12文字、半角24文字相当まで。絵文字は使えません。</p>
+          {% for error in form.display_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <button class="button" type="submit">保存</button>
+      </form>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'accounts/mypage.js' %}"></script>{% endblock %}

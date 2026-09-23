@@ -20,11 +20,15 @@
     <nav class="nav" aria-label="Account">
       {% if user.is_authenticated %}
         <details class="account-menu">
-          <summary>{{ user.username }}</summary>
-          <form method="post" action="{% url 'accounts:logout' %}">
-            {% csrf_token %}
-            <button type="submit">ログアウト</button>
-          </form>
+          <summary>{{ user.niixy_profile.display_label }}</summary>
+          <div class="account-menu-panel">
+            <a href="{% url 'mypage' %}">マイページ</a>
+            <a href="{% url 'accounts:detail' user.username %}">プロフィール</a>
+            <form method="post" action="{% url 'accounts:logout' %}">
+              {% csrf_token %}
+              <button type="submit">ログアウト</button>
+            </form>
+          </div>
         </details>
       {% else %}
         <button class="nav-button secondary" type="button" data-auth-mode="signup">新規登録</button>

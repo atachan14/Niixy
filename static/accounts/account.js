@@ -10,14 +10,23 @@ const accountContext = document.getElementById('account-page-context');
 const accountIdentity = document.getElementById('account-page-identity');
 
 function updateAccountContext() {
-  const isThreadPaneOpen = accountWorkspace.classList.contains('is-thread-pane-open');
-  accountContext.hidden = !isThreadPaneOpen;
-  accountIdentity.disabled = !isThreadPaneOpen;
+  const mode = accountWorkspace.dataset.mode;
+  accountContext.hidden = !mode;
+  accountContext.textContent = mode ? ` > ${mode}` : '';
+  accountIdentity.disabled = !mode;
 }
 
 function openThreadPane(shouldPersist = true) {
+  accountWorkspace.dataset.mode = 'Thread';
+  accountWorkspace.classList.remove('is-response-mode');
   accountWorkspace.classList.add('is-thread-pane-open');
   if (shouldPersist) sessionStorage.setItem(threadPaneStorageKey, 'true');
+  updateAccountContext();
+}
+
+function openResponsePane() {
+  accountWorkspace.dataset.mode = 'Response';
+  accountWorkspace.classList.add('is-thread-pane-open', 'is-response-mode');
   updateAccountContext();
 }
 
@@ -32,6 +41,7 @@ function closeDetail() {
 function closeThreadPane() {
   closeDetail();
   accountWorkspace.classList.remove('is-thread-pane-open');
+  delete accountWorkspace.dataset.mode;
   sessionStorage.removeItem(threadPaneStorageKey);
   updateAccountContext();
 }
@@ -72,6 +82,7 @@ function openDetail(threadId, shouldPersist = true) {
 }
 
 document.querySelectorAll('[data-open-account-threads]').forEach((button) => button.addEventListener('click', () => openThreadPane()));
+document.querySelectorAll('[data-open-account-responses]').forEach((button) => button.addEventListener('click', openResponsePane));
 accountIdentity.addEventListener('click', closeThreadPane);
 document.getElementById('close-account-thread-detail').addEventListener('click', closeDetail);
 
@@ -80,6 +91,17 @@ document.querySelector('.account-thread-lists').addEventListener('click', (event
   if (header) selectSummary(header.closest('.summary-item'));
   const detailTrigger = event.target.closest('[data-thread-detail]');
   if (detailTrigger) openDetail(detailTrigger.dataset.threadDetail);
+});
+
+document.querySelector('.account-response-pane').addEventListener('click', (event) => {
+  const header = event.target.closest('[data-response-detail]');
+  if (!header) return;
+  if (openDetail(header.dataset.responseDetail)) {
+    const target = document.querySelector(`[data-thread-detail-pane="${header.dataset.responseDetail}"] .thread-post:nth-of-type(${header.dataset.responseNumber})`);
+    target?.scrollIntoView({block: 'center'});
+    target?.classList.add('is-response-target');
+    window.setTimeout(() => target?.classList.remove('is-response-target'), 1600);
+  }
 });
 
 document.querySelectorAll('[data-thread-pane-pagination]').forEach((link) => link.addEventListener('click', () => {

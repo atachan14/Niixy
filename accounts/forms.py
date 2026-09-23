@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 from django import forms
 from django.contrib.auth import authenticate, get_user_model, password_validation
@@ -7,6 +8,24 @@ from django.core.exceptions import ValidationError
 
 User = get_user_model()
 NIIXY_ID_PATTERN = re.compile(r'^[a-z0-9_]{3,20}$')
+
+
+def is_emoji(character):
+    codepoint = ord(character)
+    return (
+        0x1F000 <= codepoint <= 0x1FAFF
+        or 0x2600 <= codepoint <= 0x27BF
+        or codepoint in {0x00A9, 0x00AE, 0x203C, 0x2049, 0x2122, 0x2139, 0x3030, 0x303D, 0x3297, 0x3299}
+        or 0xFE00 <= codepoint <= 0xFE0F
+        or codepoint == 0x20E3
+    )
+
+
+def display_width(value):
+    return sum(
+        0 if unicodedata.combining(character) else 2 if unicodedata.east_asian_width(character) in {'F', 'W'} else 1
+        for character in value
+    )
 
 
 class SignUpForm(forms.Form):
@@ -55,3 +74,21 @@ class LoginForm(forms.Form):
             if self.user is None:
                 raise ValidationError('Niixy IDまたはPasswordが正しくありません。')
         return cleaned_data
+
+
+class DisplayNameForm(forms.Form):
+    display_name = forms.CharField(
+        required=False,
+        max_length=24,
+        widget=forms.TextInput(attrs={'autocomplete': 'nickname'}),
+    )
+
+    def clean_display_name(self):
+        display_name = self.cleaned_data['display_name'].strip()
+        if any(character in '\r\n' or unicodedata.category(character).startswith('C') for character in display_name):
+            raise ValidationError('改行や制御文字は使えません。')
+        if any(is_emoji(character) for character in display_name):
+            raise ValidationError('絵文字は使えません。')
+        if display_width(display_name) > 24:
+            raise ValidationError('表示名は全角12文字、半角24文字相当までです。')
+        return display_name
