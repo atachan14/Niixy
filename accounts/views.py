@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
@@ -73,33 +73,39 @@ def prepare_threads(queryset, viewer):
 
 def account_page(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
-    created_threads = prepare_threads(Thread.objects.filter(creator=account).order_by('-created_at'), request.user)
-    created_page = Paginator(created_threads, 10).get_page(request.GET.get('created_page'))
-    response_posts = list(
-        ThreadPost.objects.filter(creator=account, number__gt=1)
-        .select_related('thread')
-        .prefetch_related('thread__access_rules', Prefetch('thread__posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')))
-        .order_by('-created_at')
-    )
-    visible_responses = []
-    for post in response_posts:
-        if not post.thread.allows(request.user, ThreadAccessRule.DISCOVER):
-            continue
-        post.can_view = post.thread.allows(request.user, ThreadAccessRule.VIEW)
-        visible_responses.append(post)
-    response_page = Paginator(visible_responses, 10).get_page(request.GET.get('response_page'))
-    detail_threads = list(created_page.object_list)
-    seen_thread_ids = {thread.pk for thread in detail_threads}
-    for post in response_page.object_list:
-        if post.thread_id not in seen_thread_ids:
-            detail_threads.append(post.thread)
-            seen_thread_ids.add(post.thread_id)
-
     return render(request, 'accounts/account_page.html', {
         'account': account,
+    })
+
+
+def account_thread_pane(request, username):
+    account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    created_threads = prepare_threads(Thread.objects.filter(creator=account).order_by('-created_at'), request.user)
+    created_page = Paginator(created_threads, 10).get_page(request.GET.get('created_page'))
+    return render(request, 'accounts/partials/thread_pane.html', {
+        'account': account,
         'created_page': created_page,
-        'detail_threads': detail_threads,
-        'response_page': response_page,
+    })
+
+
+def account_thread_detail(request, username, thread_id):
+    account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    thread = get_object_or_404(
+        Thread.objects.select_related('creator')
+        .prefetch_related(
+            'access_rules',
+            Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
+        )
+        .filter(Q(creator=account) | Q(posts__creator=account, posts__number__gt=1))
+        .distinct(),
+        pk=thread_id,
+    )
+    if not thread.allows(request.user, ThreadAccessRule.DISCOVER):
+        return render(request, 'accounts/partials/thread_not_found.html', status=404)
+    thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
+    thread.can_write = thread.allows(request.user, ThreadAccessRule.WRITE)
+    return render(request, 'accounts/partials/thread_detail.html', {
+        'thread': thread,
     })
 
 

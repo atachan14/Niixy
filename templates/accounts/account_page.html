@@ -8,7 +8,7 @@
 {% block footer %}{% endblock %}
 
 {% block content %}
-<script>if (sessionStorage.getItem('niixy:account:{{ account.username|escapejs }}:thread-pane')) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
+<script>if (sessionStorage.getItem('niixy:account:{{ account.username|escapejs }}:thread-pane') || new URLSearchParams(location.search).get('pane') === 'thread') document.documentElement.classList.add('has-restored-account-thread-pane');</script>
 <section class="account-page" data-account-id="{{ account.username }}">
   <header class="account-page-header"><h1><button id="account-page-identity" type="button" disabled>{{ account.niixy_profile.display_label }}</button><span> のプロフィール</span><span id="account-page-context" hidden> &gt; Thread</span></h1></header>
   <div class="account-workspace">
@@ -19,7 +19,7 @@
             <div class="account-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
             <div class="account-actions-grid" aria-label="Account機能">
               <button type="button" disabled>フォロー</button><button type="button" disabled>フォロワー</button>
-              <button class="is-active" type="button" data-open-account-threads>Thread</button><button class="is-active" type="button" data-open-account-responses>Response</button>
+              <button class="is-active" type="button" data-open-account-threads>Thread</button><button type="button" disabled>Response</button>
               <button type="button" disabled>Tweet</button><button type="button" disabled>Book</button>
               <button type="button" disabled>Room</button><button type="button" disabled>Interface</button>
             </div>
@@ -29,34 +29,13 @@
         </div>
       </section>
 
-      <section class="account-thread-workspace" aria-label="Thread">
+      <section class="account-thread-workspace" aria-label="Thread" data-thread-pane-url="{% url 'accounts:thread-pane' account.username %}" data-thread-detail-url-template="{% url 'accounts:thread-detail' account.username 0 %}">
         <div class="account-thread-track">
-          <section class="account-thread-pane" aria-label="Thread一覧">
-            <div class="account-thread-tabs" role="tablist" aria-label="Threadの種類">
-              <button class="is-active" type="button" role="tab" aria-selected="true" data-thread-tab="created">作成</button>
-              <button type="button" role="tab" aria-selected="false" data-thread-tab="fav">fav</button>
-              <button type="button" role="tab" aria-selected="false" data-thread-tab="bad">bad</button>
-              <button type="button" role="tab" aria-selected="false" data-thread-tab="bookmark">bookmark</button>
-            </div>
-            <div class="account-thread-lists">
-              <section class="account-thread-column is-tab-active" data-thread-column="created">
-                <div class="summary-list">{% for thread in created_page %}<article class="summary-item" data-thread-id="{{ thread.pk }}"><button class="summary-item-header" type="button"><span>{{ thread.title }} ({{ thread.posts.all|length }})</span></button><div class="summary-item-preview" hidden><div class="summary-item-preview-content">{% if thread.can_view %}{% with post=thread.posts.all.0 %}<p>{{ post.body|linebreaksbr }}</p>{% endwith %}<button class="summary-detail-trigger" type="button" data-thread-detail="{{ thread.pk }}">詳細を見る</button>{% else %}<p>このThreadは閲覧できません。</p>{% endif %}</div></div></article>{% empty %}<p class="empty">まだThreadはありません。</p>{% endfor %}</div>
-                {% if created_page.has_other_pages %}<nav class="thread-pagination" aria-label="作成したThreadのページ">{% if created_page.has_previous %}<a data-thread-pane-pagination href="?created_page={{ created_page.previous_page_number }}">前へ</a>{% endif %}<span>{{ created_page.number }} / {{ created_page.paginator.num_pages }}</span>{% if created_page.has_next %}<a data-thread-pane-pagination href="?created_page={{ created_page.next_page_number }}">次へ</a>{% endif %}</nav>{% endif %}
-              </section>
-              <section class="account-thread-column is-future" data-thread-column="fav"><p class="empty">未実装</p></section>
-              <section class="account-thread-column is-future" data-thread-column="bad"><p class="empty">未実装</p></section>
-              <section class="account-thread-column is-future" data-thread-column="bookmark"><p class="empty">未実装</p></section>
-            </div>
-          </section>
-          <section class="account-response-pane" aria-label="Response一覧">
-            <div class="account-thread-tabs" role="tablist" aria-label="Responseの種類"><button class="is-active" type="button" role="tab" aria-selected="true">作成</button><button type="button" role="tab" aria-selected="false" disabled>fav</button><button type="button" role="tab" aria-selected="false" disabled>bad</button><button type="button" role="tab" aria-selected="false" disabled>bookmark</button></div>
-            <div class="account-thread-column is-tab-active">{% for post in response_page %}<article class="response-history-item"><button class="response-thread-header" type="button" data-response-detail="{{ post.thread.pk }}" data-response-number="{{ post.number }}">{{ post.thread.title }} ({{ post.thread.posts.all|length }})</button>{% if post.can_view %}<article class="thread-post"><div class="thread-thumbnail" aria-hidden="true"></div><div><div class="thread-post-info">#{{ post.number }} {{ post.creator.niixy_profile.display_label }}<time>{{ post.created_at|date:'Y/m/d H:i' }}</time></div><div class="thread-post-body">{{ post.body|linebreaksbr }}</div></div></article>{% else %}<p class="empty">このThreadは閲覧できません。</p>{% endif %}</article>{% empty %}<p class="empty">まだResponseはありません。</p>{% endfor %}{% if response_page.has_other_pages %}<nav class="thread-pagination">{% if response_page.has_previous %}<a data-response-pane-pagination href="?response_page={{ response_page.previous_page_number }}">前へ</a>{% endif %}<span>{{ response_page.number }} / {{ response_page.paginator.num_pages }}</span>{% if response_page.has_next %}<a data-response-pane-pagination href="?response_page={{ response_page.next_page_number }}">次へ</a>{% endif %}</nav>{% endif %}</div>
-          </section>
-
+          <section class="account-thread-pane" aria-label="Thread一覧" data-thread-pane-container><p class="account-pane-loading">読み込み中...</p></section>
           <aside class="account-thread-detail-pane" aria-label="Thread詳細">
             <header class="account-thread-detail-header"><h2 id="account-thread-detail-title"></h2><button id="close-account-thread-detail" class="icon-button" type="button" aria-label="Thread一覧に戻る">×</button></header>
             <p id="account-thread-detail-empty" class="account-thread-detail-empty">Threadを選択してください</p>
-{% for thread in detail_threads %}<section class="account-thread-detail" data-thread-detail-pane="{{ thread.pk }}" data-thread-title="{{ thread.title }}" data-thread-post-count="{{ thread.posts.all|length }}" hidden>{% if thread.can_view %}{% for post in thread.posts.all %}<article class="thread-post"><div class="thread-thumbnail" aria-hidden="true"></div><div><div class="thread-post-info">#{{ post.number }} {% if post.creator %}<a href="{% url 'accounts:detail' post.creator.username %}">{{ post.creator.niixy_profile.display_label }}</a>{% else %}Guest{% endif %}<time>{{ post.created_at|date:'Y/m/d H:i' }}</time></div><div class="thread-post-body">{{ post.body|linebreaksbr }}</div></div></article>{% endfor %}{% if thread.can_write %}<form class="account-thread-reply-form thread-reply-form" action="{% url 'events:thread-post-create' thread.pk %}">{% csrf_token %}<textarea name="body" required placeholder="返信を書く"></textarea><p class="reply-form-error" hidden></p><button class="button" type="submit">送信</button></form>{% endif %}{% else %}<p class="empty">このThreadは閲覧できません。</p>{% endif %}</section>{% endfor %}
+            <div data-thread-detail-container></div>
           </aside>
         </div>
       </section>

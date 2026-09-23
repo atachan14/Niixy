@@ -163,7 +163,6 @@
 }
 
 .account-thread-pane,
-.account-response-pane,
 .account-thread-detail-pane {
   background: var(--panel);
   min-width: 0;
@@ -174,42 +173,10 @@
   border-right: 1px solid var(--line);
 }
 
-.account-response-pane {
-  border-right: 1px solid var(--line);
-  display: none !important;
-  grid-column: 1;
-  grid-row: 1;
-  overflow-y: auto;
-}
-
-.account-thread-workspace.is-response-mode .account-thread-pane {
-  display: none;
-}
-
-.account-thread-workspace.is-response-mode .account-response-pane {
-  display: block !important;
-}
-
-.response-history-item {
-  border-top: 1px solid var(--line);
-  padding: 14px 0;
-}
-
-.response-thread-header {
-  background: transparent;
-  border: 0;
-  color: var(--accent-dark);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 700;
-  margin: 0 0 12px;
-  padding: 0;
-  text-align: left;
-}
-
-.is-response-target {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
+.account-pane-loading {
+  color: var(--muted);
+  margin: 32px 20px;
+  text-align: center;
 }
 
 .account-thread-tabs {
@@ -417,19 +384,11 @@
   }
 
   .account-thread-pane,
-  .account-response-pane,
   .account-thread-detail-pane {
     flex: 0 0 100vw;
     width: 100vw;
   }
 
-  .account-response-pane {
-    display: none !important;
-  }
-
-  .account-thread-workspace.is-response-mode .account-response-pane {
-    display: block !important;
-  }
 
   .account-thread-tabs button {
     font-size: 13px;

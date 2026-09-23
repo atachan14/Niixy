@@ -68,6 +68,16 @@ class AccountPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '@creator_user')
+        self.assertNotContains(response, '作成したThread')
+        self.assertContains(response, reverse('accounts:thread-pane', args=[account.username]))
+
+    def test_thread_pane_lists_created_threads_on_demand(self):
+        account = get_user_model().objects.create_user('creator_user', password='eightchars')
+        self.make_public_thread(account, '作成したThread')
+
+        response = self.client.get(reverse('accounts:thread-pane', args=[account.username]))
+
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, '作成したThread')
 
     def test_account_page_hides_undiscoverable_threads(self):
@@ -76,20 +86,30 @@ class AccountPageTests(TestCase):
         hidden = Thread.objects.create(creator=account, title='非公開Thread')
         ThreadPost.objects.create(thread=hidden, number=1, creator=account, body='開始投稿')
 
-        response = self.client.get(reverse('accounts:detail', args=[account.username]))
+        response = self.client.get(reverse('accounts:thread-pane', args=[account.username]))
 
         self.assertEqual(list(response.context['created_page'].object_list), [visible])
         self.assertNotContains(response, '非公開Thread')
 
-    def test_responses_are_listed_outside_the_thread_tabs(self):
+    def test_replied_threads_are_not_listed_in_thread_tabs(self):
         account = get_user_model().objects.create_user('reply_user', password='eightchars')
         thread = self.make_public_thread(None, '返信したThread')
         ThreadPost.objects.create(thread=thread, number=2, creator=account, body='返信')
 
-        response = self.client.get(reverse('accounts:detail', args=[account.username]))
+        response = self.client.get(reverse('accounts:thread-pane', args=[account.username]))
 
-        self.assertContains(response, '返信したThread')
+        self.assertNotContains(response, '返信したThread')
         self.assertNotContains(response, 'data-thread-tab="replied"')
+
+    def test_thread_detail_is_loaded_on_demand(self):
+        account = get_user_model().objects.create_user('creator_user', password='eightchars')
+        thread = self.make_public_thread(account, '詳細Thread')
+
+        response = self.client.get(reverse('accounts:thread-detail', args=[account.username, thread.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '詳細Thread')
+        self.assertContains(response, '開始投稿')
 
 
 class MyPageTests(TestCase):
