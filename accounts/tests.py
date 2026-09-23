@@ -111,6 +111,61 @@ class AccountPageTests(TestCase):
         self.assertContains(response, '詳細Thread')
         self.assertContains(response, '開始投稿')
 
+    def test_response_pane_lists_responses_newest_first_without_initial_post(self):
+        account = get_user_model().objects.create_user('reply_user', password='eightchars')
+        older_thread = self.make_public_thread(None, '古い返信先')
+        newer_thread = self.make_public_thread(None, '新しい返信先')
+        older = ThreadPost.objects.create(thread=older_thread, number=2, creator=account, body='古い返信')
+        newer = ThreadPost.objects.create(thread=newer_thread, number=2, creator=account, body='新しい返信')
+        ThreadPost.objects.filter(pk=older.pk).update(created_at='2026-01-01T00:00:00Z')
+        ThreadPost.objects.filter(pk=newer.pk).update(created_at='2026-01-02T00:00:00Z')
+
+        response = self.client.get(reverse('accounts:response-pane', args=[account.username]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '古い返信')
+        self.assertContains(response, '新しい返信')
+        self.assertNotContains(response, '開始投稿')
+        content = response.content.decode()
+        self.assertLess(content.index('新しい返信先'), content.index('古い返信先'))
+
+    def test_response_pane_hides_undiscoverable_response(self):
+        account = get_user_model().objects.create_user('reply_user', password='eightchars')
+        thread = Thread.objects.create(title='秘密の返信先')
+        ThreadPost.objects.create(thread=thread, number=1, body='開始投稿')
+        ThreadPost.objects.create(thread=thread, number=2, creator=account, body='秘密の返信')
+
+        response = self.client.get(reverse('accounts:response-pane', args=[account.username]))
+
+        self.assertNotContains(response, '秘密の返信先')
+        self.assertNotContains(response, '秘密の返信')
+
+    def test_response_pane_shows_only_header_when_thread_is_not_viewable(self):
+        account = get_user_model().objects.create_user('reply_user', password='eightchars')
+        thread = Thread.objects.create(title='見出しだけのThread')
+        ThreadPost.objects.create(thread=thread, number=1, body='開始投稿')
+        ThreadPost.objects.create(thread=thread, number=2, creator=account, body='隠す返信本文')
+        ThreadAccessRule.objects.create(thread=thread, capability='discover', audience='guest')
+
+        response = self.client.get(reverse('accounts:response-pane', args=[account.username]))
+
+        self.assertContains(response, '見出しだけのThread')
+        self.assertContains(response, f'data-response-thread="{thread.pk}"')
+        self.assertNotContains(response, '隠す返信本文')
+
+    def test_response_pane_paginates_ten_responses(self):
+        account = get_user_model().objects.create_user('reply_user', password='eightchars')
+        thread = self.make_public_thread(None, '返信先')
+        for number in range(2, 13):
+            ThreadPost.objects.create(thread=thread, number=number, creator=account, body=f'返信{number}')
+
+        first_page = self.client.get(reverse('accounts:response-pane', args=[account.username]))
+        second_page = self.client.get(reverse('accounts:response-pane', args=[account.username]), {'response_page': 2})
+
+        self.assertEqual(len(first_page.context['response_page'].object_list), 10)
+        self.assertEqual(len(second_page.context['response_page'].object_list), 1)
+        self.assertContains(first_page, 'data-pane-pagination')
+
 
 class MyPageTests(TestCase):
     def setUp(self):

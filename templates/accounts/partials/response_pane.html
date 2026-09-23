@@ -1,0 +1,15 @@
+<div class="account-thread-tabs" role="tablist" aria-label="Responseの種類">
+  <button class="is-active" type="button" role="tab" aria-selected="true" data-thread-tab="created">作成</button>
+  <button type="button" role="tab" aria-selected="false" data-thread-tab="fav">fav</button>
+  <button type="button" role="tab" aria-selected="false" data-thread-tab="bad">bad</button>
+  <button type="button" role="tab" aria-selected="false" data-thread-tab="bookmark">bookmark</button>
+</div>
+<div class="account-thread-lists">
+  <section class="account-thread-column is-tab-active" data-thread-column="created">
+    <div class="response-history-list">{% for post in response_page %}<article class="response-history-item"><button class="response-thread-header" type="button" data-response-thread="{{ post.thread_id }}" data-response-post="{{ post.number }}">{{ post.thread.title }} ({{ post.thread.posts.all|length }})</button>{% if post.thread.can_view %}<div class="thread-post"><div class="thread-thumbnail" aria-hidden="true"></div><div><div class="thread-post-info">#{{ post.number }} <a href="{% url 'accounts:detail' account.username %}">{{ account.niixy_profile.display_label }}</a><time>{{ post.created_at|date:'Y/m/d H:i' }}</time></div><div class="thread-post-body">{{ post.body|linebreaksbr }}</div></div></div>{% endif %}</article>{% empty %}<p class="empty">まだResponseはありません。</p>{% endfor %}</div>
+    {% if response_page.has_other_pages %}<nav class="thread-pagination" aria-label="作成したResponseのページ">{% if response_page.has_previous %}<a data-pane-pagination href="?response_page={{ response_page.previous_page_number }}">前へ</a>{% endif %}<span>{{ response_page.number }} / {{ response_page.paginator.num_pages }}</span>{% if response_page.has_next %}<a data-pane-pagination href="?response_page={{ response_page.next_page_number }}">次へ</a>{% endif %}</nav>{% endif %}
+  </section>
+  <section class="account-thread-column is-future" data-thread-column="fav"><p class="empty">未実装</p></section>
+  <section class="account-thread-column is-future" data-thread-column="bad"><p class="empty">未実装</p></section>
+  <section class="account-thread-column is-future" data-thread-column="bookmark"><p class="empty">未実装</p></section>
+</div>

@@ -2,13 +2,16 @@ const accountPage = document.querySelector('.account-page');
 const accountWorkspace = document.querySelector('.account-workspace');
 const threadWorkspace = document.querySelector('.account-thread-workspace');
 const accountId = accountPage.dataset.accountId;
-const threadPaneStorageKey = `niixy:account:${accountId}:thread-pane`;
+const paneStorageKey = `niixy:account:${accountId}:thread-pane`;
 const threadDetailStorageKey = `niixy:account:${accountId}:thread-detail`;
-const threadPaneContainer = document.querySelector('[data-thread-pane-container]');
+const paneContainer = document.querySelector('[data-thread-pane-container]');
 const threadDetailContainer = document.querySelector('[data-thread-detail-container]');
-const threadPaneUrl = threadWorkspace.dataset.threadPaneUrl;
+const paneUrls = {thread: threadWorkspace.dataset.threadPaneUrl, response: threadWorkspace.dataset.responsePaneUrl};
 const threadDetailUrlTemplate = threadWorkspace.dataset.threadDetailUrlTemplate;
-let loadedThreadPaneQuery = null;
+const paneCache = new Map();
+let requestedPaneKey = null;
+let activePane = 'thread';
+let highlightTimer = null;
 let isApplyingHistory = false;
 const detailTitle = document.getElementById('account-thread-detail-title');
 const detailEmpty = document.getElementById('account-thread-detail-empty');
@@ -16,10 +19,10 @@ const accountContext = document.getElementById('account-page-context');
 const accountIdentity = document.getElementById('account-page-identity');
 
 function updateAccountContext() {
-  const isThreadPaneOpen = accountWorkspace.classList.contains('is-thread-pane-open');
-  accountContext.hidden = !isThreadPaneOpen;
-  accountContext.textContent = ' > Thread';
-  accountIdentity.disabled = !isThreadPaneOpen;
+  const isPaneOpen = accountWorkspace.classList.contains('is-thread-pane-open');
+  accountContext.hidden = !isPaneOpen;
+  accountContext.textContent = ` > ${activePane === 'response' ? 'Response' : 'Thread'}`;
+  accountIdentity.disabled = !isPaneOpen;
 }
 
 function renderPaneError(container) {
@@ -30,9 +33,10 @@ function detailUrl(threadId) {
   return threadDetailUrlTemplate.replace('/0/', `/${threadId}/`);
 }
 
-function paneQueryFromParams(params) {
-  const page = params.get('created_page');
-  return page ? `?created_page=${encodeURIComponent(page)}` : '';
+function paneQueryFromParams(params, pane = activePane) {
+  const key = pane === 'response' ? 'response_page' : 'created_page';
+  const page = params.get(key);
+  return page ? `?${key}=${encodeURIComponent(page)}` : '';
 }
 
 function updateUrl(params, replace = false) {
@@ -42,52 +46,66 @@ function updateUrl(params, replace = false) {
   window.history[replace ? 'replaceState' : 'pushState']({}, '', url);
 }
 
-function threadParams({threadId = null, query = ''} = {}) {
+function paneParams({pane = activePane, threadId = null, postNumber = null, query = ''} = {}) {
   const params = new URLSearchParams(query);
-  params.set('pane', 'thread');
+  params.set('pane', pane);
   if (threadId) params.set('thread', threadId);
+  if (postNumber) params.set('post', postNumber);
   return params;
 }
 
-async function loadThreadPane(query = '') {
-  if (loadedThreadPaneQuery === query) return true;
-  threadPaneContainer.innerHTML = '<p class="account-pane-loading">読み込み中...</p>';
+async function loadPane(pane, query = '') {
+  const cacheKey = `${pane}:${query}`;
+  requestedPaneKey = cacheKey;
+  if (paneCache.has(cacheKey)) {
+    paneContainer.innerHTML = paneCache.get(cacheKey);
+    return true;
+  }
+  paneContainer.innerHTML = '<p class="account-pane-loading">読み込み中...</p>';
   try {
-    const response = await fetch(`${threadPaneUrl}${query}`, {headers: {'X-Requested-With': 'fetch'}});
-    if (!response.ok) throw new Error('Thread pane request failed');
-    threadPaneContainer.innerHTML = await response.text();
-    loadedThreadPaneQuery = query;
+    const response = await fetch(`${paneUrls[pane]}${query}`, {headers: {'X-Requested-With': 'fetch'}});
+    if (!response.ok) throw new Error('Account pane request failed');
+    const html = await response.text();
+    paneCache.set(cacheKey, html);
+    if (requestedPaneKey === cacheKey) paneContainer.innerHTML = html;
     return true;
   } catch {
-    renderPaneError(threadPaneContainer);
+    if (requestedPaneKey === cacheKey) renderPaneError(paneContainer);
     return false;
   }
 }
 
-function openThreadPane(shouldPersist = true, query = '', shouldUpdateUrl = true) {
+function openPane(pane, shouldPersist = true, query = '', shouldUpdateUrl = true) {
+  activePane = pane;
   accountWorkspace.classList.add('is-thread-pane-open');
-  if (shouldPersist) sessionStorage.setItem(threadPaneStorageKey, 'true');
+  if (shouldPersist) sessionStorage.setItem(paneStorageKey, pane);
   updateAccountContext();
-  if (shouldUpdateUrl) updateUrl(threadParams({query}));
-  loadThreadPane(query);
+  if (shouldUpdateUrl) updateUrl(paneParams({pane, query}));
+  loadPane(pane, query);
+}
+
+function clearTargetHighlight() {
+  window.clearTimeout(highlightTimer);
+  document.querySelectorAll('.is-response-target').forEach((post) => post.classList.remove('is-response-target'));
 }
 
 function closeDetail(shouldUpdateUrl = true) {
   threadWorkspace.classList.remove('is-detail-open');
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
+  clearTargetHighlight();
   detailEmpty.hidden = false;
   detailEmpty.textContent = 'Threadを選択してください';
   detailTitle.textContent = '';
   sessionStorage.removeItem(threadDetailStorageKey);
   if (shouldUpdateUrl && accountWorkspace.classList.contains('is-thread-pane-open')) {
-    updateUrl(threadParams({query: paneQueryFromParams(new URLSearchParams(window.location.search))}));
+    updateUrl(paneParams({query: paneQueryFromParams(new URLSearchParams(window.location.search))}));
   }
 }
 
-function closeThreadPane() {
+function closePane() {
   closeDetail(false);
   accountWorkspace.classList.remove('is-thread-pane-open');
-  sessionStorage.removeItem(threadPaneStorageKey);
+  sessionStorage.removeItem(paneStorageKey);
   updateAccountContext();
   updateUrl(new URLSearchParams());
 }
@@ -108,14 +126,14 @@ function setPreview(preview, isOpen) {
 }
 
 function selectSummary(item) {
-  document.querySelectorAll('.summary-item').forEach((summary) => {
+  paneContainer.querySelectorAll('.summary-item').forEach((summary) => {
     const selected = summary === item;
     summary.classList.toggle('is-open', selected);
     setPreview(summary.querySelector('.summary-item-preview'), selected);
   });
 }
 
-async function openDetail(threadId, shouldPersist = true, shouldUpdateUrl = true) {
+async function openDetail(threadId, postNumber = null, shouldPersist = true, shouldUpdateUrl = true) {
   let detail = document.querySelector(`[data-thread-detail-pane="${threadId}"]`);
   if (!detail) {
     detailEmpty.hidden = false;
@@ -135,43 +153,49 @@ async function openDetail(threadId, shouldPersist = true, shouldUpdateUrl = true
   detailEmpty.hidden = true;
   detailTitle.textContent = `${detail.dataset.threadTitle} (${detail.dataset.threadPostCount})`;
   threadWorkspace.classList.add('is-detail-open');
-  document.querySelector('.account-thread-detail-pane').scrollTo({top: 0});
-  if (shouldPersist) sessionStorage.setItem(threadDetailStorageKey, threadId);
-  if (shouldUpdateUrl) {
-    updateUrl(threadParams({threadId, query: paneQueryFromParams(new URLSearchParams(window.location.search))}));
+  clearTargetHighlight();
+  const target = postNumber ? detail.querySelector(`[data-thread-post-number="${postNumber}"]`) : null;
+  if (target) {
+    target.classList.add('is-response-target');
+    target.scrollIntoView({behavior: 'smooth', block: 'center'});
+    highlightTimer = window.setTimeout(() => target.classList.remove('is-response-target'), 2200);
+  } else {
+    document.querySelector('.account-thread-detail-pane').scrollTo({top: 0});
   }
+  if (shouldPersist) sessionStorage.setItem(threadDetailStorageKey, JSON.stringify({threadId, postNumber}));
+  if (shouldUpdateUrl) updateUrl(paneParams({threadId, postNumber, query: paneQueryFromParams(new URLSearchParams(window.location.search))}));
   return true;
 }
 
-document.querySelectorAll('[data-open-account-threads]').forEach((button) => button.addEventListener('click', () => openThreadPane()));
-accountIdentity.addEventListener('click', closeThreadPane);
-document.getElementById('close-account-thread-detail').addEventListener('click', closeDetail);
+document.querySelectorAll('[data-open-account-threads]').forEach((button) => button.addEventListener('click', () => openPane('thread')));
+document.querySelectorAll('[data-open-account-responses]').forEach((button) => button.addEventListener('click', () => openPane('response')));
+accountIdentity.addEventListener('click', closePane);
+document.getElementById('close-account-thread-detail').addEventListener('click', () => closeDetail());
 
-threadPaneContainer.addEventListener('click', (event) => {
-  const pagination = event.target.closest('[data-thread-pane-pagination]');
+paneContainer.addEventListener('click', (event) => {
+  const pagination = event.target.closest('[data-pane-pagination]');
   if (pagination) {
     event.preventDefault();
     const query = new URL(pagination.href).search;
     closeDetail(false);
-    updateUrl(threadParams({query}));
-    loadThreadPane(query);
+    updateUrl(paneParams({query}));
+    loadPane(activePane, query);
     return;
   }
   const header = event.target.closest('.summary-item-header');
   if (header) selectSummary(header.closest('.summary-item'));
   const detailTrigger = event.target.closest('[data-thread-detail]');
   if (detailTrigger) openDetail(detailTrigger.dataset.threadDetail);
-
+  const responseHeader = event.target.closest('[data-response-thread]');
+  if (responseHeader) openDetail(responseHeader.dataset.responseThread, responseHeader.dataset.responsePost);
   const tab = event.target.closest('[data-thread-tab]');
   if (!tab) return;
-  threadPaneContainer.querySelectorAll('[data-thread-tab]').forEach((item) => {
-    const active = item === tab;
-    item.classList.toggle('is-active', active);
-    item.setAttribute('aria-selected', String(active));
+  paneContainer.querySelectorAll('[data-thread-tab]').forEach((item) => {
+    const selected = item === tab;
+    item.classList.toggle('is-active', selected);
+    item.setAttribute('aria-selected', String(selected));
   });
-  threadPaneContainer.querySelectorAll('.account-thread-column').forEach((column) => {
-    column.classList.toggle('is-tab-active', column.dataset.threadColumn === tab.dataset.threadTab);
-  });
+  paneContainer.querySelectorAll('.account-thread-column').forEach((column) => column.classList.toggle('is-tab-active', column.dataset.threadColumn === tab.dataset.threadTab));
 });
 
 threadDetailContainer.addEventListener('submit', async (event) => {
@@ -193,7 +217,7 @@ threadDetailContainer.addEventListener('submit', async (event) => {
     const result = await response.json();
     if (response.ok) {
       sent = true;
-      sessionStorage.setItem(threadPaneStorageKey, 'true');
+      sessionStorage.setItem(paneStorageKey, activePane);
       location.reload();
       return;
     }
@@ -212,20 +236,21 @@ threadDetailContainer.addEventListener('submit', async (event) => {
 
 function applyStateFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  const query = paneQueryFromParams(params);
+  const pane = params.get('pane');
   isApplyingHistory = true;
-  if (params.get('pane') === 'thread') {
+  if (pane === 'thread' || pane === 'response') {
+    activePane = pane;
     accountWorkspace.classList.add('is-thread-pane-open');
-    sessionStorage.setItem(threadPaneStorageKey, 'true');
+    sessionStorage.setItem(paneStorageKey, pane);
     updateAccountContext();
-    loadThreadPane(query);
+    loadPane(pane, paneQueryFromParams(params, pane));
     const threadId = params.get('thread');
-    if (threadId) openDetail(threadId, false, false);
+    if (threadId) openDetail(threadId, params.get('post'), false, false);
     else closeDetail(false);
   } else {
     closeDetail(false);
     accountWorkspace.classList.remove('is-thread-pane-open');
-    sessionStorage.removeItem(threadPaneStorageKey);
+    sessionStorage.removeItem(paneStorageKey);
     updateAccountContext();
   }
   isApplyingHistory = false;
@@ -233,16 +258,18 @@ function applyStateFromUrl() {
 
 window.addEventListener('popstate', applyStateFromUrl);
 
-if (sessionStorage.getItem(threadPaneStorageKey)) {
-  const params = new URLSearchParams(window.location.search);
-  const query = paneQueryFromParams(params);
-  const restoredDetailId = params.get('thread') || sessionStorage.getItem(threadDetailStorageKey);
-  openThreadPane(false, query, params.get('pane') !== 'thread');
-  if (restoredDetailId) openDetail(restoredDetailId, false, params.get('thread') !== restoredDetailId).then((opened) => {
-    if (!opened) sessionStorage.removeItem(threadDetailStorageKey);
-  });
-} else if (new URLSearchParams(window.location.search).get('pane') === 'thread') {
-  applyStateFromUrl();
+const initialParams = new URLSearchParams(window.location.search);
+const storedPane = sessionStorage.getItem(paneStorageKey);
+if (storedPane || ['thread', 'response'].includes(initialParams.get('pane'))) {
+  const pane = ['thread', 'response'].includes(initialParams.get('pane')) ? initialParams.get('pane') : (storedPane === 'response' ? 'response' : 'thread');
+  const query = paneQueryFromParams(initialParams, pane);
+  openPane(pane, false, query, initialParams.get('pane') !== pane);
+  let restoredDetail = null;
+  try { restoredDetail = JSON.parse(sessionStorage.getItem(threadDetailStorageKey)); } catch { restoredDetail = {threadId: sessionStorage.getItem(threadDetailStorageKey)}; }
+  if (restoredDetail && typeof restoredDetail !== 'object') restoredDetail = {threadId: restoredDetail};
+  const threadId = initialParams.get('thread') || restoredDetail?.threadId;
+  const postNumber = initialParams.get('post') || restoredDetail?.postNumber;
+  if (threadId) openDetail(threadId, postNumber, false, initialParams.get('thread') !== String(threadId));
 } else {
   updateAccountContext();
 }

@@ -8,7 +8,7 @@
 {% block footer %}{% endblock %}
 
 {% block content %}
-<script>if (sessionStorage.getItem('niixy:account:{{ account.username|escapejs }}:thread-pane') || new URLSearchParams(location.search).get('pane') === 'thread') document.documentElement.classList.add('has-restored-account-thread-pane');</script>
+<script>if (sessionStorage.getItem('niixy:account:{{ account.username|escapejs }}:thread-pane') || ['thread', 'response'].includes(new URLSearchParams(location.search).get('pane'))) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
 <section class="account-page" data-account-id="{{ account.username }}">
   <header class="account-page-header"><h1><button id="account-page-identity" type="button" disabled>{{ account.niixy_profile.display_label }}</button><span> のプロフィール</span><span id="account-page-context" hidden> &gt; Thread</span></h1></header>
   <div class="account-workspace">
@@ -19,7 +19,7 @@
             <div class="account-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
             <div class="account-actions-grid" aria-label="Account機能">
               <button type="button" disabled>フォロー</button><button type="button" disabled>フォロワー</button>
-              <button class="is-active" type="button" data-open-account-threads>Thread</button><button type="button" disabled>Response</button>
+              <button class="is-active" type="button" data-open-account-threads>Thread</button><button class="is-active" type="button" data-open-account-responses>Response</button>
               <button type="button" disabled>Tweet</button><button type="button" disabled>Book</button>
               <button type="button" disabled>Room</button><button type="button" disabled>Interface</button>
             </div>
@@ -29,7 +29,7 @@
         </div>
       </section>
 
-      <section class="account-thread-workspace" aria-label="Thread" data-thread-pane-url="{% url 'accounts:thread-pane' account.username %}" data-thread-detail-url-template="{% url 'accounts:thread-detail' account.username 0 %}">
+      <section class="account-thread-workspace" aria-label="Thread / Response" data-thread-pane-url="{% url 'accounts:thread-pane' account.username %}" data-response-pane-url="{% url 'accounts:response-pane' account.username %}" data-thread-detail-url-template="{% url 'accounts:thread-detail' account.username 0 %}">
         <div class="account-thread-track">
           <section class="account-thread-pane" aria-label="Thread一覧" data-thread-pane-container><p class="account-pane-loading">読み込み中...</p></section>
           <aside class="account-thread-detail-pane" aria-label="Thread詳細">

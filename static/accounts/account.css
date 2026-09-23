@@ -281,6 +281,41 @@
   padding: 7px 10px;
 }
 
+.response-history-item {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.response-thread-header {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  overflow: hidden;
+  padding: 14px 0 4px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.response-thread-header:hover {
+  color: var(--accent-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.thread-post.is-response-target {
+  animation: response-target-highlight 2.2s ease-out;
+}
+
+@keyframes response-target-highlight {
+  0%, 55% { background: #fff1a8; }
+  100% { background: transparent; }
+}
+
 .thread-pagination {
   align-items: center;
   display: flex;

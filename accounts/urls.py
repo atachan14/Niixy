@@ -10,5 +10,6 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('<str:username>/threads/', views.account_thread_pane, name='thread-pane'),
     path('<str:username>/threads/<int:thread_id>/', views.account_thread_detail, name='thread-detail'),
+    path('<str:username>/responses/', views.account_response_pane, name='response-pane'),
     path('<str:username>/', views.account_page, name='detail'),
 ]

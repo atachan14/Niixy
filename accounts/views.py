@@ -88,6 +88,30 @@ def account_thread_pane(request, username):
     })
 
 
+def account_response_pane(request, username):
+    account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    posts = list(
+        ThreadPost.objects.filter(creator=account, number__gt=1)
+        .select_related('thread', 'creator__niixy_profile')
+        .prefetch_related(
+            'thread__access_rules',
+            Prefetch('thread__posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
+        )
+        .order_by('-created_at')
+    )
+    responses = []
+    for post in posts:
+        if not post.thread.allows(request.user, ThreadAccessRule.DISCOVER):
+            continue
+        post.thread.can_view = post.thread.allows(request.user, ThreadAccessRule.VIEW)
+        responses.append(post)
+    response_page = Paginator(responses, 10).get_page(request.GET.get('response_page'))
+    return render(request, 'accounts/partials/response_pane.html', {
+        'account': account,
+        'response_page': response_page,
+    })
+
+
 def account_thread_detail(request, username, thread_id):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     thread = get_object_or_404(
