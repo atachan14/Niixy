@@ -6,6 +6,12 @@
 * Neon: PostgreSQL database
 * Geolonia: Map display
 
+## Database Selection
+
+Supabase を最初の候補として検討したが、無料枠では一定期間アクセスのない Project が停止する運用だった。開発休止後にポートフォリオとして公開URLを確認する際、DB再開を忘れるリスクを避けるため、無料で扱いやすい PostgreSQL として Neon を採用した。
+
+Neon Project はシンガポールリージョンに作成し、Vercel の `DATABASE_URL` から接続する。Neon や各サービスの無料枠・休止条件は将来変わり得るため、再検討時には公式ドキュメントを確認する。
+
 ## Production Settings
 
 Set these environment variables in Vercel. Do not commit their values.
