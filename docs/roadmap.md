@@ -62,6 +62,8 @@ Status: Complete
 
 ## v0.4.1 - MyPage / Account Basic Information
 
+Status: Complete
+
 本人用の最小 MyPage と、Account 基本情報としての表示名編集を追加する。
 
 主な対象:
@@ -69,6 +71,22 @@ Status: Complete
 * MyPage と SiteHeader の Account メニュー
 * 表示名の保存と Validation
 * Profile、MyPage、ThreadPost 投稿者表示への反映
+
+---
+
+## v0.5 - Interface Foundation
+
+最初の ThreadInterface 作成・適用基盤を追加する。InterfaceVersion と編集途中の Draft を分離し、複数 Interface と Require 関係を一つの Thread に適用できる状態を目指す。
+
+主な対象:
+
+* Interface の新規作成、Draft 保存、v1 公開
+* 基本的な Field 定義
+* InterfaceRequirement と循環検証
+* 複数 ThreadInterface の同時適用
+* Thread 作成時の Interface 選択と値入力
+* `#1` での ThreadInterface 表示
+* Interface の Soft Delete
 
 ---
 

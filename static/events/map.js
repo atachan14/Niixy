@@ -8,25 +8,33 @@ const ruleDialog = document.getElementById('thread-rule-dialog');
 const map = new geolonia.Map('#map');
 const markerById = new Map();
 const openThreadStorageKey = 'niimap:open-thread';
+const animateThreadStorageKey = 'niimap:animate-thread';
 const mapViewStorageKey = 'niimap:map-view';
 let draftMarker;
 let creating = false;
 let activeRuleCapability;
 
 const restoredThreadId = sessionStorage.getItem(openThreadStorageKey);
+const animateRestoredThread = sessionStorage.getItem(animateThreadStorageKey) === restoredThreadId;
 const restoredThreadPane = restoredThreadId && document.querySelector(`[data-thread-detail-pane="${restoredThreadId}"]`);
 const detailTitle = document.getElementById('thread-detail-title');
 if (restoredThreadPane) {
-  workspace.classList.add('is-detail-open');
-  workspace.classList.add('is-restoring-detail');
+  if (!animateRestoredThread) {
+    workspace.classList.add('is-detail-open');
+    workspace.classList.add('is-restoring-detail');
+  }
   restoredThreadPane.hidden = false;
   detailTitle.textContent = `${restoredThreadPane.dataset.threadTitle} (${restoredThreadPane.dataset.threadPostCount})`;
 } else {
   sessionStorage.removeItem(openThreadStorageKey);
 }
+sessionStorage.removeItem(animateThreadStorageKey);
 document.documentElement.classList.remove('has-restored-thread-detail');
 if (restoredThreadPane) {
-  requestAnimationFrame(() => requestAnimationFrame(() => workspace.classList.remove('is-restoring-detail')));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (animateRestoredThread) workspace.classList.add('is-detail-open');
+    else workspace.classList.remove('is-restoring-detail');
+  }));
 }
 
 document.getElementById('niimap-home-link')?.addEventListener('click', () => {
@@ -117,27 +125,11 @@ function selectThread(id, scroll = false) {
   list.querySelectorAll('.thread-item').forEach((item) => {
     const selected = item.dataset.threadId === String(id);
     item.classList.toggle('is-open', selected);
-    setThreadPreview(item.querySelector('.thread-preview'), selected);
   });
   markerById.forEach((marker, markerId) => marker.getElement().classList.toggle('is-highlighted', markerId === String(id)));
   showThreadMarker(id);
   const item = list.querySelector(`[data-thread-id="${id}"]`);
   if (scroll && item) item.scrollIntoView({block: 'nearest'});
-}
-function setThreadPreview(preview, isOpen) {
-  if (isOpen) {
-    preview.hidden = false;
-    requestAnimationFrame(() => preview.classList.add('is-open'));
-    return;
-  }
-
-  preview.classList.remove('is-open');
-  const hideWhenClosed = (event) => {
-    if (event.target !== preview || event.propertyName !== 'grid-template-rows') return;
-    preview.removeEventListener('transitionend', hideWhenClosed);
-    if (!preview.classList.contains('is-open')) preview.hidden = true;
-  };
-  preview.addEventListener('transitionend', hideWhenClosed);
 }
 function showThreadMarker(id) {
   const thread = markers.find((item) => String(item.id) === String(id));
@@ -172,16 +164,30 @@ createTrigger.addEventListener('click', () => {
   list.hidden = true;
   createTrigger.hidden = true;
 });
-createCancel.addEventListener('click', () => { creating = false; createForm.hidden = true; list.hidden = false; createTrigger.hidden = false; draftMarker?.remove(); draftMarker = undefined; });
+createCancel.addEventListener('click', () => {
+  creating = false;
+  createForm.reset();
+  createForm.hidden = true;
+  list.hidden = false;
+  createTrigger.hidden = false;
+  document.getElementById('thread-location-status').textContent = '地図上の地点を選択してください。';
+  document.getElementById('thread-form-error').hidden = true;
+  document.getElementById('thread-form-error').textContent = '';
+  workspace.classList.remove('is-detail-open');
+  draftMarker?.remove();
+  draftMarker = undefined;
+});
 document.getElementById('close-thread-detail').addEventListener('click', () => {
   workspace.classList.remove('is-detail-open');
   sessionStorage.removeItem(openThreadStorageKey);
 });
 list.addEventListener('click', (event) => {
   const summary = event.target.closest('.thread-summary');
-  if (summary) selectThread(summary.closest('.thread-item').dataset.threadId);
-  const detail = event.target.closest('[data-thread-detail]');
-  if (detail) openDetail(detail.dataset.threadDetail);
+  if (summary) {
+    const id = summary.closest('.thread-item').dataset.threadId;
+    selectThread(id);
+    openDetail(id);
+  }
 });
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -195,10 +201,14 @@ createForm.addEventListener('submit', async (event) => {
     if (response.ok) {
       created = true;
       saveMapView();
+      sessionStorage.setItem(openThreadStorageKey, String(data.thread_id));
+      sessionStorage.setItem(animateThreadStorageKey, String(data.thread_id));
       location.assign(data.redirect_url);
       return;
     }
-    document.getElementById('thread-form-error').textContent = Object.values(data.errors || {}).flat().join(' ');
+    const error = document.getElementById('thread-form-error');
+    error.textContent = Object.values(data.errors || {}).flat().join(' ');
+    error.hidden = false;
   } finally {
     if (!created) { button.disabled = false; button.textContent = '作成する'; }
   }
@@ -261,7 +271,7 @@ map.on('click', (event) => {
 });
 map.on('load', () => {
   restoreMapView();
-  markers.forEach((thread) => { const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map); marker.getElement().classList.add('event-map-marker'); marker.getElement().addEventListener('click', () => selectThread(thread.id, true)); markerById.set(String(thread.id), marker); });
+  markers.forEach((thread) => { const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map); marker.getElement().classList.add('event-map-marker'); marker.getElement().addEventListener('click', () => { selectThread(thread.id, true); openDetail(thread.id); }); markerById.set(String(thread.id), marker); });
   applyFilters();
   map.on('moveend', () => {
     sortByDistance();

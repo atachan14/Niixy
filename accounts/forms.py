@@ -28,8 +28,20 @@ def display_width(value):
     )
 
 
+def clean_display_name_value(value):
+    display_name = value.strip()
+    if any(character in '\r\n' or unicodedata.category(character).startswith('C') for character in display_name):
+        raise ValidationError('改行や制御文字は使えません。')
+    if any(is_emoji(character) for character in display_name):
+        raise ValidationError('絵文字は使えません。')
+    if display_width(display_name) > 24:
+        raise ValidationError('表示名は全角12文字、半角24文字相当までです。')
+    return display_name
+
+
 class SignUpForm(forms.Form):
     username = forms.CharField(min_length=3, max_length=20)
+    display_name = forms.CharField(required=False, max_length=24)
     password = forms.CharField(min_length=8, widget=forms.PasswordInput)
     password_confirmation = forms.CharField(widget=forms.PasswordInput)
 
@@ -40,6 +52,9 @@ class SignUpForm(forms.Form):
         if User.objects.filter(username__iexact=username).exists():
             raise ValidationError('このNiixy IDはすでに使われています。')
         return username
+
+    def clean_display_name(self):
+        return clean_display_name_value(self.cleaned_data['display_name'])
 
     def clean(self):
         cleaned_data = super().clean()
@@ -84,11 +99,4 @@ class DisplayNameForm(forms.Form):
     )
 
     def clean_display_name(self):
-        display_name = self.cleaned_data['display_name'].strip()
-        if any(character in '\r\n' or unicodedata.category(character).startswith('C') for character in display_name):
-            raise ValidationError('改行や制御文字は使えません。')
-        if any(is_emoji(character) for character in display_name):
-            raise ValidationError('絵文字は使えません。')
-        if display_width(display_name) > 24:
-            raise ValidationError('表示名は全角12文字、半角24文字相当までです。')
-        return display_name
+        return clean_display_name_value(self.cleaned_data['display_name'])

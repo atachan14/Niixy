@@ -4,12 +4,14 @@
 
 このディレクトリは、Niixy のプロダクト・設計方針における正本である。
 
-Niixy は次の七つの概念を中心にする。
+Niixy は次の九つの概念を中心にする。
 
 - Account: Niixy を利用する人
 - Room: Account が作成・管理する場所
 - Thread: NiiMap、Room、または Book で作られる会話
 - ThreadPost: Thread の開始投稿または時系列の返信
+- Tweet: Thread に属さず、Account の資産として蓄積する単独の呟き
+- Timeline: Tweet を収集・表示し、設定によって投稿先にもなる流れ
 - Book: Thread をテーマごとにまとめ、公開・購読できるコレクション
 - Interface: Account、Room、Thread、ThreadPost に付与する構造化・再利用可能な情報
 - NiiMap: コンテンツを発見・作成する地図サービス
@@ -20,6 +22,7 @@ Niixy は次の七つの概念を中心にする。
 
 - [コンテンツモデル](content-model.md): Thread、ThreadPost、掲載、スナップショット、活動日時
 - [Room と NiiMap](room-and-niimap.md): Thread が存在・発見される場所
+- [Tweet と Timeline](tweet-and-timeline.md): 単独の呟きと、それを収集・掲載する Timeline
 - [制限と Policy](access-policy.md): アクセス制御の方向性と v0.3 の範囲
 - [Interface](interfaces.md): Interface の分類と保留する汎用機能
 - [Account と履歴](account-and-history.md): アカウントページ、Book、Album、将来の履歴

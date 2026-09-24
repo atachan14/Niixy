@@ -71,6 +71,17 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, '公開Thread')
         self.assertNotContains(response, '非公開Thread')
 
+    def test_map_keeps_thread_creation_in_list_pane(self):
+        response = self.client.get(reverse('events:map'))
+
+        content = response.content.decode()
+        list_start = content.index('<aside class="thread-list-pane"')
+        detail_start = content.index('<aside class="thread-detail-pane"')
+        form_start = content.index('id="thread-create-form"')
+        self.assertGreater(form_start, list_start)
+        self.assertLess(form_start, detail_start)
+        self.assertNotContains(response, 'id="thread-create-detail"')
+
     def test_guest_threads_are_shown_by_default_for_an_account(self):
         user = get_user_model().objects.create_user('niixy_user', password='eightchars')
         self.client.force_login(user)

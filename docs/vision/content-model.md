@@ -14,7 +14,15 @@ ThreadPost は開始投稿と返信の両方を表す。投稿は時系列順に
 
 返信はフラットな時系列の一覧とする。`>>1` のような参照は別の投稿へのリンクであり、ネストした返信ツリーを作らない。将来は参照先を hover で表示する UI を検討する。
 
-ThreadPost の本文と ResponseInterface の実装値は、投稿後に編集しない。削除済みの返信は、投稿番号を維持したまま、当面は「削除されました」と表示する。削除済み表示のレイアウトや文言は将来の DisplayLayout と合わせて再検討する。
+ThreadPost の本文と ThreadPostInterface の実装値は、投稿後に編集しない。ThreadPostInterface は `#1` と返信の両方へ適用できる。削除済みの返信は、投稿番号を維持したまま、当面は「削除されました」と表示する。削除済み表示のレイアウトや文言は将来の DisplayLayout と合わせて再検討する。
+
+## ThreadInterface の更新
+
+Thread には複数の ThreadInterface を適用できる。作成後も新規 Interface の追加、既存 Interface の削除、実装値の編集、最新版への更新を許可する。Require された Interface は単独で削除できず、追加・削除・更新後の構成は InterfaceRequirement を満たさなければならない。
+
+Version 更新では、旧 Version の削除と新 Version の追加を利用者に個別操作させず、一つの更新操作として扱う。両 Version で継続する同一 Field の値は引き継ぎ、追加 Field は入力を求め、使用されなくなる Field は差分確認に表示する。更新により他の Interface が成立しなくなる場合は、保存前に影響を示し、更新の中止、依存する Interface の同時更新、または削除を選べるようにする。
+
+Interface の追加、削除、実装値編集、Version 更新は構造化された履歴として保持する。Thread の時系列上で変更時点を示すシステム Response として表示し、`#1` の ThreadInterface 領域から更新履歴を一覧できるようにする案を有力とする。具体的な表示と、システム Response の投稿番号・Response 数への扱いは実装時に決める。
 
 ## Book
 

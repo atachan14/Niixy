@@ -110,29 +110,6 @@ function closePane() {
   updateUrl(new URLSearchParams());
 }
 
-function setPreview(preview, isOpen) {
-  if (isOpen) {
-    preview.hidden = false;
-    requestAnimationFrame(() => preview.classList.add('is-open'));
-    return;
-  }
-  preview.classList.remove('is-open');
-  const hideWhenClosed = (event) => {
-    if (event.target !== preview || event.propertyName !== 'grid-template-rows') return;
-    preview.removeEventListener('transitionend', hideWhenClosed);
-    if (!preview.classList.contains('is-open')) preview.hidden = true;
-  };
-  preview.addEventListener('transitionend', hideWhenClosed);
-}
-
-function selectSummary(item) {
-  paneContainer.querySelectorAll('.summary-item').forEach((summary) => {
-    const selected = summary === item;
-    summary.classList.toggle('is-open', selected);
-    setPreview(summary.querySelector('.summary-item-preview'), selected);
-  });
-}
-
 async function openDetail(threadId, postNumber = null, shouldPersist = true, shouldUpdateUrl = true) {
   let detail = document.querySelector(`[data-thread-detail-pane="${threadId}"]`);
   if (!detail) {
@@ -182,8 +159,6 @@ paneContainer.addEventListener('click', (event) => {
     loadPane(activePane, query);
     return;
   }
-  const header = event.target.closest('.summary-item-header');
-  if (header) selectSummary(header.closest('.summary-item'));
   const detailTrigger = event.target.closest('[data-thread-detail]');
   if (detailTrigger) openDetail(detailTrigger.dataset.threadDetail);
   const responseHeader = event.target.closest('[data-response-thread]');

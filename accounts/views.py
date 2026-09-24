@@ -33,6 +33,9 @@ def signup(request):
         except IntegrityError:
             form.add_error('username', 'このNiixy IDはすでに使われています。')
         else:
+            profile, _ = AccountProfile.objects.get_or_create(user=user)
+            profile.display_name = form.cleaned_data['display_name']
+            profile.save(update_fields=['display_name'])
             login(request, user)
             return JsonResponse({'username': user.username})
 

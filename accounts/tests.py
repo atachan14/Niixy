@@ -12,6 +12,7 @@ class AuthenticationTests(TestCase):
             reverse('accounts:signup'),
             {
                 'username': 'niixy_user',
+                'display_name': 'こあたみ',
                 'password': 'eightchars',
                 'password_confirmation': 'eightchars',
             },
@@ -21,6 +22,7 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.json()['username'], 'niixy_user')
         self.assertTrue(get_user_model().objects.filter(username='niixy_user').exists())
         self.assertEqual(int(self.client.session['_auth_user_id']), get_user_model().objects.get().pk)
+        self.assertEqual(get_user_model().objects.get().niixy_profile.display_name, 'こあたみ')
 
     def test_signup_rejects_invalid_niixy_id(self):
         response = self.client.post(
@@ -73,12 +75,14 @@ class AccountPageTests(TestCase):
 
     def test_thread_pane_lists_created_threads_on_demand(self):
         account = get_user_model().objects.create_user('creator_user', password='eightchars')
-        self.make_public_thread(account, '作成したThread')
+        thread = self.make_public_thread(account, '作成したThread')
 
         response = self.client.get(reverse('accounts:thread-pane', args=[account.username]))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '作成したThread')
+        self.assertContains(response, f'data-thread-detail="{thread.pk}"')
+        self.assertNotContains(response, '詳細を見る')
 
     def test_account_page_hides_undiscoverable_threads(self):
         account = get_user_model().objects.create_user('creator_user', password='eightchars')
