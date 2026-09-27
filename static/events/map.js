@@ -1,4 +1,5 @@
 const markers = JSON.parse(document.getElementById('thread-markers').textContent);
+const interfaceCatalog = JSON.parse(document.getElementById('thread-interface-catalog-data').textContent);
 const workspace = document.querySelector('.thread-workspace');
 const list = document.getElementById('thread-list');
 const createForm = document.getElementById('thread-create-form');
@@ -13,6 +14,9 @@ const mapViewStorageKey = 'niimap:map-view';
 let draftMarker;
 let creating = false;
 let activeRuleCapability;
+const selectedInterfaceIds = new Set();
+const interfaceValueStore = new Map();
+let previewInterfaceId = null;
 
 const restoredThreadId = sessionStorage.getItem(openThreadStorageKey);
 const animateRestoredThread = sessionStorage.getItem(animateThreadStorageKey) === restoredThreadId;
@@ -90,6 +94,107 @@ function createFormData() {
   });
   return data;
 }
+
+function interfaceValueKey(interfaceId, fieldKey) { return `${interfaceId}:${fieldKey}`; }
+function inputName(interfaceId, fieldKey) { return `interface_value_${interfaceId}_${fieldKey}`; }
+function makeFieldControl(implementation, field) {
+  const key = interfaceValueKey(implementation.id, field.key);
+  const saved = interfaceValueStore.get(key) || [];
+  const wrapper = document.createElement('div');
+  wrapper.className = 'field thread-interface-field';
+  wrapper.dataset.valueKey = key;
+  const label = document.createElement('label');
+  label.textContent = `${field.label}${field.required ? '（必須）' : ''}`;
+  wrapper.append(label);
+  const name = inputName(implementation.id, field.key);
+  if (field.type === 'long_text') {
+    const input = document.createElement('textarea'); input.name = name; input.rows = 4; input.value = saved[0] || ''; input.required = field.required; wrapper.append(input);
+  } else if (field.type === 'boolean') {
+    const input = document.createElement('select'); input.name = name; input.required = field.required;
+    [['', '選択してください'], ['true', 'はい'], ['false', 'いいえ']].forEach(([value, text]) => { const option = document.createElement('option'); option.value = value; option.textContent = text; option.selected = saved[0] === value; input.append(option); }); wrapper.append(input);
+  } else if (field.type === 'single_choice') {
+    const input = document.createElement('select'); input.name = name; input.required = field.required;
+    const empty = document.createElement('option'); empty.value = ''; empty.textContent = '選択してください'; input.append(empty);
+    field.settings.options.forEach((value) => { const option = document.createElement('option'); option.value = value; option.textContent = value; option.selected = saved[0] === value; input.append(option); }); wrapper.append(input);
+  } else if (field.type === 'multiple_choice') {
+    const choices = document.createElement('div'); choices.className = 'thread-interface-choices';
+    field.settings.options.forEach((value) => { const choice = document.createElement('label'); const input = document.createElement('input'); input.type = 'checkbox'; input.name = name; input.value = value; input.checked = saved.includes(value); choice.append(input, document.createTextNode(value)); choices.append(choice); }); wrapper.append(choices);
+  } else {
+    const input = document.createElement('input'); input.name = name; input.required = field.required; input.value = saved[0] || '';
+    input.type = {integer: 'number', decimal: 'number', date: 'date', datetime: 'datetime-local'}[field.type] || 'text';
+    if (field.type === 'decimal') input.step = 'any'; wrapper.append(input);
+  }
+  wrapper.addEventListener('input', () => {
+    const controls = wrapper.querySelectorAll(`[name="${name}"]`);
+    const values = Array.from(controls).filter((control) => control.type !== 'checkbox' || control.checked).map((control) => control.value).filter((value) => value !== '');
+    interfaceValueStore.set(key, values);
+  });
+  return wrapper;
+}
+function appendImplementation(container, implementation, isSelectedRoot = false) {
+  const section = document.createElement('details'); section.className = 'thread-interface-implementation'; section.open = true;
+  const summary = document.createElement('summary');
+  const name = document.createElement('span');
+  name.textContent = `${implementation.name}@${implementation.creator} v${implementation.version}`;
+  summary.append(name);
+  if (isSelectedRoot) {
+    const remove = document.createElement('span'); remove.className = 'remove-thread-interface'; remove.textContent = '×'; remove.setAttribute('role', 'button'); remove.setAttribute('tabindex', '0'); remove.setAttribute('aria-label', `${implementation.name}を外す`);
+    const removeInterface = (event) => { event.preventDefault(); event.stopPropagation(); selectedInterfaceIds.delete(implementation.id); renderSelectedInterfaces(); };
+    remove.addEventListener('click', removeInterface);
+    remove.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') removeInterface(event); });
+    summary.append(remove);
+  }
+  const fields = document.createElement('div'); fields.className = 'thread-interface-implementation-fields';
+  implementation.fields.forEach((field) => fields.append(makeFieldControl(implementation, field)));
+  if (!implementation.fields.length) { const empty = document.createElement('p'); empty.className = 'empty'; empty.textContent = '入力するFieldはありません。'; fields.append(empty); }
+  section.append(summary, fields); container.append(section);
+}
+function selectedImplementations() {
+  const byId = new Map();
+  interfaceCatalog.filter((item) => selectedInterfaceIds.has(item.id)).forEach((item) => item.implementations.forEach((implementation) => byId.set(implementation.id, implementation)));
+  return Array.from(byId.values());
+}
+function renderSelectedInterfaces() {
+  const container = document.getElementById('selected-thread-interfaces'); container.replaceChildren();
+  selectedInterfaceIds.forEach((id) => {
+    const input = document.createElement('input'); input.type = 'hidden'; input.name = 'interface_ids'; input.value = id; container.append(input);
+  });
+  selectedImplementations().forEach((implementation) => appendImplementation(container, implementation, selectedInterfaceIds.has(implementation.id)));
+}
+function renderInterfacePreview(id) {
+  previewInterfaceId = id;
+  const item = interfaceCatalog.find((candidate) => candidate.id === id);
+  const detail = document.getElementById('thread-interface-selector-detail'); detail.replaceChildren();
+  const title = document.createElement('h3'); title.textContent = `${item.name}@${item.creator} v${item.version}`; detail.append(title);
+  if (item.description) { const description = document.createElement('p'); description.textContent = item.description; detail.append(description); }
+  if (item.requires.length) { const requires = document.createElement('p'); requires.className = 'thread-interface-requires'; requires.textContent = `Require: ${item.requires.map((required) => `${required.name}@${required.creator} v${required.version}`).join(', ')}`; detail.append(requires); }
+  item.implementations.forEach((implementation) => appendImplementation(detail, implementation));
+  const use = document.createElement('button'); use.className = 'button primary'; use.type = 'button'; use.textContent = selectedInterfaceIds.has(id) ? '入力内容を反映' : 'このInterfaceを使用';
+  use.addEventListener('click', () => { detail.querySelectorAll('.thread-interface-field').forEach((field) => field.dispatchEvent(new Event('input'))); selectedInterfaceIds.add(id); renderSelectedInterfaces(); closeInterfaceSelector(); });
+  detail.append(use);
+}
+function openInterfaceSelector(id = null) {
+  const selector = document.getElementById('thread-interface-selector'); selector.hidden = false;
+  requestAnimationFrame(() => selector.classList.add('is-open'));
+  if (id) renderInterfacePreview(id);
+}
+function closeInterfaceSelector() {
+  const selector = document.getElementById('thread-interface-selector'); selector.classList.remove('is-open');
+  window.setTimeout(() => { selector.hidden = true; }, 260);
+}
+document.getElementById('open-thread-interface-selector').addEventListener('click', () => openInterfaceSelector());
+document.getElementById('close-thread-interface-selector').addEventListener('click', closeInterfaceSelector);
+document.querySelectorAll('[data-thread-interface-tab]').forEach((tab) => tab.addEventListener('click', () => {
+  document.querySelectorAll('[data-thread-interface-tab]').forEach((item) => {
+    const active = item === tab;
+    item.classList.toggle('is-active', active);
+    item.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('[data-thread-interface-list]').forEach((list) => {
+    list.classList.toggle('is-active', list.dataset.threadInterfaceList === tab.dataset.threadInterfaceTab);
+  });
+}));
+document.querySelectorAll('[data-select-thread-interface]').forEach((button) => button.addEventListener('click', () => renderInterfacePreview(Number(button.dataset.selectThreadInterface))));
 function accountIds() { return new Set(document.getElementById('filter-account-ids').value.toLowerCase().split(/[\s,]+/).filter(Boolean)); }
 function applyFilters() {
   const guests = document.getElementById('filter-show-guests').checked;
@@ -173,6 +278,9 @@ createCancel.addEventListener('click', () => {
   document.getElementById('thread-location-status').textContent = '地図上の地点を選択してください。';
   document.getElementById('thread-form-error').hidden = true;
   document.getElementById('thread-form-error').textContent = '';
+  selectedInterfaceIds.clear();
+  interfaceValueStore.clear();
+  renderSelectedInterfaces();
   workspace.classList.remove('is-detail-open');
   draftMarker?.remove();
   draftMarker = undefined;

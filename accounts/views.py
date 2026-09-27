@@ -12,6 +12,7 @@ from events.models import Thread, ThreadAccessRule, ThreadPost
 
 from .forms import DisplayNameForm, LoginForm, SignUpForm
 from .models import AccountProfile
+from interfaces.views import interface_management_context
 
 
 User = get_user_model()
@@ -62,6 +63,8 @@ def prepare_threads(queryset, viewer):
         queryset.select_related('creator').prefetch_related(
             'access_rules',
             Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
+            'interface_implementations__version__interface__creator',
+            'interface_implementations__values__field',
         )
     )
     discoverable = []
@@ -122,6 +125,8 @@ def account_thread_detail(request, username, thread_id):
         .prefetch_related(
             'access_rules',
             Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
+            'interface_implementations__version__interface__creator',
+            'interface_implementations__values__field',
         )
         .filter(Q(creator=account) | Q(posts__creator=account, posts__number__gt=1))
         .distinct(),
@@ -149,8 +154,24 @@ def my_page(request):
         messages.success(request, '基本情報を更新しました。')
         return redirect('mypage')
 
-    return render(request, 'accounts/my_page.html', {
+    render_panes = request.GET.get('_panes') == '1' or request.method == 'POST'
+    context = {
         'account': request.user,
         'form': form,
         'show_basic_info': show_basic_info,
-    })
+        'show_interface': request.GET.get('section') == 'interface',
+        'render_mypage_panes': render_panes,
+    }
+    selected_draft_id = request.GET.get('draft')
+    if selected_draft_id and selected_draft_id.isdigit():
+        selected_draft_id = int(selected_draft_id)
+    else:
+        selected_draft_id = None
+    selected_interface_id = request.GET.get('interface')
+    if selected_interface_id and selected_interface_id.isdigit():
+        selected_interface_id = int(selected_interface_id)
+    else:
+        selected_interface_id = None
+    if render_panes and request.GET.get('section') == 'interface':
+        context.update(interface_management_context(request.user, selected_draft_id, selected_interface_id))
+    return render(request, 'accounts/my_page.html', context)

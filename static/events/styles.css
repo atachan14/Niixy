@@ -870,6 +870,49 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-rule-item button, .thread-rule-add, .thread-rule-candidates button { background: #fff; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; padding: 6px 8px; }
 .thread-rule-item button { border: 0; background: transparent; font-size: 18px; line-height: 1; padding: 0 2px; }
 .thread-rule-add { color: var(--accent-dark); justify-self: start; }
+.thread-interface-input { border-top: 1px solid var(--line); padding-top: 10px; }
+.thread-interface-input > summary { cursor: pointer; font-size: 16px; font-weight: 700; padding: 4px 0 10px; }
+.thread-interface-input-content { display: grid; gap: 10px; min-width: 0; width: 100%; }
+#selected-thread-interfaces { min-width: 0; width: 100%; }
+#open-thread-interface-selector { background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--accent-dark); cursor: pointer; font: inherit; justify-self: start; padding: 7px 10px; }
+.selected-interface-root { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+.selected-interface-root button { background: transparent; border: 0; color: var(--text); cursor: pointer; font: inherit; padding: 10px 4px; }
+.selected-interface-root button:first-child { flex: 1; font-weight: 700; text-align: left; }
+.thread-interface-implementation { border-bottom: 1px solid var(--line); box-sizing: border-box; min-width: 0; padding: 0; width: 100%; }
+.thread-interface-implementation > summary { align-items: center; box-sizing: border-box; cursor: pointer; display: flex; font-weight: 700; justify-content: space-between; padding: 10px 0; width: 100%; }
+.thread-interface-implementation > summary span:first-child { color: var(--text); flex: 1; font: inherit; font-weight: 700; min-width: 0; text-align: left; }
+.thread-interface-implementation > summary .remove-thread-interface { cursor: pointer; flex: 0 0 auto; font-weight: 400; margin-left: auto; padding: 4px; }
+.thread-interface-implementation-fields { display: grid; gap: 10px; padding: 2px 0 14px; }
+.thread-interface-field input:not([type='checkbox']), .thread-interface-field select, .thread-interface-field textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; min-height: 40px; padding: 8px 9px; width: 100%; }
+.thread-interface-choices { display: grid; gap: 7px; }
+.thread-interface-choices label { align-items: center; display: flex; gap: 7px; }
+.thread-interface-selector { background: var(--panel); bottom: 0; left: 0; position: fixed; right: 0; top: var(--header-height); transform: translateX(100%); transition: transform 260ms ease; z-index: 20; }
+.thread-interface-selector.is-open { transform: translateX(0); }
+.thread-interface-selector[hidden] { display: none; }
+.thread-interface-selector > header { align-items: center; border-bottom: 1px solid var(--line); display: flex; height: 60px; justify-content: space-between; padding: 0 24px; }
+.thread-interface-selector > header h2 { font-size: 18px; margin: 0; }
+.thread-interface-selector-body { display: grid; grid-template-columns: minmax(300px, 38%) minmax(0, 62%); height: calc(100% - 60px); }
+.thread-interface-catalog { border-right: 1px solid var(--line); overflow-y: auto; padding: 16px 20px; }
+.thread-interface-catalog-tabs { border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; }
+.thread-interface-catalog-tabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; flex: 0 0 auto; font: inherit; font-size: 14px; font-weight: 700; min-height: 48px; padding: 0 14px; }
+.thread-interface-catalog-tabs button.is-active { border-bottom-color: var(--accent); color: var(--accent-dark); }
+.thread-interface-catalog-list { display: none; }
+.thread-interface-catalog-list.is-active { display: block; }
+.thread-interface-catalog-list button { background: transparent; border: 0; border-bottom: 1px solid var(--line); color: var(--text); cursor: pointer; display: grid; gap: 4px; padding: 14px 0; text-align: left; width: 100%; }
+.thread-interface-catalog-list small, .thread-interface-creator, .thread-interface-requires { color: var(--muted); }
+.thread-interface-selector-detail { overflow-y: auto; padding: 24px; }
+.thread-interface-selector-detail > h3 { font-size: 22px; margin: 0; }
+.thread-interface-selector-detail > p { line-height: 1.6; }
+.thread-interface-selector-detail > .button { float: right; margin-top: 20px; }
+.thread-interface-accordion { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 10px; }
+.thread-interface-accordion > summary, .thread-interface-entry > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.thread-interface-accordion-content { display: grid; gap: 6px; padding: 4px 0 8px; }
+.thread-interface-entry { border-top: 1px solid var(--line); }
+.thread-interface-entry summary small { color: var(--muted); font-weight: 400; }
+.thread-interface-entry dl { margin: 0; }
+.thread-interface-entry dl div { display: grid; gap: 4px; grid-template-columns: minmax(100px, 35%) minmax(0, 1fr); padding: 7px 0; }
+.thread-interface-entry dt { color: var(--muted); }
+.thread-interface-entry dd { margin: 0; overflow-wrap: anywhere; }
 .thread-rule-dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 18px; width: min(360px, calc(100vw - 32px)); }
 .thread-rule-dialog::backdrop { background: rgba(36, 33, 29, 0.42); }
 .thread-rule-dialog form { display: grid; gap: 16px; }
@@ -887,4 +930,9 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
   .thread-detail-header { top: 0; }
   .thread-post { grid-template-columns: clamp(44px, 18%, 64px) minmax(0, 1fr); }
   .thread-workspace.is-detail-open .thread-track { transform: translateX(-100vw); }
+  .thread-interface-selector { top: var(--header-height); }
+  .thread-interface-selector > header { padding: 0 16px; }
+  .thread-interface-selector-body { display: block; overflow-y: auto; }
+  .thread-interface-catalog { border-right: 0; overflow: visible; }
+  .thread-interface-selector-detail { border-top: 1px solid var(--line); overflow: visible; padding: 20px 16px 40px; }
 }

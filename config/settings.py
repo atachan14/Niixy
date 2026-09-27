@@ -57,6 +57,7 @@ GEOLONIA_API_KEY = os.environ.get('GEOLONIA_API_KEY', 'YOUR-API-KEY')
 INSTALLED_APPS = [
     'accounts',
     'events',
+    'interfaces',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

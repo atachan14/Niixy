@@ -1,11 +1,14 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db.models import Max, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+
+from interfaces.services import prepare_thread_interfaces, save_thread_interfaces, thread_interface_catalog
 
 from .forms import ThreadCreateForm, ThreadPostForm
 from .idempotency import run_once, submission_id_from
@@ -16,12 +19,15 @@ CAPABILITIES = (ThreadAccessRule.DISCOVER, ThreadAccessRule.VIEW, ThreadAccessRu
 
 
 def map_view(request):
+    interface_catalog = thread_interface_catalog()
     threads = list(
         Thread.objects.select_related('creator__niixy_profile')
         .prefetch_related(
             'access_rules',
             Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
             Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
+            'interface_implementations__version__interface__creator',
+            'interface_implementations__values__field',
         )
     )
     threads = [thread for thread in threads if thread.allows(request.user, ThreadAccessRule.DISCOVER)]
@@ -61,6 +67,11 @@ def map_view(request):
             (ThreadAccessRule.VIEW, '閲覧制限'),
             (ThreadAccessRule.WRITE, '書込制限'),
         ],
+        'thread_interface_catalog': interface_catalog,
+        'created_thread_interface_catalog': [
+            item for item in interface_catalog
+            if request.user.is_authenticated and item['creator'] == request.user.username
+        ],
     })
 
 
@@ -85,6 +96,24 @@ def thread_create(request):
     if not form.is_valid():
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
 
+    try:
+        interface_ids = [int(value) for value in request.POST.getlist('interface_ids')]
+    except ValueError:
+        return JsonResponse({'errors': {'interfaces': ['Interfaceの指定が正しくありません。']}}, status=400)
+    value_lists = {}
+    for key in request.POST:
+        if not key.startswith('interface_value_'):
+            continue
+        _, _, interface_id, field_key = key.split('_', 3)
+        try:
+            value_lists[(int(interface_id), field_key)] = request.POST.getlist(key)
+        except ValueError:
+            return JsonResponse({'errors': {'interfaces': ['Interfaceの入力値が正しくありません。']}}, status=400)
+    try:
+        prepared_interfaces = prepare_thread_interfaces(interface_ids, value_lists)
+    except ValidationError as error:
+        return JsonResponse({'errors': error.message_dict}, status=400)
+
     def create_thread():
         thread = Thread.objects.create(
                 submission_id=submission_id,
@@ -101,6 +130,7 @@ def thread_create(request):
                 ThreadAccessRule(thread=thread, capability=rule.capability, audience=rule.audience)
                 for rule in rules_from_request(request)
         ])
+        save_thread_interfaces(thread, prepared_interfaces)
         return thread
 
     thread, _ = run_once(Thread, submission_id, create_thread)

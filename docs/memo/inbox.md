@@ -19,7 +19,7 @@
 
 ## Inbox
 
-
+- SummaryPane以外のアコーディオンにもアニメーションを反映
 
 
 ## Idea

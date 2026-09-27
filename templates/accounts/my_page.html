@@ -3,13 +3,14 @@
 
 {% block title %}{{ account.niixy_profile.display_label }} のマイページ | Niixy{% endblock %}
 {% block main_class %}mypage-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/mypage.css' %}">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20260927-1">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
 {% block content %}
-<section class="mypage{% if show_basic_info %} is-basic-info-open{% endif %}">
-  <header class="mypage-header"><h1><button id="mypage-identity" type="button"{% if not show_basic_info %} disabled{% endif %}>{{ account.niixy_profile.display_label }} のマイページ</button><span id="mypage-context"{% if not show_basic_info %} hidden{% endif %}> &gt; 基本情報</span></h1></header>
+<section class="mypage" data-initial-section="{% if show_basic_info %}basic{% elif show_interface %}interface{% else %}overview{% endif %}" data-pane-url="{% url 'mypage' %}" data-interface-list-url="{% url 'interfaces:management-list' %}">
+  <header class="mypage-header"><h1><button id="mypage-identity" type="button"{% if not show_basic_info and not show_interface %} disabled{% endif %}>{{ account.niixy_profile.display_label }} のマイページ</button><span id="mypage-context"{% if not show_basic_info and not show_interface %} hidden{% endif %}> &gt; {% if show_interface %}Interface{% else %}基本情報{% endif %}</span></h1></header>
+  <div class="mypage-viewport">
   <div class="mypage-workspace">
     <section class="mypage-overview" aria-label="マイページ概要">
       <div class="mypage-overview-content">
@@ -17,13 +18,13 @@
         <div class="mypage-actions" aria-label="マイページ機能">
           <button id="open-basic-info" class="is-active" type="button">基本情報</button>
           <button type="button" disabled>Album</button>
-          <button type="button" disabled>Interface</button>
+          <button id="open-interface" class="is-active" type="button">Interface</button>
           <button type="button" disabled>Layout</button>
         </div>
       </div>
     </section>
 
-    <section class="basic-info-pane" aria-label="基本情報">
+    {% if render_mypage_panes and not show_interface %}<section class="basic-info-pane" aria-label="基本情報">
       <header class="basic-info-header"><h2>基本情報</h2><button id="close-basic-info" class="icon-button" type="button" aria-label="マイページ概要に戻る">×</button></header>
       <form class="basic-info-form" method="post" novalidate>
         {% csrf_token %}
@@ -35,9 +36,95 @@
         </div>
         <button class="button" type="submit">保存</button>
       </form>
-    </section>
+    </section>{% endif %}
+
+    {% if render_mypage_panes and show_interface %}<section class="interface-management" aria-label="Interface管理">
+      <div class="interface-track{% if selected_interface_draft or selected_interface %} is-detail-open{% endif %}">
+        <section class="interface-list-pane">
+          <header class="interface-pane-header"><h2>Interface</h2><form method="post" action="{% url 'interfaces:draft-create' %}">{% csrf_token %}<button class="button" type="submit">新規作成</button></form></header>
+          <div class="interface-tabs" role="tablist" aria-label="Interface一覧">
+            <button{% if not selected_interface_draft and not selected_interface or selected_interface.status == 'active' %} class="is-active"{% endif %} type="button" role="tab" aria-selected="{% if selected_interface_draft or selected_interface.status == 'deleted' %}false{% else %}true{% endif %}" data-interface-tab="created">作成</button>
+            <button{% if selected_interface_draft %} class="is-active"{% endif %} type="button" role="tab" aria-selected="{% if selected_interface_draft %}true{% else %}false{% endif %}" data-interface-tab="draft">編集中</button>
+            <button type="button" role="tab" aria-selected="false" data-interface-tab="saved">保存</button>
+            <button{% if selected_interface.status == 'deleted' %} class="is-active"{% endif %} type="button" role="tab" aria-selected="{% if selected_interface.status == 'deleted' %}true{% else %}false{% endif %}" data-interface-tab="deleted">削除済み</button>
+          </div>
+          <div class="interface-list-section{% if not selected_interface_draft and selected_interface.status != 'deleted' %} is-active{% endif %}" data-interface-list="created">
+            {% for item in active_interfaces %}{% include 'interfaces/summary_item.html' with interface=item selected_id=selected_interface.pk %}{% empty %}<p class="empty">公開したInterfaceはありません。</p>{% endfor %}
+          </div>
+          <div class="interface-list-section{% if selected_interface_draft %} is-active{% endif %}" data-interface-list="draft">
+            {% for draft in interface_drafts %}{% include 'interfaces/summary_item.html' with draft=draft selected_id=selected_interface_draft.pk %}{% empty %}<p class="empty">編集中のInterfaceはありません。</p>{% endfor %}
+          </div>
+          <div class="interface-list-section" data-interface-list="saved"><p class="empty">保存したInterfaceはありません。</p></div>
+          <div class="interface-list-section{% if selected_interface.status == 'deleted' %} is-active{% endif %}" data-interface-list="deleted">
+            {% for item in deleted_interfaces %}{% include 'interfaces/summary_item.html' with interface=item selected_id=selected_interface.pk deleted=True %}{% empty %}<p class="empty">削除済みInterfaceはありません。</p>{% endfor %}
+          </div>
+        </section>
+
+        <aside class="interface-detail-pane">
+          <header class="interface-pane-header"><h2>{% if selected_interface_draft %}{{ selected_interface_draft.get_kind_display }}:{{ selected_interface_draft.name }}@{{ account.username }} v{{ selected_interface_draft.next_version_number }} の定義{% if selected_interface_draft.interface_id %}編集{% else %}作成{% endif %}{% else %}Interface詳細{% endif %}</h2><button id="close-interface-detail" class="icon-button" type="button" data-list-url="{% url 'mypage' %}?section=interface" aria-label="Interface一覧に戻る">×</button></header>
+          {% if selected_interface_draft %}
+          <form class="interface-draft-form" method="post" action="{% url 'interfaces:draft-update' selected_interface_draft.pk %}" novalidate>
+            {% csrf_token %}
+            <details class="interface-form-section" open><summary>基本情報</summary><div class="interface-section-body"><div class="interface-inline-field"><label for="{{ interface_draft_form.name.id_for_label }}">名前</label><div class="interface-name-input">{{ interface_draft_form.name }}<span>@{{ account.username }}</span></div></div><div class="interface-inline-field"><label for="{{ interface_draft_form.description.id_for_label }}">詳細</label>{{ interface_draft_form.description }}</div></div></details>
+            <details class="interface-form-section" open><summary>Require</summary><div class="interface-section-body">
+              <div id="interface-require-inputs">{{ interface_draft_form.required_interfaces }}</div>
+              <div id="selected-interface-requires" class="selected-interface-requires">
+                {% for candidate in interface_require_candidates %}<div class="selected-interface-require" data-selected-require="{{ candidate.pk }}" hidden><span><strong>{{ candidate.name }}@{{ candidate.creator.username }}</strong><small>{{ candidate.get_kind_display }} / v{{ candidate.current_version.version_number }}</small></span><button class="icon-button remove-interface-require" type="button" data-require-id="{{ candidate.pk }}" aria-label="{{ candidate.name }}のRequireを解除">×</button></div>{% endfor %}
+                <p id="empty-interface-requires" class="empty">Requireはありません。</p>
+              </div>
+              <button id="open-require-picker" class="button secondary" type="button">Requireを追加</button>
+            </div></details>
+            <details class="interface-form-section" open><summary>Field</summary><div class="interface-section-body interface-field-groups">
+              {% for candidate in interface_require_candidates %}<details class="interface-field-group" data-required-field-group="{{ candidate.pk }}" open hidden><summary>{{ candidate.name }}@{{ candidate.creator.username }}</summary><div class="required-interface-fields">{% for field in candidate.current_version.fields.all %}<div class="required-interface-field"><strong>{{ field.label }}</strong><span>{{ field.get_field_type_display }}{% if field.required %} / 必須{% endif %}</span></div>{% empty %}<p class="empty">Fieldはありません。</p>{% endfor %}</div></details>{% endfor %}
+              <details class="interface-field-group" open><summary>Self</summary><div class="self-interface-fields">
+              {{ interface_field_formset.management_form }}
+              <div id="interface-field-list">
+                {% for field_form in interface_field_formset %}<article class="interface-field-editor">
+                  {{ field_form.field_id }}{{ field_form.DELETE.as_hidden }}
+                  {{ field_form.label }}{{ field_form.field_type }}<label class="interface-required-toggle">必須 {{ field_form.required }}</label><div class="interface-options-field">{{ field_form.options }}</div><button class="icon-button remove-interface-field" type="button" aria-label="Fieldを削除">×</button>
+                </article>{% endfor %}
+              </div>
+              <template id="interface-field-template"><article class="interface-field-editor">
+                {{ interface_field_formset.empty_form.field_id }}{{ interface_field_formset.empty_form.DELETE.as_hidden }}
+                {{ interface_field_formset.empty_form.label }}{{ interface_field_formset.empty_form.field_type }}<label class="interface-required-toggle">必須 {{ interface_field_formset.empty_form.required }}</label><div class="interface-options-field">{{ interface_field_formset.empty_form.options }}</div><button class="icon-button remove-interface-field" type="button" aria-label="Fieldを削除">×</button>
+              </article></template>
+              <button id="add-interface-field" class="button secondary" type="button">Fieldを追加</button>
+              </div></details>
+            </div></details>
+            <div class="interface-form-actions"><button class="button secondary" type="submit" name="action" value="save">中断</button><button class="button primary" type="submit" name="action" value="publish">公開</button></div>
+          </form>
+          <form class="discard-interface-draft" method="post" action="{% url 'interfaces:draft-discard' selected_interface_draft.pk %}">{% csrf_token %}<button type="submit">Draftを破棄</button></form>
+          {% elif selected_interface %}
+          <div class="published-interface-detail">
+            <header><div><h3>{{ selected_interface.name }}@{{ selected_interface.creator.username }}</h3><p>v{{ selected_interface.current_version.version_number }} / {{ selected_interface.get_kind_display }}</p></div>{% if selected_interface.status == 'deleted' %}<span class="interface-status">削除済み</span>{% endif %}</header>
+            {% if selected_interface.current_version.description %}<p class="interface-description">{{ selected_interface.current_version.description|linebreaksbr }}</p>{% endif %}
+            <section class="interface-form-section"><h3>Require</h3>{% for requirement in selected_interface.current_version.requirements.all %}<div class="published-requirement"><strong>{{ requirement.required_interface.name }}</strong><small>{{ requirement.required_interface.creator.username }} / v{{ requirement.required_version.version_number }}</small></div>{% empty %}<p class="empty">Requireはありません。</p>{% endfor %}</section>
+            <section class="interface-form-section"><h3>Field</h3>{% for field in selected_interface.current_version.fields.all %}<div class="published-field"><div><strong>{{ field.label }}</strong>{% if field.required %}<span>必須</span>{% endif %}</div><small>{{ field.get_field_type_display }}</small>{% if field.settings.options %}<p>{{ field.settings.options|join:' / ' }}</p>{% endif %}</div>{% empty %}<p class="empty">Fieldはありません。</p>{% endfor %}</section>
+            {% if selected_interface.status == 'active' %}<div class="published-interface-actions"><form method="post" action="{% url 'interfaces:draft-edit' selected_interface.pk %}">{% csrf_token %}<button class="button primary" type="submit">定義を編集</button></form></div><form class="interface-delete-form" method="post" action="{% url 'interfaces:delete' selected_interface.pk %}">{% csrf_token %}{% if selected_interface_dependents %}<p>{{ selected_interface_dependents }}件のInterfaceがこのInterfaceをRequireしています。削除後、それらは更新されるまで新規利用できなくなります。</p>{% endif %}<button type="submit">Interfaceを削除</button></form>{% else %}<form class="interface-restore-form" method="post" action="{% url 'interfaces:restore' selected_interface.pk %}">{% csrf_token %}<button class="button" type="submit">Interfaceを復元</button></form>{% endif %}
+          </div>
+          {% else %}<p class="interface-detail-empty">Interfaceを選択してください</p>{% endif %}
+        </aside>
+        {% if selected_interface_draft %}
+        <section class="add-require-list-pane" aria-label="RequireするInterfaceの一覧">
+          <header class="interface-pane-header"><h2>Interface</h2><button id="close-require-picker" class="icon-button" type="button" aria-label="定義編集へ戻る">×</button></header>
+          <div class="interface-tabs" role="tablist" aria-label="RequireするInterface一覧">
+            <button class="is-active" type="button" role="tab" aria-selected="true" data-require-tab="created">作成</button>
+            <button type="button" role="tab" aria-selected="false" data-require-tab="saved">保存</button>
+          </div>
+          <div class="require-picker-list is-active" data-require-list="created">{% for candidate in interface_require_created %}{% include 'interfaces/summary_item.html' with interface=candidate summary_action='require' draft_id=selected_interface_draft.pk %}{% empty %}<p class="empty">作成したInterfaceはありません。</p>{% endfor %}</div>
+          <div class="require-picker-list" data-require-list="saved"><p class="empty">保存したInterfaceはありません。</p></div>
+        </section>
+        <section class="add-require-detail-pane" aria-label="RequireするInterfaceの詳細">
+          <header class="interface-pane-header"><h2>Interface詳細</h2><button id="back-require-list" class="icon-button" type="button" aria-label="Interface一覧へ戻る">×</button></header>
+          <p id="require-picker-empty" class="interface-detail-empty">Interfaceを選択してください</p>
+          {% for candidate in interface_require_candidates %}<article class="require-candidate-detail" data-require-detail="{{ candidate.pk }}" hidden><header><div><h3>{{ candidate.name }}@{{ candidate.creator.username }}</h3><p>{{ candidate.get_kind_display }} / v{{ candidate.current_version.version_number }}</p></div><button class="button primary add-interface-require" type="button" data-require-id="{{ candidate.pk }}">追加</button></header>{% if candidate.current_version.description %}<p>{{ candidate.current_version.description|linebreaksbr }}</p>{% endif %}<section><h4>Field</h4>{% for field in candidate.current_version.fields.all %}<div class="required-interface-field"><strong>{{ field.label }}</strong><span>{{ field.get_field_type_display }}{% if field.required %} / 必須{% endif %}</span></div>{% empty %}<p class="empty">Fieldはありません。</p>{% endfor %}</section></article>{% endfor %}
+        </section>
+        {% endif %}
+      </div>
+    </section>{% endif %}
+  </div>
   </div>
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/mypage.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/mypage.js' %}?v=20260927-1"></script>{% endblock %}

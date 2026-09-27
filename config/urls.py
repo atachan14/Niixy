@@ -21,6 +21,7 @@ from accounts import views as account_views
 
 urlpatterns = [
     path('mypage/', account_views.my_page, name='mypage'),
+    path('mypage/interfaces/', include('interfaces.urls')),
     path('accounts/', include('accounts.urls')),
     path('', include('events.urls')),
     path('admin/', admin.site.urls),

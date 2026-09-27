@@ -5,6 +5,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import Locality, Station, Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
+from interfaces.models import FieldType, Interface, InterfaceDraft, InterfaceDraftField
+from interfaces.services import publish_draft
 
 
 class ThreadViewTests(TestCase):
@@ -33,6 +35,52 @@ class ThreadViewTests(TestCase):
         self.client.post(reverse('events:thread-create'), payload)
         self.client.post(reverse('events:thread-create'), payload)
         self.assertEqual(Thread.objects.count(), 1)
+
+    def test_thread_creation_saves_interface_implementation(self):
+        owner = get_user_model().objects.create_user('interface_owner', password='eightchars')
+        draft = InterfaceDraft.objects.create(creator=owner, kind=Interface.THREAD, name='Event')
+        draft_field = InterfaceDraftField.objects.create(
+            draft=draft,
+            label='開始日時',
+            field_type=FieldType.DATETIME,
+            required=True,
+            position=0,
+        )
+        interface, _ = publish_draft(draft.pk)
+        payload = self.payload()
+        payload['interface_ids'] = str(interface.pk)
+        payload[f'interface_value_{interface.pk}_{draft_field.field_key}'] = '2026-10-01T12:00'
+
+        response = self.client.post(reverse('events:thread-create'), payload)
+
+        self.assertEqual(response.status_code, 200)
+        implementation = Thread.objects.get().interface_implementations.get()
+        self.assertEqual(implementation.interface, interface)
+        self.assertEqual(implementation.values.get().value, '2026-10-01T12:00:00')
+
+        detail_response = self.client.get(reverse('events:map'))
+        self.assertContains(detail_response, 'ThreadIF')
+        self.assertContains(detail_response, '開始日時')
+        self.assertContains(detail_response, '2026-10-01T12:00:00')
+
+    def test_map_exposes_active_thread_interfaces_to_creation_ui(self):
+        owner = get_user_model().objects.create_user('catalog_owner', password='eightchars')
+        draft = InterfaceDraft.objects.create(creator=owner, kind=Interface.THREAD, name='募集')
+        interface, _ = publish_draft(draft.pk)
+        self.client.force_login(owner)
+
+        response = self.client.get(reverse('events:map'))
+
+        catalog = response.context['thread_interface_catalog']
+        created_catalog = response.context['created_thread_interface_catalog']
+        self.assertEqual(catalog[0]['version'], interface.current_version.version_number)
+        self.assertEqual(catalog[0]['creator'], owner.username)
+        self.assertEqual(catalog[0]['id'], interface.pk)
+        self.assertEqual(created_catalog[0]['id'], interface.pk)
+        self.assertContains(response, 'data-thread-interface-tab="search"')
+        self.assertContains(response, 'data-thread-interface-tab="created"')
+        self.assertContains(response, 'data-thread-interface-tab="saved"')
+        self.assertContains(response, 'data-select-thread-interface')
 
     def test_guest_can_reply_when_write_rule_allows_it(self):
         thread = Thread.objects.create(title='公開Thread')
