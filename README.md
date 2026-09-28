@@ -17,7 +17,11 @@ Niixyは、以下の2点を主要機能として想定して開発しているSN
 
 ## デモ
 
+**公開版**
+
 [Niixyの公開版を開く](https://niixy-psi.vercel.app/)
+
+**スクリーンショット**
 
 ![Niixyのマップ画面](readme-assets/screenshots/niixy-map.png)
 
