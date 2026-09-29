@@ -6,20 +6,42 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import InterfaceDraftFieldFormSet, InterfaceDraftForm
-from .models import FieldType, Interface, InterfaceDraft, InterfaceDraftField, InterfaceDraftRequirement
-from .services import publish_draft
+from .forms import FieldDefinitionForm, InterfaceDraftFieldFormSet, InterfaceDraftForm
+from .models import FieldDefinition, Interface, InterfaceDraft, InterfaceDraftField
+from .services import publish_draft, publish_field_definition
 
 
 def field_initial(field):
-    options = field.settings.get('options', []) if isinstance(field.settings, dict) else []
     return {
         'field_id': field.pk,
-        'label': field.label,
-        'field_type': field.field_type,
+        'definition_id': field.definition_id,
         'required': field.required,
-        'options': '\n'.join(options),
     }
+
+
+def draft_field_formset(draft, data=None):
+    fields = list(draft.fields.all())
+    formset = InterfaceDraftFieldFormSet(
+        data,
+        prefix='fields',
+        initial=[field_initial(field) for field in fields],
+    )
+    for form, field in zip(formset.forms, fields):
+        form.definition_item = field.definition
+    return formset
+
+
+def mark_interface_update_status(interfaces):
+    for interface in interfaces:
+        interface.requires_update = bool(
+            interface.current_version_id
+            and any(
+                field.definition.status != FieldDefinition.ACTIVE
+                or field.definition.current_version_id != field.field_version_id
+                for field in interface.current_version.fields.all()
+            )
+        )
+    return interfaces
 
 
 def interface_management_context(
@@ -31,19 +53,19 @@ def interface_management_context(
 ):
     drafts = list(
         user.interface_drafts.select_related('interface__current_version').prefetch_related(
-            'fields',
-            'requirements__required_interface__creator',
-            'requirements__required_interface__current_version__fields',
+            'fields__definition__creator',
+            'fields__definition__current_version',
         )
     )
-    interfaces = list(
+    interfaces = mark_interface_update_status(list(
         user.interfaces.select_related('current_version')
         .prefetch_related(
-            'current_version__fields',
-            'current_version__requirements__required_interface__creator',
+            'current_version__fields__definition__creator',
+            'current_version__fields__definition__current_version',
+            'current_version__fields__field_version',
         )
         .order_by('name')
-    )
+    ))
     selected_draft = next((draft for draft in drafts if draft.pk == selected_draft_id), None)
     selected_interface = next((item for item in interfaces if item.pk == selected_interface_id), None)
     if selected_draft:
@@ -52,41 +74,31 @@ def interface_management_context(
             if selected_draft.interface_id and selected_draft.interface.current_version_id
             else 1
         )
-        draft_form = draft_form or InterfaceDraftForm(user=user, draft=selected_draft, initial={
+        draft_form = draft_form or InterfaceDraftForm(initial={
             'name': selected_draft.name,
             'description': selected_draft.description,
-            'required_interfaces': [item.required_interface_id for item in selected_draft.requirements.all()],
         })
-        field_formset = field_formset or InterfaceDraftFieldFormSet(
-            prefix='fields',
-            initial=[field_initial(field) for field in selected_draft.fields.all()],
-        )
-    require_candidates = []
-    if draft_form:
-        require_candidates = list(
-            draft_form.fields['required_interfaces'].queryset.prefetch_related('current_version__fields')
-        )
+        field_formset = field_formset or draft_field_formset(selected_draft)
     return {
         'interface_drafts': drafts,
         'active_interfaces': [item for item in interfaces if item.status == Interface.ACTIVE],
         'deleted_interfaces': [item for item in interfaces if item.status == Interface.DELETED],
         'selected_interface_draft': selected_draft,
         'selected_interface': selected_interface,
-        'selected_interface_dependents': (
-            selected_interface.version_dependents.values('version__interface_id').distinct().count()
-            if selected_interface else 0
-        ),
+        'selected_interface_dependents': 0,
         'interface_draft_form': draft_form,
         'interface_field_formset': field_formset,
-        'interface_require_candidates': require_candidates,
-        'interface_require_created': [item for item in require_candidates if item.creator_id == user.pk],
-        'field_type_choices': FieldType.choices,
     }
 
 
 def interface_list_context(user):
     drafts = list(user.interface_drafts.select_related('interface__current_version'))
-    interfaces = list(user.interfaces.select_related('current_version').order_by('name'))
+    interfaces = mark_interface_update_status(list(
+        user.interfaces.select_related('current_version').prefetch_related(
+            'current_version__fields__definition__current_version',
+            'current_version__fields__field_version',
+        ).order_by('name')
+    ))
     return {
         'interface_drafts': drafts,
         'active_interfaces': [item for item in interfaces if item.status == Interface.ACTIVE],
@@ -97,9 +109,8 @@ def interface_list_context(user):
 def draft_detail_context(user, draft_id):
     draft = get_object_or_404(
         user.interface_drafts.select_related('interface__current_version').prefetch_related(
-            'fields',
-            'requirements__required_interface__creator',
-            'requirements__required_interface__current_version__fields',
+            'fields__definition__creator',
+            'fields__definition__current_version',
         ),
         pk=draft_id,
     )
@@ -107,19 +118,13 @@ def draft_detail_context(user, draft_id):
         draft.interface.current_version.version_number + 1
         if draft.interface_id and draft.interface.current_version_id else 1
     )
-    requirements = [item.required_interface for item in draft.requirements.all()]
     return {
         'selected_interface_draft': draft,
-        'interface_draft_form': InterfaceDraftForm(user=user, draft=draft, initial={
+        'interface_draft_form': InterfaceDraftForm(initial={
             'name': draft.name,
             'description': draft.description,
-            'required_interfaces': [item.pk for item in requirements],
         }),
-        'interface_field_formset': InterfaceDraftFieldFormSet(
-            prefix='fields',
-            initial=[field_initial(field) for field in draft.fields.all()],
-        ),
-        'selected_require_interfaces': requirements,
+        'interface_field_formset': draft_field_formset(draft),
     }
 
 
@@ -139,16 +144,16 @@ def draft_detail(request, draft_id):
 def published_detail(request, interface_id):
     interface = get_object_or_404(
         request.user.interfaces.select_related('current_version').prefetch_related(
-            'current_version__fields',
-            'current_version__requirements__required_interface__creator',
+            'current_version__fields__definition__creator',
+            'current_version__fields__definition__current_version',
+            'current_version__fields__field_version',
         ),
         pk=interface_id,
     )
+    mark_interface_update_status([interface])
     return render(request, 'interfaces/published_detail_pane.html', {
         'selected_interface': interface,
-        'selected_interface_dependents': interface.version_dependents.values(
-            'version__interface_id'
-        ).distinct().count(),
+        'selected_interface_dependents': 0,
     })
 
 
@@ -160,9 +165,10 @@ def definition_detail(request, interface_id):
         Interface.objects.filter(visibility, current_version__isnull=False)
         .select_related('creator', 'current_version')
         .prefetch_related(
-            'current_version__fields',
-            'current_version__requirements__required_interface__creator',
-            'current_version__requirements__required_version',
+            'current_version__fields__definition__creator',
+            'current_version__fields__definition__current_version',
+            'current_version__fields__field_version',
+            'current_version__fields__field_version__synonyms__target__creator',
         ),
         pk=interface_id,
     )
@@ -170,35 +176,29 @@ def definition_detail(request, interface_id):
 
 
 @login_required
-def add_require_list(request, draft_id):
+def add_field_list(request, draft_id):
     draft = get_object_or_404(InterfaceDraft, pk=draft_id, creator=request.user)
-    candidates = list(
-        Interface.objects.filter(status=Interface.ACTIVE, current_version__isnull=False)
-        .exclude(pk=draft.interface_id)
+    fields = list(
+        FieldDefinition.objects.filter(status=FieldDefinition.ACTIVE, current_version__isnull=False)
         .select_related('creator', 'current_version')
         .order_by('creator__username', 'name')
     )
-    return render(request, 'interfaces/add_require_list_pane.html', {
+    return render(request, 'interfaces/add_field_list_pane.html', {
         'draft': draft,
-        'interface_require_created': [item for item in candidates if item.creator_id == request.user.pk],
+        'created_fields': [item for item in fields if item.creator_id == request.user.pk],
     })
 
 
 @login_required
-def add_require_detail(request, draft_id, interface_id):
+def add_field_detail(request, draft_id, field_id):
     draft = get_object_or_404(InterfaceDraft, pk=draft_id, creator=request.user)
     candidate = get_object_or_404(
-        Interface.objects.filter(status=Interface.ACTIVE, current_version__isnull=False)
-        .exclude(pk=draft.interface_id)
+        FieldDefinition.objects.filter(status=FieldDefinition.ACTIVE, current_version__isnull=False)
         .select_related('creator', 'current_version')
-        .prefetch_related(
-            'current_version__fields',
-            'current_version__requirements__required_interface__creator',
-            'current_version__requirements__required_version',
-        ),
-        pk=interface_id,
+        .prefetch_related('current_version__synonyms__target__creator'),
+        pk=field_id,
     )
-    return render(request, 'interfaces/add_require_detail_pane.html', {'candidate': candidate})
+    return render(request, 'interfaces/add_field_detail_pane.html', {'candidate': candidate})
 
 
 @login_required
@@ -217,8 +217,7 @@ def draft_create(request):
 def draft_edit(request, interface_id):
     interface = get_object_or_404(
         Interface.objects.select_related('current_version').prefetch_related(
-            'current_version__fields',
-            'current_version__requirements',
+            'current_version__fields__definition__current_version',
         ),
         pk=interface_id,
         creator=request.user,
@@ -238,62 +237,64 @@ def draft_edit(request, interface_id):
         InterfaceDraftField.objects.bulk_create([
             InterfaceDraftField(
                 draft=draft,
-                field_key=field.field_key,
-                label=field.label,
-                field_type=field.field_type,
+                definition=field.definition,
                 required=field.required,
-                settings=field.settings,
                 position=field.position,
             )
             for field in interface.current_version.fields.all()
-        ])
-        InterfaceDraftRequirement.objects.bulk_create([
-            InterfaceDraftRequirement(
-                draft=draft,
-                required_interface=requirement.required_interface,
-                position=requirement.position,
-            )
-            for requirement in interface.current_version.requirements.all()
         ])
     return redirect(f'/mypage/?section=interface&draft={draft.pk}')
 
 
 def save_draft_forms(draft, draft_form, field_formset):
     existing_fields = {field.pk: field for field in draft.fields.all()}
-    submitted_ids = set()
     with transaction.atomic():
         draft.name = draft_form.cleaned_data['name'].strip()
         draft.description = draft_form.cleaned_data['description'].strip()
         draft.save(update_fields=['name', 'description', 'updated_at'])
 
-        draft.requirements.all().delete()
-        InterfaceDraftRequirement.objects.bulk_create([
-            InterfaceDraftRequirement(draft=draft, required_interface=required, position=position)
-            for position, required in enumerate(draft_form.cleaned_data['required_interfaces'])
-        ])
-
+        definition_ids = {
+            form.cleaned_data['definition_id']
+            for form in field_formset.forms
+            if form.cleaned_data and not form.cleaned_data.get('DELETE')
+        }
+        definitions = {
+            item.pk: item
+            for item in FieldDefinition.objects.filter(
+                pk__in=definition_ids,
+                status=FieldDefinition.ACTIVE,
+                current_version__isnull=False,
+            ).select_related('current_version')
+        }
+        if len(definitions) != len(definition_ids):
+            raise ValidationError('選択したFieldが見つかりません。')
+        retained_ids = {
+            form.cleaned_data['field_id']
+            for form in field_formset.forms
+            if (
+                form.cleaned_data
+                and not form.cleaned_data.get('DELETE')
+                and form.cleaned_data.get('field_id')
+            )
+        }
+        if not retained_ids.issubset(existing_fields):
+            raise ValidationError('編集対象ではないFieldが含まれています。')
+        draft.fields.exclude(pk__in=retained_ids).delete()
         position = 0
         for form in field_formset.forms:
             if not form.cleaned_data or form.cleaned_data.get('DELETE'):
                 continue
             field_id = form.cleaned_data.get('field_id')
             field = existing_fields.get(field_id) if field_id else None
-            if field_id and field is None:
-                raise ValidationError('編集対象ではないFieldが含まれています。')
-            settings = {}
-            if form.cleaned_data['field_type'] in {FieldType.SINGLE_CHOICE, FieldType.MULTIPLE_CHOICE}:
-                settings = {'options': form.cleaned_data['normalized_options']}
+            if field and field.definition_id != form.cleaned_data['definition_id']:
+                raise ValidationError('追加済みFieldの参照先は変更できません。')
             if field is None:
                 field = InterfaceDraftField(draft=draft)
-            field.label = form.cleaned_data['label'].strip()
-            field.field_type = form.cleaned_data['field_type']
+            field.definition = definitions[form.cleaned_data['definition_id']]
             field.required = form.cleaned_data['required']
-            field.settings = settings
             field.position = position
             field.save()
-            submitted_ids.add(field.pk)
             position += 1
-        draft.fields.exclude(pk__in=submitted_ids).delete()
 
 
 @login_required
@@ -304,7 +305,7 @@ def draft_update(request, draft_id):
         pk=draft_id,
         creator=request.user,
     )
-    draft_form = InterfaceDraftForm(request.POST, user=request.user, draft=draft)
+    draft_form = InterfaceDraftForm(request.POST)
     field_formset = InterfaceDraftFieldFormSet(request.POST, prefix='fields')
     if not draft_form.is_valid() or not field_formset.is_valid():
         errors = []
@@ -358,3 +359,143 @@ def interface_restore(request, interface_id):
     interface.save(update_fields=['status', 'updated_at'])
     messages.success(request, f'{interface.name}を復元しました。')
     return redirect(f'/mypage/?section=interface&interface={interface.pk}')
+
+
+def field_form_initial(definition):
+    version = definition.current_version
+    return {
+        'name': version.name,
+        'description': version.description,
+        'field_type': version.field_type,
+        'options': '\n'.join(version.settings.get('options', [])),
+        'synonym_targets': list(version.synonyms.values_list('target_id', flat=True)),
+    }
+
+
+@login_required
+def field_management_list(request):
+    fields = list(
+        request.user.field_definitions.select_related('current_version').order_by('name')
+    )
+    return render(request, 'interfaces/field_management_list_pane.html', {
+        'active_fields': [item for item in fields if item.status == FieldDefinition.ACTIVE],
+        'deleted_fields': [item for item in fields if item.status == FieldDefinition.DELETED],
+    })
+
+
+@login_required
+def field_create(request):
+    return render(request, 'interfaces/field_editor_pane.html', {
+        'field_form': FieldDefinitionForm(),
+        'publication_version': 1,
+        'selected_synonym_targets': [],
+    })
+
+
+def field_detail(request, field_id):
+    visibility = Q(status=FieldDefinition.ACTIVE)
+    if request.user.is_authenticated:
+        visibility |= Q(creator=request.user)
+    definition = get_object_or_404(
+        FieldDefinition.objects.filter(visibility, current_version__isnull=False)
+        .select_related('creator', 'current_version')
+        .prefetch_related('current_version__synonyms__target__creator'),
+        pk=field_id,
+    )
+    return render(request, 'interfaces/field_detail_pane.html', {'field_item': definition})
+
+
+@login_required
+def field_edit(request, field_id):
+    definition = get_object_or_404(
+        request.user.field_definitions.select_related('current_version').prefetch_related(
+            'current_version__synonyms'
+        ),
+        pk=field_id,
+        status=FieldDefinition.ACTIVE,
+        current_version__isnull=False,
+    )
+    return render(request, 'interfaces/field_editor_pane.html', {
+        'field_item': definition,
+        'field_form': FieldDefinitionForm(
+            definition=definition,
+            initial=field_form_initial(definition),
+        ),
+        'publication_version': definition.current_version.version_number + 1,
+        'selected_synonym_targets': [item.target for item in definition.current_version.synonyms.all()],
+    })
+
+
+@login_required
+def add_synonym_list(request):
+    source_id = request.GET.get('source')
+    fields = FieldDefinition.objects.filter(
+        status=FieldDefinition.ACTIVE,
+        current_version__isnull=False,
+    ).select_related('creator', 'current_version')
+    if source_id:
+        fields = fields.exclude(pk=source_id)
+    fields = list(fields.order_by('creator__username', 'name'))
+    return render(request, 'interfaces/add_synonym_list_pane.html', {
+        'created_fields': [item for item in fields if item.creator_id == request.user.pk],
+    })
+
+
+@login_required
+def add_synonym_detail(request, field_id):
+    candidate = get_object_or_404(
+        FieldDefinition.objects.filter(status=FieldDefinition.ACTIVE, current_version__isnull=False)
+        .select_related('creator', 'current_version'),
+        pk=field_id,
+    )
+    return render(request, 'interfaces/add_synonym_detail_pane.html', {'candidate': candidate})
+
+
+@login_required
+@require_POST
+def field_publish(request, field_id=None):
+    definition = None
+    if field_id is not None:
+        definition = get_object_or_404(FieldDefinition, pk=field_id, creator=request.user)
+    form = FieldDefinitionForm(request.POST, definition=definition)
+    if not form.is_valid():
+        messages.error(request, ' '.join(
+            str(error) for errors in form.errors.values() for error in errors
+        ))
+        target = f'/mypage/interfaces/manage/fields/{field_id}/edit/' if field_id else '/mypage/interfaces/manage/fields/new/'
+        return redirect(target)
+    try:
+        definition, version = publish_field_definition(
+            creator=request.user,
+            definition=definition,
+            name=form.cleaned_data['name'],
+            description=form.cleaned_data['description'],
+            field_type=form.cleaned_data['field_type'],
+            settings=form.cleaned_data['settings'],
+            synonym_target_ids=[item.pk for item in form.cleaned_data['synonym_targets']],
+        )
+    except ValidationError as error:
+        messages.error(request, ' '.join(error.messages))
+        return redirect('/mypage/?section=definition&kind=field')
+    messages.success(request, f'{definition.name} v{version.version_number}を公開しました。')
+    return redirect(f'/mypage/?section=definition&kind=field&field={definition.pk}')
+
+
+@login_required
+@require_POST
+def field_delete(request, field_id):
+    definition = get_object_or_404(FieldDefinition, pk=field_id, creator=request.user)
+    definition.status = FieldDefinition.DELETED
+    definition.save(update_fields=['status', 'updated_at'])
+    messages.success(request, f'{definition.name}を削除しました。既存の実装では引き続き利用されます。')
+    return redirect('/mypage/?section=definition&kind=field')
+
+
+@login_required
+@require_POST
+def field_restore(request, field_id):
+    definition = get_object_or_404(FieldDefinition, pk=field_id, creator=request.user)
+    definition.status = FieldDefinition.ACTIVE
+    definition.save(update_fields=['status', 'updated_at'])
+    messages.success(request, f'{definition.name}を復元しました。')
+    return redirect(f'/mypage/?section=definition&kind=field&field={definition.pk}')

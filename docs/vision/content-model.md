@@ -18,9 +18,9 @@ ThreadPost の本文と ThreadPostInterface の実装値は、投稿後に編集
 
 ## ThreadInterface の更新
 
-Thread には複数の ThreadInterface を適用できる。作成後も新規 Interface の追加、既存 Interface の削除、実装値の編集、最新版への更新を許可する。Require された Interface は単独で削除できず、追加・削除・更新後の構成は InterfaceRequirement を満たさなければならない。
+Thread には複数の ThreadInterface を適用できる。作成後も新規 Interface の追加、既存 Interface の削除、実装値の編集、最新版への更新を許可する。各Interfaceは用途ごとのまとまりとして表示するが、同じFieldまたは片同義で接続されたFieldはThread内の一つのValueを共有する。
 
-Version 更新では、旧 Version の削除と新 Version の追加を利用者に個別操作させず、一つの更新操作として扱う。両 Version で継続する同一 Field の値は引き継ぎ、追加 Field は入力を求め、使用されなくなる Field は差分確認に表示する。更新により他の Interface が成立しなくなる場合は、保存前に影響を示し、更新の中止、依存する Interface の同時更新、または削除を選べるようにする。
+Version 更新では、旧 Version の削除と新 Version の追加を利用者に個別操作させず、一つの更新操作として扱う。両 Version で継続する同一 Field の値は引き継ぎ、追加 Field は入力を求め、使用されなくなる Field は差分確認に表示する。片同義によって複数の既存Valueが統合される場合は、最初に実装されたFieldのValueを維持し、保存前に影響を示す。
 
 Interface の追加、削除、実装値編集、Version 更新は構造化された履歴として保持する。Thread の時系列上で変更時点を示すシステム Response として表示し、`#1` の ThreadInterface 領域から更新履歴を一覧できるようにする案を有力とする。具体的な表示と、システム Response の投稿番号・Response 数への扱いは実装時に決める。
 

@@ -3,16 +3,20 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Max
+from django.db.models import F, Max
 from django.urls import reverse
 
 from .models import (
+    FieldDefinition,
+    FieldSynonym,
     FieldType,
+    FieldVersion,
     Interface,
     InterfaceDraft,
     InterfaceField,
-    InterfaceRequirement,
     InterfaceVersion,
+    ThreadFieldBinding,
+    ThreadFieldValue,
     ThreadInterfaceImplementation,
     ThreadInterfaceValue,
 )
@@ -36,19 +40,94 @@ def validate_field_settings(field):
         raise ValidationError({f'field:{field.pk}': 'このField型には設定を指定できません。'})
 
 
-def requirement_reaches(requirement_version, target_interface_id, visited=None):
-    visited = visited or set()
-    if requirement_version.interface_id == target_interface_id:
-        return True
-    if requirement_version.pk in visited:
-        return False
-    visited.add(requirement_version.pk)
-    return any(
-        requirement_reaches(requirement.required_version, target_interface_id, visited)
-        for requirement in requirement_version.requirements.select_related(
-            'required_version__interface'
+def publish_field_definition(
+    *,
+    creator,
+    name,
+    field_type,
+    settings=None,
+    description='',
+    synonym_target_ids=(),
+    definition=None,
+):
+    name = name.strip()
+    settings = settings or {}
+    if not name:
+        raise ValidationError({'name': 'Field名を入力してください。'})
+
+    candidate = type('FieldCandidate', (), {
+        'pk': definition.pk if definition else 'new',
+        'settings': settings,
+        'field_type': field_type,
+    })()
+    validate_field_settings(candidate)
+
+    with transaction.atomic():
+        if definition is None:
+            try:
+                definition = FieldDefinition.objects.create(creator=creator, name=name)
+            except IntegrityError as error:
+                raise ValidationError({'name': '同じ名前のFieldがすでに存在します。'}) from error
+        else:
+            definition = FieldDefinition.objects.select_for_update().get(pk=definition.pk)
+            if definition.creator_id != creator.pk:
+                raise ValidationError('作成者以外はFieldを更新できません。')
+            if definition.status != FieldDefinition.ACTIVE:
+                raise ValidationError('削除済みFieldは更新できません。')
+            if definition.current_version_id and definition.current_version.field_type != field_type:
+                raise ValidationError({'field_type': 'Fieldの型を変更する場合は、新しいFieldを作成してください。'})
+
+        targets = list(
+            FieldDefinition.objects.filter(
+                pk__in=set(synonym_target_ids),
+                status=FieldDefinition.ACTIVE,
+                current_version__isnull=False,
+            ).select_related('current_version')
         )
-    )
+        if len(targets) != len(set(synonym_target_ids)):
+            raise ValidationError({'synonyms': '選択した片同義Targetが見つかりません。'})
+        if definition.pk in {target.pk for target in targets}:
+            raise ValidationError({'synonyms': 'Field自身を片同義Targetにはできません。'})
+        if any(target.current_version.field_type != field_type for target in targets):
+            raise ValidationError({'synonyms': '同じ型のFieldだけを片同義Targetにできます。'})
+
+        latest_number = definition.versions.aggregate(latest=Max('version_number'))['latest'] or 0
+        version = FieldVersion.objects.create(
+            definition=definition,
+            version_number=latest_number + 1,
+            name=name,
+            description=description.strip(),
+            field_type=field_type,
+            settings=settings,
+        )
+        FieldSynonym.objects.bulk_create([
+            FieldSynonym(source_version=version, target=target, position=position)
+            for position, target in enumerate(targets)
+        ])
+        definition.name = name
+        definition.current_version = version
+        try:
+            definition.save(update_fields=['name', 'current_version', 'updated_at'])
+        except IntegrityError as error:
+            raise ValidationError({'name': '同じ名前のFieldがすでに存在します。'}) from error
+    return definition, version
+
+
+def expand_field_definition_ids(definition_ids):
+    """Expand search fields through current one-way synonym edges."""
+    expanded = set(definition_ids)
+    pending = list(expanded)
+    while pending:
+        source_id = pending.pop()
+        target_ids = FieldSynonym.objects.filter(
+            source_version__definition_id=source_id,
+            source_version__definition__current_version_id=F('source_version_id'),
+        ).values_list('target_id', flat=True)
+        for target_id in target_ids:
+            if target_id not in expanded:
+                expanded.add(target_id)
+                pending.append(target_id)
+    return expanded
 
 
 @transaction.atomic
@@ -56,7 +135,7 @@ def publish_draft(draft_id):
     draft = (
         InterfaceDraft.objects.select_for_update()
         .select_related('creator')
-        .prefetch_related('fields', 'requirements__required_interface__current_version')
+        .prefetch_related('fields__definition__current_version')
         .get(pk=draft_id)
     )
     name = draft.name.strip()
@@ -64,8 +143,13 @@ def publish_draft(draft_id):
         raise ValidationError({'name': 'Interface名を入力してください。'})
 
     fields = list(draft.fields.all())
+    resolved_fields = []
     for field in fields:
-        validate_field_settings(field)
+        definition = field.definition
+        field_version = definition.current_version
+        if definition.status != FieldDefinition.ACTIVE or field_version is None:
+            raise ValidationError({'fields': f'{definition.name}は現在利用できません。'})
+        resolved_fields.append((field, definition, field_version))
 
     if draft.interface_id is None:
         try:
@@ -79,16 +163,6 @@ def publish_draft(draft_id):
         if interface.status != Interface.ACTIVE:
             raise ValidationError('削除済みInterfaceは公開できません。')
 
-    requirements = list(draft.requirements.select_related('required_interface__current_version'))
-    resolved_requirements = []
-    for requirement in requirements:
-        required_interface = requirement.required_interface
-        if required_interface.status != Interface.ACTIVE or required_interface.current_version_id is None:
-            raise ValidationError({'requirements': f'{required_interface.name}は現在利用できません。'})
-        if required_interface.pk == interface.pk or requirement_reaches(required_interface.current_version, interface.pk):
-            raise ValidationError({'requirements': 'InterfaceのRequire関係を循環させることはできません。'})
-        resolved_requirements.append((requirement, required_interface.current_version))
-
     latest_number = interface.versions.aggregate(latest=Max('version_number'))['latest'] or 0
     version = InterfaceVersion.objects.create(
         interface=interface,
@@ -99,23 +173,12 @@ def publish_draft(draft_id):
     InterfaceField.objects.bulk_create([
         InterfaceField(
             version=version,
-            field_key=field.field_key,
-            label=field.label.strip(),
-            field_type=field.field_type,
+            definition=definition,
+            field_version=field_version,
             required=field.required,
-            settings=field.settings,
             position=field.position,
         )
-        for field in fields
-    ])
-    InterfaceRequirement.objects.bulk_create([
-        InterfaceRequirement(
-            version=version,
-            required_interface=requirement.required_interface,
-            required_version=required_version,
-            position=requirement.position,
-        )
-        for requirement, required_version in resolved_requirements
+        for field, definition, field_version in resolved_fields
     ])
     interface.name = name
     interface.kind = draft.kind
@@ -128,31 +191,28 @@ def publish_draft(draft_id):
 def resolve_interface_versions(interface_ids):
     interfaces = {
         item.pk: item
-        for item in Interface.objects.filter(pk__in=interface_ids).select_related('current_version')
+        for item in Interface.objects.filter(pk__in=interface_ids).select_related(
+            'current_version'
+        ).prefetch_related(
+            'current_version__fields__definition__current_version',
+            'current_version__fields__field_version__synonyms',
+        )
     }
     if len(interfaces) != len(set(interface_ids)):
         raise ValidationError({'interfaces': '選択したInterfaceが見つかりません。'})
 
     resolved = []
-    visited = set()
-
-    def visit(interface):
-        if interface.pk in visited:
-            return
+    for interface_id in interface_ids:
+        interface = interfaces[interface_id]
         if interface.status != Interface.ACTIVE or interface.current_version_id is None:
             raise ValidationError({'interfaces': f'{interface.name}は現在利用できません。'})
-        for requirement in interface.current_version.requirements.select_related(
-            'required_interface', 'required_version'
-        ):
-            required = requirement.required_interface
-            if required.status != Interface.ACTIVE or required.current_version_id != requirement.required_version_id:
-                raise ValidationError({'interfaces': f'{interface.name}のRequire関係は更新が必要です。'})
-            visit(required)
-        visited.add(interface.pk)
+        for field in interface.current_version.fields.all():
+            if (
+                field.definition.status != FieldDefinition.ACTIVE
+                or field.definition.current_version_id != field.field_version_id
+            ):
+                raise ValidationError({'interfaces': f'{interface.name}はFieldの更新が必要です。'})
         resolved.append(interface.current_version)
-
-    for interface_id in interface_ids:
-        visit(interfaces[interface_id])
     return resolved
 
 
@@ -194,21 +254,69 @@ def normalize_field_value(field, raw_values):
     raise ValidationError({str(field.field_key): f'{field.label}の型に対応していません。'})
 
 
+def _connected_field_components(fields):
+    definitions = {field.definition_id for field in fields}
+    graph = {definition_id: set() for definition_id in definitions}
+    for field in fields:
+        if not field.field_version_id:
+            continue
+        for target_id in field.field_version.synonyms.values_list('target_id', flat=True):
+            if target_id in definitions:
+                graph[field.definition_id].add(target_id)
+                graph[target_id].add(field.definition_id)
+
+    component_by_definition = {}
+    for definition_id in definitions:
+        if definition_id in component_by_definition:
+            continue
+        component = set()
+        pending = [definition_id]
+        while pending:
+            current = pending.pop()
+            if current in component:
+                continue
+            component.add(current)
+            pending.extend(graph[current] - component)
+        anchor = min(component)
+        for item in component:
+            component_by_definition[item] = anchor
+    return component_by_definition
+
+
 def prepare_thread_interfaces(interface_ids, value_lists):
     versions = resolve_interface_versions(interface_ids)
-    prepared = []
+    all_fields = [field for version in versions for field in version.fields.all()]
+    component_by_definition = _connected_field_components(all_fields)
+    supplied_values = {}
+    normalized = []
     for version in versions:
         field_values = []
         for field in version.fields.all():
             raw_values = value_lists.get((version.interface_id, str(field.field_key)), [])
+            required = field.required
+            field.required = False
             value = normalize_field_value(field, raw_values)
+            field.required = required
+            component = component_by_definition.get(field.definition_id, field.definition_id)
             if value is not None:
-                field_values.append((field, value))
-        prepared.append((version, field_values))
+                supplied_values.setdefault(component, value)
+            field_values.append((field, component, required))
+        normalized.append((version, field_values))
+
+    prepared = []
+    for version, field_values in normalized:
+        resolved_values = []
+        for field, component, required in field_values:
+            value = supplied_values.get(component)
+            if required and value is None:
+                raise ValidationError({str(field.field_key): f'{field.label}は必須です。'})
+            resolved_values.append((field, value, component))
+        prepared.append((version, resolved_values))
     return prepared
 
 
 def save_thread_interfaces(thread, prepared):
+    values_by_component = {}
     for position, (version, field_values) in enumerate(prepared):
         implementation = ThreadInterfaceImplementation.objects.create(
             thread=thread,
@@ -216,10 +324,28 @@ def save_thread_interfaces(thread, prepared):
             version=version,
             position=position,
         )
-        ThreadInterfaceValue.objects.bulk_create([
-            ThreadInterfaceValue(implementation=implementation, field=field, value=value)
-            for field, value in field_values
-        ])
+        interface_values = []
+        for field, value, component in field_values:
+            if value is None:
+                continue
+            shared_value = values_by_component.get(component)
+            if shared_value is None:
+                shared_value = ThreadFieldValue.objects.create(thread=thread, value=value)
+                values_by_component[component] = shared_value
+            binding, _ = ThreadFieldBinding.objects.get_or_create(
+                thread=thread,
+                definition=field.definition,
+                defaults={'value': shared_value},
+            )
+            if binding.value_id != shared_value.pk:
+                shared_value = binding.value
+                values_by_component[component] = shared_value
+            interface_values.append(ThreadInterfaceValue(
+                implementation=implementation,
+                field=field,
+                binding=binding,
+            ))
+        ThreadInterfaceValue.objects.bulk_create(interface_values)
 
 
 def thread_interface_catalog():
@@ -243,15 +369,7 @@ def thread_interface_catalog():
             'kind': interface.get_kind_display(),
             'updated_at': interface.updated_at,
             'description': interface.current_version.description,
-            'requires': [
-                {
-                    'id': version.interface_id,
-                    'name': version.name,
-                    'creator': version.interface.creator.username,
-                    'version': version.version_number,
-                }
-                for version in versions[:-1]
-            ],
+            'requires': [],
             'implementations': [
                 {
                     'id': version.interface_id,
@@ -266,6 +384,10 @@ def thread_interface_catalog():
                             'type_label': field.get_field_type_display(),
                             'required': field.required,
                             'settings': field.settings,
+                            'definition_id': field.definition_id,
+                            'synonym_target_ids': list(
+                                field.field_version.synonyms.values_list('target_id', flat=True)
+                            ),
                         }
                         for field in version.fields.all()
                     ],

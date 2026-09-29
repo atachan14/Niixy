@@ -1,6 +1,16 @@
 from django.contrib import admin
 
-from .models import Interface, InterfaceDraft, InterfaceField, InterfaceRequirement, InterfaceVersion
+from .models import (
+    FieldDefinition,
+    FieldSynonym,
+    FieldVersion,
+    Interface,
+    InterfaceDraft,
+    InterfaceField,
+    InterfaceVersion,
+    ThreadFieldBinding,
+    ThreadFieldValue,
+)
 
 
 admin.site.register(Interface)
@@ -17,4 +27,8 @@ class ImmutablePublishedAdmin(admin.ModelAdmin):
 
 admin.site.register(InterfaceVersion, ImmutablePublishedAdmin)
 admin.site.register(InterfaceField, ImmutablePublishedAdmin)
-admin.site.register(InterfaceRequirement, ImmutablePublishedAdmin)
+admin.site.register(FieldDefinition)
+admin.site.register(FieldVersion, ImmutablePublishedAdmin)
+admin.site.register(FieldSynonym, ImmutablePublishedAdmin)
+admin.site.register(ThreadFieldBinding)
+admin.site.register(ThreadFieldValue)

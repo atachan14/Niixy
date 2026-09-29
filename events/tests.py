@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from .models import Locality, Station, Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from interfaces.models import FieldType, Interface, InterfaceDraft, InterfaceDraftField
-from interfaces.services import publish_draft
+from interfaces.services import publish_draft, publish_field_definition
 
 
 class ThreadViewTests(TestCase):
@@ -39,11 +39,15 @@ class ThreadViewTests(TestCase):
 
     def test_thread_creation_saves_interface_implementation(self):
         owner = get_user_model().objects.create_user('interface_owner', password='eightchars')
+        definition, _ = publish_field_definition(
+            creator=owner,
+            name='開始日時',
+            field_type=FieldType.DATETIME,
+        )
         draft = InterfaceDraft.objects.create(creator=owner, kind=Interface.THREAD, name='Event')
         draft_field = InterfaceDraftField.objects.create(
             draft=draft,
-            label='開始日時',
-            field_type=FieldType.DATETIME,
+            definition=definition,
             required=True,
             position=0,
         )

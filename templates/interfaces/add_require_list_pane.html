@@ -1,6 +1,0 @@
-<section class="ui-pane ui-list-pane add-require-list-pane" data-mypage-pane="add-require-list">
-  <header class="ui-pane-header ui-list-pane-header interface-pane-header"><h2>Interface一覧</h2><button class="icon-button" type="button" data-close-add-require aria-label="定義編集へ戻る">×</button></header>
-  <div class="ui-tabs interface-tabs" role="tablist" aria-label="RequireするInterface一覧"><button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="created">作成</button><button type="button" role="tab" aria-selected="false" data-ui-tab="saved">保存</button></div>
-  <div class="ui-tab-panel require-picker-list is-active" data-ui-tab-panel="created">{% for candidate in interface_require_created %}{% include 'interfaces/summary_item.html' with interface=candidate summary_action='require' draft_id=draft.pk %}{% empty %}<p class="empty">作成したInterfaceはありません。</p>{% endfor %}</div>
-  <div class="ui-tab-panel require-picker-list" data-ui-tab-panel="saved"><p class="empty">保存したInterfaceはありません。</p></div>
-</section>

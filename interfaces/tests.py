@@ -8,11 +8,26 @@ from .models import (
     Interface,
     InterfaceDraft,
     InterfaceDraftField,
-    InterfaceDraftRequirement,
     ThreadInterfaceImplementation,
 )
-from .services import prepare_thread_interfaces, publish_draft, save_thread_interfaces, thread_interface_catalog
+from .services import (
+    expand_field_definition_ids,
+    prepare_thread_interfaces,
+    publish_draft,
+    publish_field_definition,
+    save_thread_interfaces,
+    thread_interface_catalog,
+)
 from events.models import Thread
+
+
+def create_field(user, name='値', field_type=FieldType.SHORT_TEXT, settings=None):
+    return publish_field_definition(
+        creator=user,
+        name=name,
+        field_type=field_type,
+        settings=settings or {},
+    )[0]
 
 
 class PublishDraftTests(TestCase):
@@ -29,10 +44,10 @@ class PublishDraftTests(TestCase):
     def test_publish_creates_immutable_version_and_removes_draft(self):
         draft = self.make_draft()
         self.assertEqual(draft.publication_version_number, 1)
+        definition = create_field(self.user, '開始日時', FieldType.DATETIME)
         field = InterfaceDraftField.objects.create(
             draft=draft,
-            label='開始日時',
-            field_type=FieldType.DATETIME,
+            definition=definition,
             required=True,
             position=0,
         )
@@ -44,17 +59,14 @@ class PublishDraftTests(TestCase):
         self.assertEqual(version.fields.get().field_key, field.field_key)
         self.assertFalse(InterfaceDraft.objects.filter(pk=draft.pk).exists())
 
-    def test_publish_resolves_required_interface_current_version(self):
-        required = self.publish_interface('Base')
-        draft = self.make_draft('Child')
-        InterfaceDraftRequirement.objects.create(draft=draft, required_interface=required, position=0)
+    def test_publish_pins_current_field_version(self):
+        definition = create_field(self.user, '共通Field')
+        draft = self.make_draft('Field user')
+        InterfaceDraftField.objects.create(draft=draft, definition=definition, position=0)
 
-        interface, version = publish_draft(draft.pk)
+        _, version = publish_draft(draft.pk)
 
-        requirement = version.requirements.get()
-        self.assertEqual(requirement.required_interface, required)
-        self.assertEqual(requirement.required_version, required.current_version)
-        self.assertEqual(interface.current_version, version)
+        self.assertEqual(version.fields.get().field_version, definition.current_version)
 
     def test_published_definition_cannot_be_changed(self):
         interface = self.publish_interface('Locked')
@@ -64,46 +76,26 @@ class PublishDraftTests(TestCase):
         with self.assertRaises(ValidationError):
             version.save()
 
-    def test_publish_rejects_deleted_requirement(self):
-        required = self.publish_interface('Deleted')
-        required.status = Interface.DELETED
-        required.save(update_fields=['status'])
-        draft = self.make_draft('Child')
-        InterfaceDraftRequirement.objects.create(draft=draft, required_interface=required, position=0)
+    def test_publish_rejects_deleted_field(self):
+        definition = create_field(self.user, 'Deleted')
+        definition.status = definition.DELETED
+        definition.save(update_fields=['status'])
+        draft = self.make_draft('Field user')
+        InterfaceDraftField.objects.create(draft=draft, definition=definition, position=0)
 
         with self.assertRaises(ValidationError):
             publish_draft(draft.pk)
 
         self.assertTrue(InterfaceDraft.objects.filter(pk=draft.pk).exists())
 
-    def test_publish_rejects_requirement_cycle(self):
-        first = self.publish_interface('First')
-        second_draft = self.make_draft('Second')
-        InterfaceDraftRequirement.objects.create(draft=second_draft, required_interface=first, position=0)
-        second, _ = publish_draft(second_draft.pk)
-        first_draft = InterfaceDraft.objects.create(
-            creator=self.user,
-            interface=first,
-            kind=first.kind,
-            name=first.name,
-        )
-        InterfaceDraftRequirement.objects.create(draft=first_draft, required_interface=second, position=0)
-
-        with self.assertRaises(ValidationError):
-            publish_draft(first_draft.pk)
-
     def test_choice_field_requires_unique_options(self):
-        draft = self.make_draft()
-        InterfaceDraftField.objects.create(
-            draft=draft,
-            label='種別',
-            field_type=FieldType.SINGLE_CHOICE,
-            settings={'options': ['募集', '募集']},
-            position=0,
-        )
-
         with self.assertRaises(ValidationError):
-            publish_draft(draft.pk)
+            publish_field_definition(
+                creator=self.user,
+                name='種別',
+                field_type=FieldType.SINGLE_CHOICE,
+                settings={'options': ['募集', '募集']},
+            )
 
     def test_name_is_unique_per_creator_case_insensitively(self):
         self.publish_interface('Event')
@@ -116,22 +108,20 @@ class PublishDraftTests(TestCase):
 class InterfaceManagementViewTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user('interface_editor', password='eightchars')
+        self.definition = create_field(self.user, '開催日時', FieldType.DATETIME)
         self.client.force_login(self.user)
 
     def field_payload(self, **overrides):
         payload = {
             'name': 'Event',
             'description': '日時を扱うInterface',
-            'required_interfaces': [],
             'fields-TOTAL_FORMS': '1',
             'fields-INITIAL_FORMS': '0',
             'fields-MIN_NUM_FORMS': '0',
             'fields-MAX_NUM_FORMS': '1000',
             'fields-0-field_id': '',
-            'fields-0-label': '開催日時',
-            'fields-0-field_type': FieldType.DATETIME,
+            'fields-0-definition_id': str(self.definition.pk),
             'fields-0-required': 'on',
-            'fields-0-options': '',
             'fields-0-DELETE': '',
             'action': 'save',
         }
@@ -183,8 +173,7 @@ class InterfaceManagementViewTests(TestCase):
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Reusable')
         InterfaceDraftField.objects.create(
             draft=draft,
-            label='参加人数',
-            field_type=FieldType.INTEGER,
+            definition=create_field(self.user, '参加人数', FieldType.INTEGER),
             required=True,
             position=0,
         )
@@ -210,18 +199,16 @@ class InterfaceManagementViewTests(TestCase):
         self.assertContains(owner_response, '削除済み')
         self.assertEqual(public_response.status_code, 404)
 
-    def test_add_require_panes_are_loaded_separately(self):
-        required_draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Base')
-        required, _ = publish_draft(required_draft.pk)
+    def test_add_field_panes_are_loaded_separately(self):
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Child')
 
-        list_response = self.client.get(reverse('interfaces:add-require-list', args=[draft.pk]))
-        detail_response = self.client.get(reverse('interfaces:add-require-detail', args=[draft.pk, required.pk]))
+        list_response = self.client.get(reverse('interfaces:add-field-list', args=[draft.pk]))
+        detail_response = self.client.get(reverse('interfaces:add-field-detail', args=[draft.pk, self.definition.pk]))
 
-        self.assertContains(list_response, 'data-mypage-pane="add-require-list"')
-        self.assertNotContains(list_response, 'data-mypage-pane="add-require-detail"')
-        self.assertContains(detail_response, 'data-mypage-pane="add-require-detail"')
-        self.assertContains(detail_response, 'Base@interface_editor v1/ThreadIF', count=1)
+        self.assertContains(list_response, 'data-mypage-pane="add-field-list"')
+        self.assertNotContains(list_response, 'data-mypage-pane="add-field-detail"')
+        self.assertContains(detail_response, 'data-mypage-pane="add-field-detail"')
+        self.assertContains(detail_response, '開催日時@interface_editor v1/Field', count=1)
 
     def test_create_and_save_draft_with_field(self):
         create_response = self.client.post(reverse('interfaces:draft-create'))
@@ -235,7 +222,7 @@ class InterfaceManagementViewTests(TestCase):
         draft.refresh_from_db()
         self.assertRedirects(save_response, f'/mypage/?section=interface&draft={draft.pk}')
         self.assertEqual(draft.name, 'Event')
-        self.assertEqual(draft.fields.get().label, '開催日時')
+        self.assertEqual(draft.fields.get().definition, self.definition)
 
     def test_definition_editor_header_uses_interface_identity(self):
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Editing')
@@ -261,15 +248,14 @@ class InterfaceManagementViewTests(TestCase):
         self.assertRedirects(response, '/mypage/?section=interface')
         self.assertEqual(interface.name, 'Event')
         self.assertEqual(interface.current_version.version_number, 1)
-        self.assertEqual(interface.current_version.fields.get().label, '開催日時')
+        self.assertEqual(interface.current_version.fields.get().definition, self.definition)
         self.assertFalse(InterfaceDraft.objects.filter(pk=draft.pk).exists())
 
     def test_edit_definition_clones_current_version_into_draft(self):
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Event')
         source_field = InterfaceDraftField.objects.create(
             draft=draft,
-            label='開始日時',
-            field_type=FieldType.DATETIME,
+            definition=self.definition,
             required=True,
             position=0,
         )
@@ -323,21 +309,55 @@ class InterfaceManagementViewTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_draft_can_save_and_publish_requirement(self):
-        required_draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Base')
-        required, _ = publish_draft(required_draft.pk)
+    def test_draft_can_save_and_publish_multiple_fields(self):
+        second = create_field(self.user, '終了日時', FieldType.DATETIME)
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Child')
-
+        payload = self.field_payload(name='Child', action='publish')
+        payload.update({
+            'fields-TOTAL_FORMS': '2',
+            'fields-1-field_id': '',
+            'fields-1-definition_id': str(second.pk),
+            'fields-1-required': '',
+            'fields-1-DELETE': '',
+        })
         response = self.client.post(
             reverse('interfaces:draft-update', args=[draft.pk]),
-            self.field_payload(name='Child', required_interfaces=[str(required.pk)], action='publish'),
+            payload,
         )
 
         self.assertRedirects(response, '/mypage/?section=interface')
         child = Interface.objects.get(name='Child')
-        requirement = child.current_version.requirements.get()
-        self.assertEqual(requirement.required_interface, required)
-        self.assertEqual(requirement.required_version, required.current_version)
+        self.assertEqual(child.current_version.fields.count(), 2)
+
+    def test_removing_first_field_compacts_positions(self):
+        second = create_field(self.user, '終了日時', FieldType.DATETIME)
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Compact')
+        first_binding = InterfaceDraftField.objects.create(
+            draft=draft, definition=self.definition, position=0
+        )
+        second_binding = InterfaceDraftField.objects.create(
+            draft=draft, definition=second, position=1
+        )
+        payload = self.field_payload(name='Compact')
+        payload.update({
+            'fields-TOTAL_FORMS': '2',
+            'fields-INITIAL_FORMS': '2',
+            'fields-0-field_id': str(first_binding.pk),
+            'fields-0-definition_id': str(self.definition.pk),
+            'fields-0-required': '',
+            'fields-0-DELETE': 'on',
+            'fields-1-field_id': str(second_binding.pk),
+            'fields-1-definition_id': str(second.pk),
+            'fields-1-required': '',
+            'fields-1-DELETE': '',
+        })
+
+        response = self.client.post(reverse('interfaces:draft-update', args=[draft.pk]), payload)
+
+        self.assertRedirects(response, f'/mypage/?section=interface&draft={draft.pk}')
+        remaining = draft.fields.get()
+        self.assertEqual(remaining.definition, second)
+        self.assertEqual(remaining.position, 0)
 
     def test_owner_can_soft_delete_and_restore_interface(self):
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Temporary')
@@ -385,12 +405,11 @@ class ThreadInterfaceServiceTests(TestCase):
 
     def publish(self, name, field_type=FieldType.SHORT_TEXT, required=False, settings=None):
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name=name)
+        definition = create_field(self.user, f'{name} value', field_type, settings)
         field = InterfaceDraftField.objects.create(
             draft=draft,
-            label='値',
-            field_type=field_type,
+            definition=definition,
             required=required,
-            settings=settings or {},
             position=0,
         )
         interface, _ = publish_draft(draft.pk)
@@ -416,17 +435,17 @@ class ThreadInterfaceServiceTests(TestCase):
         with self.assertRaises(ValidationError):
             prepare_thread_interfaces([interface.pk], {})
 
-    def test_shared_requirement_is_implemented_once(self):
-        base, _ = self.publish('Base')
+    def test_shared_field_is_resolved_for_each_interface_without_extra_interface(self):
+        definition = create_field(self.user, 'Shared')
         children = []
         for name in ('Child A', 'Child B'):
             draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name=name)
-            InterfaceDraftRequirement.objects.create(draft=draft, required_interface=base, position=0)
+            InterfaceDraftField.objects.create(draft=draft, definition=definition, position=0)
             children.append(publish_draft(draft.pk)[0])
 
         prepared = prepare_thread_interfaces([item.pk for item in children], {})
 
-        self.assertEqual([version.interface.name for version, _ in prepared], ['Base', 'Child A', 'Child B'])
+        self.assertEqual([version.interface.name for version, _ in prepared], ['Child A', 'Child B'])
 
     def test_catalog_provides_reusable_definition_detail_url(self):
         interface, _ = self.publish('Catalog')
@@ -436,3 +455,194 @@ class ThreadInterfaceServiceTests(TestCase):
         self.assertEqual(item['id'], interface.pk)
         self.assertEqual(item['detail_url'], reverse('interfaces:definition-detail', args=[interface.pk]))
         self.assertEqual(item['kind'], 'ThreadIF')
+
+
+class IndependentFieldTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user('field_owner', password='eightchars')
+
+    def make_interface(self, name, definition, required=False):
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name=name)
+        draft_field = InterfaceDraftField.objects.create(
+            draft=draft,
+            definition=definition,
+            required=required,
+            position=0,
+        )
+        interface, _ = publish_draft(draft.pk)
+        return interface, draft_field.field_key
+
+    def test_field_update_creates_an_immutable_next_version(self):
+        definition, first = publish_field_definition(
+            creator=self.user,
+            name='開始時刻',
+            field_type=FieldType.DATETIME,
+        )
+
+        definition, second = publish_field_definition(
+            creator=self.user,
+            definition=definition,
+            name='開始日時',
+            field_type=FieldType.DATETIME,
+        )
+
+        self.assertEqual((first.version_number, second.version_number), (1, 2))
+        self.assertEqual(definition.current_version, second)
+        first.name = '変更不可'
+        with self.assertRaises(ValidationError):
+            first.save()
+
+    def test_field_type_cannot_change_between_versions(self):
+        definition, _ = publish_field_definition(
+            creator=self.user,
+            name='人数',
+            field_type=FieldType.INTEGER,
+        )
+
+        with self.assertRaises(ValidationError):
+            publish_field_definition(
+                creator=self.user,
+                definition=definition,
+                name='人数',
+                field_type=FieldType.SHORT_TEXT,
+            )
+
+    def test_one_way_synonym_expands_search_only_from_source(self):
+        target, _ = publish_field_definition(
+            creator=self.user,
+            name='好きなポケモン',
+            field_type=FieldType.SHORT_TEXT,
+        )
+        source, _ = publish_field_definition(
+            creator=self.user,
+            name='好みのポケモン',
+            field_type=FieldType.SHORT_TEXT,
+            synonym_target_ids=[target.pk],
+        )
+
+        self.assertEqual(expand_field_definition_ids([source.pk]), {source.pk, target.pk})
+        self.assertEqual(expand_field_definition_ids([target.pk]), {target.pk})
+
+    def test_thread_catalog_includes_field_identity_and_synonym_targets(self):
+        target = create_field(self.user, 'Target')
+        source, _ = publish_field_definition(
+            creator=self.user,
+            name='Source',
+            field_type=FieldType.SHORT_TEXT,
+            synonym_target_ids=[target.pk],
+        )
+        interface, _ = self.make_interface('Catalog', source)
+
+        item = next(entry for entry in thread_interface_catalog() if entry['id'] == interface.pk)
+        field = item['implementations'][0]['fields'][0]
+
+        self.assertEqual(field['definition_id'], source.pk)
+        self.assertEqual(field['synonym_target_ids'], [target.pk])
+
+    def test_synonymous_fields_share_one_thread_value(self):
+        target, _ = publish_field_definition(
+            creator=self.user,
+            name='好きなポケモン',
+            field_type=FieldType.SHORT_TEXT,
+        )
+        source, _ = publish_field_definition(
+            creator=self.user,
+            name='好みのポケモン',
+            field_type=FieldType.SHORT_TEXT,
+            synonym_target_ids=[target.pk],
+        )
+        first, first_key = self.make_interface('First', target)
+        second, second_key = self.make_interface('Second', source)
+        prepared = prepare_thread_interfaces(
+            [first.pk, second.pk],
+            {
+                (first.pk, str(first_key)): ['ピカチュウ'],
+                (second.pk, str(second_key)): ['ミュウ'],
+            },
+        )
+        thread = Thread.objects.create(title='片同義Thread')
+
+        save_thread_interfaces(thread, prepared)
+
+        interface_values = [
+            item
+            for implementation in thread.interface_implementations.order_by('position')
+            for item in implementation.values.select_related('binding__value')
+        ]
+        self.assertEqual(thread.field_values.count(), 1)
+        self.assertEqual(thread.field_bindings.count(), 2)
+        self.assertEqual({item.binding.value_id for item in interface_values}, {thread.field_values.get().pk})
+        self.assertEqual({item.binding.value.value for item in interface_values}, {'ピカチュウ'})
+
+
+class FieldManagementViewTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user('field_editor', password='eightchars')
+        self.client.force_login(self.user)
+
+    def payload(self, **overrides):
+        payload = {
+            'name': '開催日時',
+            'description': 'イベントの開始日時',
+            'field_type': FieldType.DATETIME,
+            'options': '',
+            'synonym_targets': [],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_field_can_be_created_without_a_draft(self):
+        response = self.client.post(reverse('interfaces:field-publish-new'), self.payload())
+
+        definition = self.user.field_definitions.get()
+        self.assertRedirects(
+            response,
+            f'/mypage/?section=definition&kind=field&field={definition.pk}',
+        )
+        self.assertEqual(definition.current_version.version_number, 1)
+
+    def test_field_list_and_detail_are_separate_panes(self):
+        definition = create_field(self.user, '一覧Field')
+
+        list_response = self.client.get(reverse('interfaces:field-management-list'))
+        detail_response = self.client.get(reverse('interfaces:field-detail', args=[definition.pk]))
+
+        self.assertContains(list_response, 'data-mypage-pane="field-list"')
+        self.assertNotContains(list_response, 'data-mypage-pane="field-detail"')
+        self.assertContains(detail_response, 'data-mypage-pane="field-detail"')
+        self.assertContains(detail_response, '一覧Field@field_editor v1/Field', count=1)
+
+    def test_field_update_marks_referencing_interface_as_stale(self):
+        definition = create_field(self.user, '更新Field')
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Stale')
+        InterfaceDraftField.objects.create(draft=draft, definition=definition, position=0)
+        interface, _ = publish_draft(draft.pk)
+
+        publish_field_definition(
+            creator=self.user,
+            definition=definition,
+            name='更新Field',
+            field_type=FieldType.SHORT_TEXT,
+            description='v2',
+        )
+
+        response = self.client.get(reverse('interfaces:management-list'))
+        self.assertContains(response, '更新が必要')
+        with self.assertRaises(ValidationError):
+            prepare_thread_interfaces([interface.pk], {})
+
+    def test_field_update_with_synonym_is_displayed(self):
+        target = create_field(self.user, 'Target')
+        source = create_field(self.user, 'Source')
+
+        response = self.client.post(
+            reverse('interfaces:field-publish', args=[source.pk]),
+            self.payload(name='Source', field_type=FieldType.SHORT_TEXT, synonym_targets=[str(target.pk)]),
+        )
+        source.refresh_from_db()
+
+        self.assertRedirects(
+            response,
+            f'/mypage/?section=definition&kind=field&field={source.pk}',
+        )
+        self.assertEqual(source.current_version.synonyms.get().target, target)

@@ -39,7 +39,10 @@ function ensureInterfaceSelectorPanes() {
   document.querySelector('.thread-track').append(document.getElementById('thread-interface-selector-template').content.cloneNode(true));
   NiixyUI.bindTabs(document.querySelector('.thread-interface-catalog'));
   document.getElementById('close-thread-interface-selector').addEventListener('click', closeInterfaceSelector);
-  document.getElementById('back-thread-interface-selector').addEventListener('click', () => setThreadStage('interface-list'));
+  document.getElementById('back-thread-interface-selector').addEventListener('click', () => {
+    setThreadStage('interface-list');
+    synchronizeThreadFieldControls();
+  });
   document.querySelectorAll('[data-select-thread-interface]').forEach((button) => button.addEventListener('click', () => renderInterfacePreview(Number(button.dataset.selectThreadInterface))));
 }
 
@@ -137,6 +140,8 @@ function makeFieldControl(implementation, field) {
   const wrapper = document.createElement('div');
   wrapper.className = 'field thread-interface-field';
   wrapper.dataset.valueKey = key;
+  wrapper.dataset.definitionId = String(field.definition_id);
+  wrapper.dataset.synonymTargets = JSON.stringify(field.synonym_target_ids || []);
   const label = document.createElement('label');
   label.textContent = `${field.label}${field.required ? '（必須）' : ''}`;
   wrapper.append(label);
@@ -159,11 +164,61 @@ function makeFieldControl(implementation, field) {
     if (field.type === 'decimal') input.step = 'any'; wrapper.append(input);
   }
   wrapper.addEventListener('input', () => {
-    const controls = wrapper.querySelectorAll(`[name="${name}"]`);
-    const values = Array.from(controls).filter((control) => control.type !== 'checkbox' || control.checked).map((control) => control.value).filter((value) => value !== '');
-    interfaceValueStore.set(key, values);
+    synchronizeThreadFieldControls(wrapper);
   });
   return wrapper;
+}
+function readThreadFieldValues(wrapper) {
+  return Array.from(wrapper.querySelectorAll('input, select, textarea'))
+    .filter((control) => control.type !== 'checkbox' || control.checked)
+    .map((control) => control.value)
+    .filter((value) => value !== '');
+}
+function writeThreadFieldValues(wrapper, values) {
+  wrapper.querySelectorAll('input, select, textarea').forEach((control) => {
+    if (control.type === 'checkbox') control.checked = values.includes(control.value);
+    else control.value = values[0] || '';
+  });
+  interfaceValueStore.set(wrapper.dataset.valueKey, values);
+}
+function synchronizeThreadFieldControls(source = null) {
+  const selectedWrappers = Array.from(
+    document.querySelectorAll('#selected-thread-interfaces .thread-interface-field'),
+  );
+  const previewWrappers = threadStack.is('interface-detail')
+    ? Array.from(document.querySelectorAll('#thread-interface-selector-detail .thread-interface-field'))
+    : [];
+  const wrappers = [...selectedWrappers, ...previewWrappers];
+  const definitions = new Set(wrappers.map((wrapper) => wrapper.dataset.definitionId));
+  const graph = new Map(Array.from(definitions, (id) => [id, new Set()]));
+  wrappers.forEach((wrapper) => {
+    const sourceId = wrapper.dataset.definitionId;
+    JSON.parse(wrapper.dataset.synonymTargets).map(String).forEach((targetId) => {
+      if (!definitions.has(targetId)) return;
+      graph.get(sourceId).add(targetId);
+      graph.get(targetId).add(sourceId);
+    });
+  });
+  const visited = new Set();
+  wrappers.forEach((wrapper) => {
+    const rootId = wrapper.dataset.definitionId;
+    if (visited.has(rootId)) return;
+    const component = new Set();
+    const pending = [rootId];
+    while (pending.length) {
+      const definitionId = pending.pop();
+      if (component.has(definitionId)) continue;
+      component.add(definitionId);
+      graph.get(definitionId).forEach((targetId) => pending.push(targetId));
+    }
+    component.forEach((definitionId) => visited.add(definitionId));
+    const componentWrappers = wrappers.filter((item) => component.has(item.dataset.definitionId));
+    const sourceInComponent = source && component.has(source.dataset.definitionId) ? source : null;
+    const values = sourceInComponent
+      ? readThreadFieldValues(sourceInComponent)
+      : (componentWrappers.map(readThreadFieldValues).find((items) => items.length) || []);
+    componentWrappers.forEach((item) => writeThreadFieldValues(item, values));
+  });
 }
 function appendImplementation(container, implementation, isSelectedRoot = false) {
   const section = document.createElement('details'); section.className = 'thread-interface-implementation'; section.open = true;
@@ -194,6 +249,7 @@ function renderSelectedInterfaces() {
     const input = document.createElement('input'); input.type = 'hidden'; input.name = 'interface_ids'; input.value = id; container.append(input);
   });
   selectedImplementations().forEach((implementation) => appendImplementation(container, implementation, selectedInterfaceIds.has(implementation.id)));
+  synchronizeThreadFieldControls();
 }
 async function renderInterfacePreview(id) {
   previewInterfaceId = id;
@@ -218,6 +274,7 @@ async function renderInterfacePreview(id) {
   const editorTitle = document.createElement('h3'); editorTitle.textContent = '実装内容'; editor.append(editorTitle);
   item.implementations.forEach((implementation) => appendImplementation(editor, implementation));
   detail.append(editor);
+  synchronizeThreadFieldControls();
   const actions = document.createElement('div'); actions.className = 'interface-detail-actions';
   const use = document.createElement('button'); use.className = 'button primary'; use.type = 'button'; use.textContent = selectedInterfaceIds.has(id) ? '入力内容を反映' : 'このThreadIFを実装する';
   use.addEventListener('click', () => { detail.querySelectorAll('.thread-interface-field').forEach((field) => field.dispatchEvent(new Event('input'))); selectedInterfaceIds.add(id); renderSelectedInterfaces(); closeInterfaceSelector(); });
@@ -232,6 +289,7 @@ function closeInterfaceSelector() {
   previewRequestId += 1;
   previewInterfaceId = null;
   setThreadStage('list');
+  synchronizeThreadFieldControls();
 }
 document.getElementById('open-thread-interface-selector').addEventListener('click', () => openInterfaceSelector());
 function accountIds() { return new Set(document.getElementById('filter-account-ids').value.toLowerCase().split(/[\s,]+/).filter(Boolean)); }

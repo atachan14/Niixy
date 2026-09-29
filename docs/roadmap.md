@@ -76,13 +76,13 @@ Status: Complete
 
 ## v0.5 - Interface Foundation
 
-最初の ThreadInterface 作成・適用基盤を追加する。InterfaceVersion と編集途中の Draft を分離し、複数 Interface と Require 関係を一つの Thread に適用できる状態を目指す。
+最初の ThreadInterface 作成・適用基盤を追加する。独立した Field と FieldVersion、InterfaceVersion と編集途中の Draft を分離し、複数 Interface を一つの Thread に適用できる状態を目指す。
 
 主な対象:
 
 * Interface の新規作成、Draft 保存、v1 公開
-* 基本的な Field 定義
-* InterfaceRequirement と循環検証
+* 独立した Field の作成、Version 公開、片同義
+* Interface から FieldVersion を参照する構造
 * 複数 ThreadInterface の同時適用
 * Thread 作成時の Interface 選択と値入力
 * `#1` での ThreadInterface 表示

@@ -94,25 +94,25 @@ Account ページでは SiteHeader の直下に `表示名 @NiixyID` を表示�
 
 ## 2026-09-24 - Interface 間の関係を Require とする
 
-状態: 採用
+状態: 置換済み（2026-09-29 の「Field を Interface から独立させる」を採用）
 
 Interface の関係は定義を取り込む継承ではなく、別の Interface の実装を要求する InterfaceRequirement で表す。Require 先と Require 元は対象へそれぞれ実装し、複数経路から同じ Interface を要求しても実装と値は一つだけとする。Require 関係は循環を禁止する。
 
 ## 2026-09-24 - Interface の最新版適用と既存対象の Snapshot を両立する
 
-状態: 採用
+状態: 一部置換済み（2026-09-29 の「Field を Interface から独立させる」を採用）
 
 公開済み InterfaceVersion と Field 定義は変更しない。新規実装では各 Interface と Require 先の最新版だけを使用し、利用者に Version を選ばせない。InterfaceRequirement は特定 Version を固定せず、新規実装時に Require 先の最新版との互換性を検証する。互換性を失った依存元 Interface は、作成者が新 Version で対応するまで新規利用できない。既存 Thread は適用時点の Version 構成を維持し、作成者が差分を確認して最新版へ更新できるようにする。Field 定義を変更する場合は新しい Field とし、未変更の Field だけ同じ Field ID と値を引き継ぐ。旧 Version は過去ログ維持のために残し、新規投稿を最新版へ集約して検索対象の分散を抑える。
 
 ## 2026-09-24 - Interface は Draft を経て公開し Soft Delete する
 
-状態: 採用
+状態: 一部置換済み（2026-09-29 の「Field を Interface から独立させる」を採用）
 
 新規 Interface と公開済み Interface の次回 Version は、作成者だけが扱う Draft として途中保存する。Draft は公開済み InterfaceVersion ではなく、公開時に検証を通過した定義だけを変更不能な v1 または次の Version として作成する。Version 番号は公開時に確定し、現在 Version は公開完了後に切り替える。削除は Interface を `deleted` にする Soft Delete とし、定義を空にした新 Version は作らない。削除済み Interface は一覧から隠して新規実装・新規 Require を禁止するが、既存対象は解決済み Version を継続利用する。削除済み Interface と同名で作成しようとした場合は既存 Interface の復元として扱い、定義も変える場合だけ新 Version を作る。Version は定義変更だけを表し、公開済み Version と Field は削除しない。
 
 ## 2026-09-24 - ThreadInterface は作成後も変更可能にする
 
-状態: 採用
+状態: 一部置換済み（2026-09-29 の「Field を Interface から独立させる」を採用）
 
 Thread 作成後も ThreadInterface の追加、削除、実装値の編集、最新版への更新を許可する。Require された Interface は単独削除できず、操作後の構成は Requirement を満たさなければならない。変更は構造化された履歴として保持し、システム Response と `#1` 内の履歴一覧で示す案を有力とする。
 
@@ -139,3 +139,23 @@ SummaryItem 内の概要アコーディオンと「詳細を見る」操作を�
 状態: 採用・詳細保留
 
 コンテンツに対する操作は「保存」とし、利用者が保存先を選択できる方向で設計する。初期の保存先として Bookmark を一つ提供し、将来は複数の保存リスト作成と保存時の新規リスト作成に対応する。当面は単一 Bookmark を前提に実装し、複数化に伴うデータモデルと UI の変更は Bookmark 基盤の完成後に行う。
+
+## 2026-09-29 - Field を Interface から独立させる
+
+状態: 採用（2026-09-24 の InterfaceRequirement と Interface 内 Field 定義を置換）
+
+Field は InterfaceVersion の内部定義ではなく、作成者と安定 ID を持つ独立した再利用可能な定義とする。Field は対象種別を持たず、Account、Room、Thread、ThreadPost などへの実装時に対象ごとの Value と接続する。InterfaceVersion は FieldVersion を参照し、必須・任意と表示順を保持する。
+
+Field は Version を持つ。公開済み FieldVersion は変更せず、新規 InterfaceVersion は各 Field の最新版だけを参照できる。既存対象は実装時の InterfaceVersion と FieldVersion を継続利用する。Field の意味または値型を変える場合は新しい Field とし、同じ値を安全に引き継げる変更だけを同じ Field の新 Version とする。
+
+FieldVersion は別の Field を片同義として参照できる。片同義の検索展開は参照元から参照先への片方向とするが、同じ対象へ両 Field が実装された場合は一つの Value を共有する。複数の既存 Value が片同義によって接続される場合は、対象へ最初に実装された Field の Value を維持し、Interface 実装前に変更内容を示す。
+
+Field の再利用を InterfaceRequirement で表現しない。InterfaceRequirement は廃止し、Field、将来の ComputedField、Action、Layout の依存は Field 参照または RequireField で表現する。複数 Interface の同時実装は維持し、各 Interface は用途ごとの意味のあるまとまりとして表示する。
+
+## 2026-09-29 - Layout を Interface と独立させる
+
+状態: 採用
+
+Layout は複数 Interface の Field、ComputedField、Action を横断して配置するため、InterfaceVersion の内部には置かず独立した定義とする。対象は用途に対応する Layout を一つ使用し、通常利用者には Niixy の標準 Layout を自動適用する。ThreadPost 作成時の Layout Snapshot と、本文などの固定領域を Layout から削除できない方針は維持する。
+
+Field、ComputedField、Action、Interface、Layout のユーザー向け総称は「定義」、英語表記は Definition とする。これは UI 上の分類であり、共通の親データモデルを必須としない。

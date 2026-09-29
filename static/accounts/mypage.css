@@ -74,41 +74,63 @@
 
 .interface-list-pane,
 .interface-detail-pane,
+.field-list-pane,
+.field-detail-pane,
 .add-require-list-pane,
-.add-require-detail-pane {
+.add-require-detail-pane,
+.add-field-list-pane,
+.add-field-detail-pane {
   min-width: 0;
   overflow-y: auto;
 }
 
 .interface-list-pane,
-.add-require-list-pane {
+.field-list-pane,
+.add-require-list-pane,
+.add-field-list-pane {
   flex: 0 0 var(--ui-workspace-fixed-width);
   width: var(--ui-workspace-fixed-width);
 }
 
 .interface-detail-pane,
-.add-require-detail-pane {
+.field-detail-pane,
+.add-require-detail-pane,
+.add-field-detail-pane {
   flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width));
   width: calc(100vw - var(--ui-workspace-fixed-width));
 }
 
-.interface-list-pane {
+.interface-list-pane,
+.field-list-pane {
   border-right: 1px solid var(--line);
 }
 
-.interface-detail-pane {
+.interface-detail-pane,
+.field-detail-pane {
   overflow-x: hidden;
   position: relative;
   padding: 0 24px 36px;
 }
 
-.interface-detail-pane .interface-pane-header {
+.interface-detail-pane .interface-pane-header,
+.field-detail-pane .interface-pane-header {
   margin: 0 -24px;
   padding: 0 24px;
 }
 
-.interface-detail-pane > .interface-definition-detail {
+.interface-detail-pane > .interface-definition-detail,
+.field-detail-pane > .interface-definition-detail {
   padding-top: 24px;
+}
+
+.interface-update-required,
+.interface-update-warning {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.interface-update-warning {
+  margin: 20px 0 0;
 }
 
 .interface-form-section h3 {
@@ -267,8 +289,17 @@
   border-top: 1px solid var(--line);
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(150px, 1.4fr) minmax(130px, 0.8fr) auto minmax(170px, 1fr) 36px;
+  grid-template-columns: minmax(0, 1fr) auto 36px;
   padding: 12px 0;
+}
+
+.interface-field-identity {
+  display: grid;
+  gap: 2px;
+}
+
+.interface-field-identity small {
+  color: var(--muted);
 }
 
 .interface-field-editor > * {
@@ -294,16 +325,7 @@
 
 @media (max-width: 1200px) {
   .interface-field-editor {
-    grid-template-columns: minmax(0, 1fr) minmax(120px, 0.7fr) auto 36px;
-  }
-
-  .interface-field-editor > .interface-options-field {
-    grid-column: 1 / -1;
-  }
-
-  .interface-field-editor > .remove-interface-field {
-    grid-column: 4;
-    grid-row: 1;
+    grid-template-columns: minmax(0, 1fr) auto 36px;
   }
 }
 
@@ -338,13 +360,16 @@
 }
 
 .add-require-list-pane,
-.add-require-detail-pane {
+.add-require-detail-pane,
+.add-field-list-pane,
+.add-field-detail-pane {
   background: var(--panel);
   min-width: 0;
   overflow-y: auto;
 }
 
-.add-require-list-pane {
+.add-require-list-pane,
+.add-field-list-pane {
   border-right: 1px solid var(--line);
 }
 
@@ -361,11 +386,13 @@
   cursor: pointer;
 }
 
-.add-require-detail-pane {
+.add-require-detail-pane,
+.add-field-detail-pane {
   padding: 0 24px 36px;
 }
 
-.add-require-detail-pane .interface-pane-header {
+.add-require-detail-pane .interface-pane-header,
+.add-field-detail-pane .interface-pane-header {
   margin: 0 -24px 24px;
   padding: 0 24px;
 }
@@ -548,33 +575,32 @@
 
   .interface-list-pane,
   .interface-detail-pane,
+  .field-list-pane,
+  .field-detail-pane,
   .add-require-list-pane,
-  .add-require-detail-pane {
+  .add-require-detail-pane,
+  .add-field-list-pane,
+  .add-field-detail-pane {
     flex: 0 0 100vw;
     width: 100vw;
   }
 
   .interface-detail-pane,
-  .add-require-detail-pane {
+  .field-detail-pane,
+  .add-require-detail-pane,
+  .add-field-detail-pane {
     padding: 0 16px calc(32px + env(safe-area-inset-bottom));
   }
 
   .interface-detail-pane .interface-pane-header,
-  .add-require-detail-pane .interface-pane-header {
+  .field-detail-pane .interface-pane-header,
+  .add-require-detail-pane .interface-pane-header,
+  .add-field-detail-pane .interface-pane-header {
     margin: 0 -16px;
     padding: 0 16px;
   }
 
   .interface-field-editor {
-    grid-template-columns: minmax(0, 1fr) minmax(110px, 0.7fr) auto 36px;
-  }
-
-  .interface-field-editor > .interface-options-field {
-    grid-column: 1 / -1;
-  }
-
-  .interface-field-editor > .remove-interface-field {
-    grid-column: 4;
-    grid-row: 1;
+    grid-template-columns: minmax(0, 1fr) auto 36px;
   }
 }

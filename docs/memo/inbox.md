@@ -19,43 +19,16 @@
 
 ## Inbox
 
-Thread詳細Paneでの「ThreadIF」アコーディオンのレイアウトで迷っててさ、
-てか「制限」アコーディオンも要件として追加するつもりなんだけど
-- ThreadIF
-    - InterfaceA
-    - InterfaceB
-- 制限
-っていう二重アコーディオンは見た目的にも操作的にもやっぱ重いかなぁ。
-「ThreadIF」っていう親アコーディオンを廃止して
-- InterfaceA
-- InterfaceB
-- 制限
-ってする案も検討中だけど、
-Interfaceが継承を前提としてる都合上、1Interface毎に1フィールドみたいなのを大量に継承するとめっちゃ縦長になっちゃうよね。
-もはや、上記のアコーディオンとか関係なく、各フィールドの上に各Interface名も陳列されるっていう。
+- NiiMapの一覧のItemを、Mapに表示されてる範囲内だけにする。
+- Thread詳細のHeaderと#1の間に座標を表示しする（将来的にRoomに配置してる場合はRoom名を表示）。
+    - 座標をクリックでNiiMapを展開して（既にNiiMapの場合はWorkSpace遷移、NiiMap以外の場合はPage遷移）、対象座標を中心とした位置を表示。
+    - （Roomをクリックした場合は対象Roomを展開）
 
-てことで、フィールドはInterfaceの外で定義するって案を考えてる
-「開始時間@NiixyID v1/field」
-みたいな。
-で、Interfaceは、Interface外で定義済みのフィールドから好きなものを選択してまとめる。
-「参加状況」みたいな既存フィールドを参照して自動反映するようなフィールドはフィールドがRequireFieldを持つ。
-DisplayLayoutもRequireFieldを持って、InterfaceはDisplayLayoutも保持できる。
-「参加」ボタンみたいな機能もRequireFieldを持つのかなぁ。この辺はどういう仕組みで実装するかまだ見えてなくて、よくわかんないね？
+- NiiMapの一覧のHeaderを「検索」「新規作成」にする。
+    - NiiMap上の「絞り込み」は廃止（一覧Paneの検索に機能を移動）
+    - 「検索」ではSummaryList表示部を
 
-Interface
-    Field
-        RequireField
-    function
-        RequireField
-    DisplayLayout
-        RequireField
 
-こういう感じになるのかなぁ？
-そしたら、Interfaceを多重継承してInterface欄が縦長になる問題が、
-たくさんのFieldを保持した1つのInterfaceで表現できるようになりそう？
-そしたらもう、ThreadIFは1つまででいっか。AccountIFは微妙に事情変わるかもだけど。
-
-この案どう思う？
 
 ## Idea
 
