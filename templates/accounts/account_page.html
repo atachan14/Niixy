@@ -3,16 +3,16 @@
 
 {% block title %}{{ account.niixy_profile.display_label }} | Niixy{% endblock %}
 {% block main_class %}account-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20260929-3">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
 {% block content %}
-<script>if (sessionStorage.getItem('niixy:account:{{ account.username|escapejs }}:thread-pane') || ['thread', 'response'].includes(new URLSearchParams(location.search).get('pane'))) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
+<script>if (['thread', 'response'].includes(new URLSearchParams(location.search).get('pane'))) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
 <section class="account-page" data-account-id="{{ account.username }}">
   <header class="account-page-header"><h1><button id="account-page-identity" type="button" disabled>{{ account.niixy_profile.display_label }}</button><span> のプロフィール</span><span id="account-page-context" hidden> &gt; Thread</span></h1></header>
   <div class="account-workspace">
-    <div class="account-track">
+    <div class="account-track ui-workspace-track">
       <section class="account-overview-pane" aria-label="Account概要">
         <div class="account-overview-content">
           <section class="account-hero">
@@ -31,9 +31,9 @@
 
       <section class="account-thread-workspace" aria-label="Thread / Response" data-thread-pane-url="{% url 'accounts:thread-pane' account.username %}" data-response-pane-url="{% url 'accounts:response-pane' account.username %}" data-thread-detail-url-template="{% url 'accounts:thread-detail' account.username 0 %}">
         <div class="account-thread-track">
-          <section class="account-thread-pane" aria-label="Thread一覧" data-thread-pane-container><p class="account-pane-loading">読み込み中...</p></section>
-          <aside class="account-thread-detail-pane" aria-label="Thread詳細">
-            <header class="account-thread-detail-header"><h2 id="account-thread-detail-title"></h2><button id="close-account-thread-detail" class="icon-button" type="button" aria-label="Thread一覧に戻る">×</button></header>
+          <section class="ui-list-pane account-thread-pane" aria-label="Thread一覧"><header class="ui-pane-header ui-list-pane-header"><h2 id="account-list-title">Thread一覧</h2><button id="close-account-list" class="icon-button" type="button" aria-label="Profileに戻る">×</button></header><div data-thread-pane-container><p class="account-pane-loading">読み込み中...</p></div></section>
+          <aside class="ui-detail-pane account-thread-detail-pane" aria-label="Thread詳細">
+            <header class="ui-pane-header ui-detail-pane-header account-thread-detail-header"><h2 id="account-thread-detail-title"></h2><button id="close-account-thread-detail" class="icon-button" type="button" aria-label="Thread一覧に戻る">×</button></header>
             <p id="account-thread-detail-empty" class="account-thread-detail-empty">Threadを選択してください</p>
             <div data-thread-detail-container></div>
           </aside>
@@ -44,4 +44,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/account.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20260929-2"></script>{% endblock %}

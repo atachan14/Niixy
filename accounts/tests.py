@@ -72,6 +72,7 @@ class AccountPageTests(TestCase):
         self.assertContains(response, '@creator_user')
         self.assertNotContains(response, '作成したThread')
         self.assertContains(response, reverse('accounts:thread-pane', args=[account.username]))
+        self.assertNotContains(response, "sessionStorage.getItem('niixy:account:")
 
     def test_thread_pane_lists_created_threads_on_demand(self):
         account = get_user_model().objects.create_user('creator_user', password='eightchars')

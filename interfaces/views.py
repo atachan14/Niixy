@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -151,6 +152,23 @@ def published_detail(request, interface_id):
     })
 
 
+def definition_detail(request, interface_id):
+    visibility = Q(status=Interface.ACTIVE)
+    if request.user.is_authenticated:
+        visibility |= Q(creator=request.user)
+    interface = get_object_or_404(
+        Interface.objects.filter(visibility, current_version__isnull=False)
+        .select_related('creator', 'current_version')
+        .prefetch_related(
+            'current_version__fields',
+            'current_version__requirements__required_interface__creator',
+            'current_version__requirements__required_version',
+        ),
+        pk=interface_id,
+    )
+    return render(request, 'interfaces/definition_detail_content.html', {'interface_item': interface})
+
+
 @login_required
 def add_require_list(request, draft_id):
     draft = get_object_or_404(InterfaceDraft, pk=draft_id, creator=request.user)
@@ -173,7 +191,11 @@ def add_require_detail(request, draft_id, interface_id):
         Interface.objects.filter(status=Interface.ACTIVE, current_version__isnull=False)
         .exclude(pk=draft.interface_id)
         .select_related('creator', 'current_version')
-        .prefetch_related('current_version__fields'),
+        .prefetch_related(
+            'current_version__fields',
+            'current_version__requirements__required_interface__creator',
+            'current_version__requirements__required_version',
+        ),
         pk=interface_id,
     )
     return render(request, 'interfaces/add_require_detail_pane.html', {'candidate': candidate})

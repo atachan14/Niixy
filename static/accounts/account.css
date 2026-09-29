@@ -48,23 +48,18 @@
 }
 
 .account-track {
+  --ui-workspace-fixed-width: 360px;
   display: flex;
   height: 100%;
-  transition: transform 260ms ease;
-  width: 200vw;
-}
-
-.account-workspace.is-thread-pane-open .account-track {
-  transform: translateX(-100vw);
+  width: max-content;
 }
 
 .has-restored-account-thread-pane .account-track {
-  transform: translateX(-100vw);
+  transform: translateX(calc(-1 * var(--ui-workspace-fixed-width)));
   transition: none;
 }
 
-.account-overview-pane,
-.account-thread-workspace {
+.account-overview-pane {
   background: var(--panel);
   flex: 0 0 100vw;
   min-width: 0;
@@ -153,13 +148,11 @@
 }
 
 .account-thread-workspace {
-  overflow: hidden;
+  display: contents;
 }
 
 .account-thread-track {
-  display: grid;
-  grid-template-columns: minmax(320px, 40%) minmax(0, 60%);
-  height: 100%;
+  display: contents;
 }
 
 .account-thread-pane,
@@ -171,6 +164,8 @@
 
 .account-thread-pane {
   border-right: 1px solid var(--line);
+  flex: 0 0 var(--ui-workspace-fixed-width);
+  width: var(--ui-workspace-fixed-width);
 }
 
 .account-pane-loading {
@@ -179,39 +174,8 @@
   text-align: center;
 }
 
-.account-thread-tabs {
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  min-height: 52px;
-  overflow-x: auto;
-}
-
-.account-thread-tabs button {
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--muted);
-  cursor: pointer;
-  flex: 0 0 auto;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  padding: 0 16px;
-}
-
-.account-thread-tabs button.is-active {
-  border-bottom-color: var(--accent);
-  color: var(--accent-dark);
-}
-
 .account-thread-column {
-  display: none;
   padding: 18px 20px 28px;
-}
-
-.account-thread-column.is-tab-active {
-  display: block;
 }
 
 .summary-item {
@@ -223,18 +187,9 @@
 }
 
 .summary-item-header {
-  background: transparent;
-  border: 0;
-  color: var(--text);
-  cursor: pointer;
   font: inherit;
-  font-weight: 700;
-  overflow: hidden;
-  padding: 14px 0;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .response-history-item {
@@ -286,7 +241,9 @@
 }
 
 .account-thread-detail-pane {
+  flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width));
   padding: 0 20px 24px;
+  width: calc(100vw - var(--ui-workspace-fixed-width));
 }
 
 .account-thread-detail-header {
@@ -332,6 +289,9 @@
 }
 
 @media (max-width: 780px) {
+  .account-track {
+    --ui-workspace-fixed-width: 100vw;
+  }
   .account-page-header {
     padding: 0 16px;
   }
@@ -362,16 +322,6 @@
 
   .account-profile-placeholder {
     min-height: 280px;
-  }
-
-  .account-thread-track {
-    display: flex;
-    transition: transform 260ms ease;
-    width: 200vw;
-  }
-
-  .account-thread-workspace.is-detail-open .account-thread-track {
-    transform: translateX(-100vw);
   }
 
   .account-thread-pane,

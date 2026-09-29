@@ -11,7 +11,7 @@ from .models import (
     InterfaceDraftRequirement,
     ThreadInterfaceImplementation,
 )
-from .services import prepare_thread_interfaces, publish_draft, save_thread_interfaces
+from .services import prepare_thread_interfaces, publish_draft, save_thread_interfaces, thread_interface_catalog
 from events.models import Thread
 
 
@@ -28,6 +28,7 @@ class PublishDraftTests(TestCase):
 
     def test_publish_creates_immutable_version_and_removes_draft(self):
         draft = self.make_draft()
+        self.assertEqual(draft.publication_version_number, 1)
         field = InterfaceDraftField.objects.create(
             draft=draft,
             label='開始日時',
@@ -140,7 +141,7 @@ class InterfaceManagementViewTests(TestCase):
     def test_my_page_shows_interface_management(self):
         response = self.client.get(reverse('mypage'), {'section': 'interface', '_panes': '1'})
 
-        self.assertContains(response, 'data-interface-tab="draft"')
+        self.assertContains(response, 'data-ui-tab="draft"')
         self.assertContains(response, reverse('interfaces:draft-create'))
 
     def test_management_list_is_served_as_its_own_pane(self):
@@ -158,6 +159,56 @@ class InterfaceManagementViewTests(TestCase):
 
         self.assertContains(response, 'data-mypage-pane="interface-detail"')
         self.assertNotContains(response, 'data-mypage-pane="interface-list"')
+        self.assertContains(response, 'Pane@interface_editor v1/ThreadIF', count=1)
+        self.assertContains(response, 'aria-label="Action"')
+        self.assertNotContains(response, '>Action<')
+        self.assertContains(response, 'Interfaceを削除')
+        self.assertContains(response, 'data-refresh-interface-list')
+
+    def test_deleted_published_detail_shows_restore_action(self):
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Restore action')
+        interface, _ = publish_draft(draft.pk)
+        interface.status = Interface.DELETED
+        interface.save(update_fields=['status'])
+
+        response = self.client.get(reverse('interfaces:published-detail', args=[interface.pk]))
+
+        self.assertContains(response, 'aria-label="Action"')
+        self.assertNotContains(response, '>Action<')
+        self.assertContains(response, 'Interfaceを復元')
+        self.assertContains(response, 'data-refresh-interface-list')
+        self.assertNotContains(response, 'Interfaceを削除')
+
+    def test_definition_detail_is_reusable_without_management_actions(self):
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Reusable')
+        InterfaceDraftField.objects.create(
+            draft=draft,
+            label='参加人数',
+            field_type=FieldType.INTEGER,
+            required=True,
+            position=0,
+        )
+        interface, _ = publish_draft(draft.pk)
+
+        response = self.client.get(reverse('interfaces:definition-detail', args=[interface.pk]))
+
+        self.assertContains(response, 'class="interface-definition-detail')
+        self.assertNotContains(response, 'Reusable@interface_editor')
+        self.assertContains(response, '参加人数')
+        self.assertNotContains(response, '定義を編集')
+
+    def test_deleted_definition_detail_is_visible_only_to_owner(self):
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Deleted')
+        interface, _ = publish_draft(draft.pk)
+        interface.status = Interface.DELETED
+        interface.save(update_fields=['status'])
+
+        owner_response = self.client.get(reverse('interfaces:definition-detail', args=[interface.pk]))
+        self.client.logout()
+        public_response = self.client.get(reverse('interfaces:definition-detail', args=[interface.pk]))
+
+        self.assertContains(owner_response, '削除済み')
+        self.assertEqual(public_response.status_code, 404)
 
     def test_add_require_panes_are_loaded_separately(self):
         required_draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Base')
@@ -170,6 +221,7 @@ class InterfaceManagementViewTests(TestCase):
         self.assertContains(list_response, 'data-mypage-pane="add-require-list"')
         self.assertNotContains(list_response, 'data-mypage-pane="add-require-detail"')
         self.assertContains(detail_response, 'data-mypage-pane="add-require-detail"')
+        self.assertContains(detail_response, 'Base@interface_editor v1/ThreadIF', count=1)
 
     def test_create_and_save_draft_with_field(self):
         create_response = self.client.post(reverse('interfaces:draft-create'))
@@ -184,6 +236,19 @@ class InterfaceManagementViewTests(TestCase):
         self.assertRedirects(save_response, f'/mypage/?section=interface&draft={draft.pk}')
         self.assertEqual(draft.name, 'Event')
         self.assertEqual(draft.fields.get().label, '開催日時')
+
+    def test_definition_editor_header_uses_interface_identity(self):
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Editing')
+
+        response = self.client.get(reverse('interfaces:draft-detail', args=[draft.pk]))
+
+        self.assertContains(response, 'Editing@interface_editor v1/ThreadIF', count=1)
+        self.assertContains(response, 'aria-label="Action"')
+        self.assertNotContains(response, '>Action<')
+        self.assertContains(response, 'form="interface-draft-form"', count=2)
+        self.assertContains(response, '>中断<')
+        self.assertContains(response, '>公開<')
+        self.assertContains(response, '>破棄<')
 
     def test_publish_saves_submitted_values_and_creates_v1(self):
         draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Draft')
@@ -215,6 +280,7 @@ class InterfaceManagementViewTests(TestCase):
         edit_draft = InterfaceDraft.objects.get(interface=interface)
         self.assertRedirects(response, f'/mypage/?section=interface&draft={edit_draft.pk}')
         self.assertEqual(edit_draft.name, 'Event')
+        self.assertEqual(edit_draft.publication_version_number, 2)
         self.assertEqual(edit_draft.fields.get().field_key, source_field.field_key)
 
     def test_edit_definition_publishes_next_version_with_renamed_interface(self):
@@ -299,6 +365,19 @@ class InterfaceManagementViewTests(TestCase):
         interface.refresh_from_db()
         self.assertEqual(interface.status, Interface.ACTIVE)
 
+    def test_user_cannot_restore_another_users_interface(self):
+        other = get_user_model().objects.create_user('interface_owner_3', password='eightchars')
+        draft = InterfaceDraft.objects.create(creator=other, kind=Interface.THREAD, name='Protected restore')
+        interface, _ = publish_draft(draft.pk)
+        interface.status = Interface.DELETED
+        interface.save(update_fields=['status'])
+
+        response = self.client.post(reverse('interfaces:restore', args=[interface.pk]))
+
+        self.assertEqual(response.status_code, 404)
+        interface.refresh_from_db()
+        self.assertEqual(interface.status, Interface.DELETED)
+
 
 class ThreadInterfaceServiceTests(TestCase):
     def setUp(self):
@@ -348,3 +427,12 @@ class ThreadInterfaceServiceTests(TestCase):
         prepared = prepare_thread_interfaces([item.pk for item in children], {})
 
         self.assertEqual([version.interface.name for version, _ in prepared], ['Base', 'Child A', 'Child B'])
+
+    def test_catalog_provides_reusable_definition_detail_url(self):
+        interface, _ = self.publish('Catalog')
+
+        item = thread_interface_catalog()[0]
+
+        self.assertEqual(item['id'], interface.pk)
+        self.assertEqual(item['detail_url'], reverse('interfaces:definition-detail', args=[interface.pk]))
+        self.assertEqual(item['kind'], 'ThreadIF')

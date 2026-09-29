@@ -1,13 +1,13 @@
-<section class="interface-list-pane" data-mypage-pane="interface-list">
-  <header class="interface-pane-header"><h2>Interface</h2><form method="post" action="{% url 'interfaces:draft-create' %}">{% csrf_token %}<button class="button" type="submit">新規作成</button></form></header>
-  <div class="interface-tabs" role="tablist" aria-label="Interface一覧">
-    <button class="is-active" type="button" role="tab" aria-selected="true" data-interface-tab="created">作成</button>
-    <button type="button" role="tab" aria-selected="false" data-interface-tab="draft">編集中</button>
-    <button type="button" role="tab" aria-selected="false" data-interface-tab="saved">保存</button>
-    <button type="button" role="tab" aria-selected="false" data-interface-tab="deleted">削除済み</button>
+<section class="ui-pane ui-list-pane interface-list-pane" data-mypage-pane="interface-list">
+  <header class="ui-pane-header ui-list-pane-header interface-pane-header"><h2>Interface一覧</h2><button class="icon-button" type="button" data-close-interface-list aria-label="MyPageに戻る">×</button></header>
+  <div class="ui-tabs interface-tabs" role="tablist" aria-label="Interface一覧">
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="created">作成</button>
+    <button type="button" role="tab" aria-selected="false" data-ui-tab="draft">編集中</button>
+    <button type="button" role="tab" aria-selected="false" data-ui-tab="saved">保存</button>
+    <button type="button" role="tab" aria-selected="false" data-ui-tab="deleted">削除済み</button>
   </div>
-  <div class="interface-list-section is-active" data-interface-list="created">{% for item in active_interfaces %}{% include 'interfaces/summary_item.html' with interface=item detail_url_name='interfaces:published-detail' %}{% empty %}<p class="empty">公開したInterfaceはありません。</p>{% endfor %}</div>
-  <div class="interface-list-section" data-interface-list="draft">{% for draft in interface_drafts %}{% include 'interfaces/summary_item.html' with draft=draft detail_url_name='interfaces:draft-detail' %}{% empty %}<p class="empty">編集中のInterfaceはありません。</p>{% endfor %}</div>
-  <div class="interface-list-section" data-interface-list="saved"><p class="empty">保存したInterfaceはありません。</p></div>
-  <div class="interface-list-section" data-interface-list="deleted">{% for item in deleted_interfaces %}{% include 'interfaces/summary_item.html' with interface=item deleted=True detail_url_name='interfaces:published-detail' %}{% empty %}<p class="empty">削除済みInterfaceはありません。</p>{% endfor %}</div>
+  <div class="ui-tab-panel ui-summary-list interface-list-section is-active" data-ui-tab-panel="created"><form class="interface-create-action" method="post" action="{% url 'interfaces:draft-create' %}">{% csrf_token %}<button class="button" type="submit">新規作成</button></form>{% for item in active_interfaces %}{% include 'interfaces/summary_item.html' with interface=item detail_url_name='interfaces:published-detail' %}{% empty %}<p class="empty">公開したInterfaceはありません。</p>{% endfor %}</div>
+  <div class="ui-tab-panel interface-list-section" data-ui-tab-panel="draft">{% for draft in interface_drafts %}{% include 'interfaces/summary_item.html' with draft=draft detail_url_name='interfaces:draft-detail' %}{% empty %}<p class="empty">編集中のInterfaceはありません。</p>{% endfor %}</div>
+  <div class="ui-tab-panel interface-list-section" data-ui-tab-panel="saved"><p class="empty">保存したInterfaceはありません。</p></div>
+  <div class="ui-tab-panel interface-list-section" data-ui-tab-panel="deleted">{% for item in deleted_interfaces %}{% include 'interfaces/summary_item.html' with interface=item deleted=True detail_url_name='interfaces:published-detail' %}{% empty %}<p class="empty">削除済みInterfaceはありません。</p>{% endfor %}</div>
 </section>

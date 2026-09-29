@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Max
+from django.urls import reverse
 
 from .models import (
     FieldType,
@@ -235,9 +236,12 @@ def thread_interface_catalog():
             continue
         catalog.append({
             'id': interface.pk,
+            'detail_url': reverse('interfaces:definition-detail', args=[interface.pk]),
             'name': interface.name,
             'creator': interface.creator.username,
             'version': interface.current_version.version_number,
+            'kind': interface.get_kind_display(),
+            'updated_at': interface.updated_at,
             'description': interface.current_version.description,
             'requires': [
                 {

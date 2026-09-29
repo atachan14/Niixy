@@ -8,6 +8,7 @@ urlpatterns = [
     path('manage/', views.management_list, name='management-list'),
     path('manage/drafts/<int:draft_id>/', views.draft_detail, name='draft-detail'),
     path('manage/<int:interface_id>/', views.published_detail, name='published-detail'),
+    path('<int:interface_id>/detail/', views.definition_detail, name='definition-detail'),
     path('manage/drafts/<int:draft_id>/add-requires/', views.add_require_list, name='add-require-list'),
     path('manage/drafts/<int:draft_id>/add-requires/<int:interface_id>/', views.add_require_detail, name='add-require-detail'),
     path('drafts/new/', views.draft_create, name='draft-create'),

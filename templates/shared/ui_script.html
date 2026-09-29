@@ -1,0 +1,158 @@
+<script>
+window.NiixyUI = (() => {
+  async function fetchFragment(url, selector = null) {
+    const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
+    if (!response.ok) throw new Error('UI fragment request failed');
+    const documentFragment = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const fragment = selector ? documentFragment.querySelector(selector) : documentFragment.body.firstElementChild;
+    if (!fragment) throw new Error('UI fragment was not found');
+    return fragment;
+  }
+
+  function createStatusPane({tagName = 'section', className = '', attributes = {}, message = '読み込み中...'}) {
+    const pane = document.createElement(tagName);
+    pane.className = `ui-pane ${className} is-loading`.trim();
+    Object.entries(attributes).forEach(([name, value]) => { pane.dataset[name] = value; });
+    const status = document.createElement('p');
+    status.className = 'ui-pane-status';
+    status.textContent = message;
+    pane.append(status);
+    return pane;
+  }
+
+  function showPaneError(pane, message = '読み込みに失敗しました。') {
+    pane.classList.remove('is-loading');
+    pane.classList.add('has-load-error');
+    pane.replaceChildren();
+    const status = document.createElement('p');
+    status.className = 'ui-pane-status';
+    status.textContent = message;
+    pane.append(status);
+  }
+
+  function bindTabs(root) {
+    root.querySelectorAll('[data-ui-tab]:not([data-ui-tab-bound])').forEach((tab) => {
+      tab.dataset.uiTabBound = 'true';
+      tab.addEventListener('click', () => {
+        root.querySelectorAll('[data-ui-tab]').forEach((item) => {
+          const selected = item === tab;
+          item.classList.toggle('is-active', selected);
+          item.setAttribute('aria-selected', String(selected));
+        });
+        root.querySelectorAll('[data-ui-tab-panel]').forEach((panel) => {
+          panel.classList.toggle('is-active', panel.dataset.uiTabPanel === tab.dataset.uiTab);
+        });
+      });
+    });
+  }
+
+  function createPaneStack(element, stages) {
+    const stageClasses = [...new Set(Object.values(stages).filter(Boolean))];
+    let currentStage = Object.keys(stages).find((stage) => {
+      const className = stages[stage];
+      return className ? element.classList.contains(className) : false;
+    }) || Object.keys(stages).find((stage) => !stages[stage]) || null;
+
+    return {
+      get stage() { return currentStage; },
+      is(stage) { return currentStage === stage; },
+      set(stage) {
+        if (!(stage in stages)) throw new Error(`Unknown pane stage: ${stage}`);
+        element.classList.remove(...stageClasses);
+        if (stages[stage]) element.classList.add(stages[stage]);
+        element.dataset.uiPaneStage = stage;
+        currentStage = stage;
+      },
+      append(pane) { element.append(pane); return pane; },
+      remove(...selectors) {
+        selectors.forEach((selector) => element.querySelector(selector)?.remove());
+      },
+    };
+  }
+
+  function createWorkspace(viewport, stages, {track = viewport.firstElementChild} = {}) {
+    let currentStage = Object.keys(stages)[0] || null;
+    let resizeFrame = null;
+
+    const align = () => {
+      const definition = stages[currentStage];
+      if (!definition || definition.root) {
+        track.style.setProperty('--ui-workspace-offset', '0px');
+        return;
+      }
+      const target = typeof definition.target === 'string' ? track.querySelector(definition.target) : definition.target;
+      if (!target) return;
+      const trackRect = track.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const offset = Math.max(0, targetRect.right - trackRect.left - viewport.clientWidth);
+      track.style.setProperty('--ui-workspace-offset', `${offset}px`);
+    };
+
+    const handleResize = () => {
+      window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = window.requestAnimationFrame(align);
+    };
+    window.addEventListener('resize', handleResize);
+
+    return {
+      get stage() { return currentStage; },
+      is(stage) { return currentStage === stage; },
+      align,
+      set(stage) {
+        if (!(stage in stages)) throw new Error(`Unknown workspace stage: ${stage}`);
+        track.dataset.uiWorkspaceStage = stage;
+        currentStage = stage;
+        align();
+      },
+    };
+  }
+
+  function bindAccordion(details) {
+    if (details.dataset.uiAccordionBound || details.matches('.account-menu, .map-filter, [data-ui-accordion="off"]')) return;
+    const summary = details.querySelector(':scope > summary');
+    if (!summary) return;
+    details.dataset.uiAccordionBound = 'true';
+
+    const content = document.createElement('div');
+    content.className = 'ui-accordion-content';
+    const inner = document.createElement('div');
+    inner.className = 'ui-accordion-content-inner';
+    while (summary.nextSibling) inner.append(summary.nextSibling);
+    content.append(inner);
+    details.append(content);
+
+    const setExpanded = (expanded) => {
+      summary.setAttribute('aria-expanded', String(expanded));
+      if (expanded) {
+        details.open = true;
+        requestAnimationFrame(() => content.classList.add('is-open'));
+      } else {
+        content.classList.remove('is-open');
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) details.open = false;
+      }
+    };
+
+    if (details.open) content.classList.add('is-open');
+    summary.setAttribute('aria-expanded', String(details.open));
+    summary.addEventListener('click', (event) => {
+      event.preventDefault();
+      setExpanded(!content.classList.contains('is-open'));
+    });
+    content.addEventListener('transitionend', (event) => {
+      if (event.propertyName === 'grid-template-rows' && !content.classList.contains('is-open')) details.open = false;
+    });
+  }
+
+  function bindAccordions(root = document) {
+    if (root.matches?.('details')) bindAccordion(root);
+    root.querySelectorAll?.('details').forEach(bindAccordion);
+  }
+
+  bindAccordions();
+  new MutationObserver((mutations) => mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
+    if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
+  }))).observe(document.body, {childList: true, subtree: true});
+
+  return {bindAccordions, bindTabs, createPaneStack, createStatusPane, createWorkspace, fetchFragment, showPaneError};
+})();
+</script>

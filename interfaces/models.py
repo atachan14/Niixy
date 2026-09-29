@@ -93,6 +93,12 @@ class InterfaceDraft(models.Model):
     def __str__(self):
         return f'Draft: {self.creator.username}/{self.name}'
 
+    @property
+    def publication_version_number(self):
+        if self.interface_id and self.interface.current_version_id:
+            return self.interface.current_version.version_number + 1
+        return 1
+
 
 class FieldType(models.TextChoices):
     SHORT_TEXT = 'short_text', '一行テキスト'

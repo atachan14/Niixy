@@ -2,6 +2,14 @@ const myPage = document.querySelector('.mypage');
 const workspace = document.querySelector('.mypage-workspace');
 const identity = document.getElementById('mypage-identity');
 const contextLabel = document.getElementById('mypage-context');
+const pageStack = NiixyUI.createWorkspace(document.querySelector('.mypage-viewport'), {
+  overview: {root: true},
+  basic: {target: '.basic-info-pane'},
+  interface: {target: '.interface-list-pane'},
+  'interface-detail': {target: '.interface-detail-pane'},
+  'add-list': {target: '.add-require-list-pane'},
+  'add-detail': {target: '.add-require-detail-pane'},
+}, {track: workspace});
 
 function updateContext(feature = null) {
   identity.disabled = !feature;
@@ -10,44 +18,28 @@ function updateContext(feature = null) {
 }
 
 function showOverview() {
-  myPage.classList.remove('is-basic-info-open', 'is-interface-open');
+  pageStack.set('overview');
   updateContext();
   history.pushState({}, '', myPage.dataset.paneUrl);
 }
 
-async function fetchPane(url) {
-  const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
-  if (!response.ok) throw new Error('Pane request failed');
-  return new DOMParser().parseFromString(await response.text(), 'text/html').body.firstElementChild;
-}
-
 function loadingPane(className, paneName) {
-  const pane = document.createElement(className === 'interface-detail-pane' ? 'aside' : 'section');
-  pane.className = `${className} is-loading`;
-  pane.dataset.mypagePane = paneName;
-  pane.innerHTML = '<p class="mypage-pane-status">読み込み中...</p>';
-  return pane;
-}
-
-function showPaneError(pane) {
-  pane.classList.remove('is-loading');
-  pane.classList.add('has-load-error');
-  pane.innerHTML = '<p class="mypage-pane-status">読み込みに失敗しました。</p>';
+  return NiixyUI.createStatusPane({
+    tagName: className === 'interface-detail-pane' ? 'aside' : 'section',
+    className,
+    attributes: {mypagePane: paneName},
+  });
 }
 
 const interfaceTrack = () => workspace.querySelector('.interface-track');
 
 function setInterfaceStage(stage) {
-  const track = interfaceTrack();
-  if (!track) return;
-  track.classList.remove('is-detail-open', 'is-require-list-open', 'is-require-detail-open');
-  if (stage === 'detail') track.classList.add('is-detail-open');
-  if (stage === 'add-list') track.classList.add('is-require-list-open');
-  if (stage === 'add-detail') track.classList.add('is-require-detail-open');
+  const pageStage = {list: 'interface', detail: 'interface-detail', 'add-list': 'add-list', 'add-detail': 'add-detail'}[stage];
+  if (pageStage) pageStack.set(pageStage);
 }
 
 function removePanes(...names) {
-  names.forEach((name) => workspace.querySelector(`[data-mypage-pane="${name}"]`)?.remove());
+  names.forEach((name) => interfaceTrack()?.querySelector(`[data-mypage-pane="${name}"]`)?.remove());
 }
 
 async function openBasic(updateHistory = true) {
@@ -56,12 +48,11 @@ async function openBasic(updateHistory = true) {
   workspace.querySelector('.basic-info-pane, .interface-management')?.remove();
   const loading = loadingPane('basic-info-pane', 'basic-info');
   workspace.append(loading);
-  myPage.classList.remove('is-interface-open');
-  myPage.classList.add('is-basic-info-open');
+  pageStack.set('basic');
   updateContext('basic');
   if (updateHistory) history.pushState({}, '', myPage.dataset.paneUrl);
   let pane;
-  try { pane = await fetchPane(url); } catch { showPaneError(loading); return; }
+  try { pane = await NiixyUI.fetchFragment(url, '.basic-info-pane'); } catch { NiixyUI.showPaneError(loading); return; }
   loading.replaceWith(pane);
   pane.querySelector('#close-basic-info')?.addEventListener('click', showOverview);
   setTimeout(() => pane.querySelector('#id_display_name')?.focus(), 260);
@@ -77,21 +68,18 @@ async function openInterfaceList(updateHistory = true) {
   track.append(loading);
   management.append(track);
   workspace.append(management);
-  myPage.classList.remove('is-basic-info-open');
-  myPage.classList.add('is-interface-open');
+  pageStack.set('interface');
   updateContext('interface');
   if (updateHistory) history.pushState({}, '', `${myPage.dataset.paneUrl}?section=interface`);
   let list;
-  try { list = await fetchPane(myPage.dataset.interfaceListUrl); } catch { showPaneError(loading); return; }
+  try { list = await NiixyUI.fetchFragment(myPage.dataset.interfaceListUrl); } catch { NiixyUI.showPaneError(loading); return; }
   loading.replaceWith(list);
   bindInterfaceList(list);
 }
 
 function bindInterfaceList(list) {
-  list.querySelectorAll('[data-interface-tab]').forEach((tab) => tab.addEventListener('click', () => {
-    list.querySelectorAll('[data-interface-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
-    list.querySelectorAll('[data-interface-list]').forEach((section) => section.classList.toggle('is-active', section.dataset.interfaceList === tab.dataset.interfaceTab));
-  }));
+  NiixyUI.bindTabs(list);
+  list.querySelector('[data-close-interface-list]')?.addEventListener('click', showOverview);
   list.addEventListener('click', async (event) => {
     const item = event.target.closest('[data-detail-url]');
     if (!item) return;
@@ -108,7 +96,7 @@ async function openInterfaceDetail(url, historyUrl = null) {
   setInterfaceStage('detail');
   if (historyUrl) history.pushState({}, '', historyUrl);
   let detail;
-  try { detail = await fetchPane(url); } catch { showPaneError(loading); return; }
+  try { detail = await NiixyUI.fetchFragment(url); } catch { NiixyUI.showPaneError(loading); return; }
   loading.replaceWith(detail);
   bindInterfaceDetail(detail);
 }
@@ -116,12 +104,17 @@ async function openInterfaceDetail(url, historyUrl = null) {
 function bindAjaxForms(root) {
   root.querySelectorAll('form').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const refreshInterfaceList = form.hasAttribute('data-refresh-interface-list');
     const data = new FormData(form);
     if (event.submitter?.name) data.set(event.submitter.name, event.submitter.value);
     if (event.submitter) event.submitter.disabled = true;
     try {
       const response = await fetch(form.action || location.href, {method: 'POST', body: data});
       if (!response.ok) throw new Error('Interface operation failed');
+      if (refreshInterfaceList) {
+        await openInterfaceList(true);
+        return;
+      }
       const target = new URL(response.url);
       const draftId = target.searchParams.get('draft');
       const interfaceId = target.searchParams.get('interface');
@@ -136,8 +129,9 @@ function bindAjaxForms(root) {
 
 function bindInterfaceDetail(detail) {
   detail.querySelector('[data-close-interface-detail]')?.addEventListener('click', () => {
-    if (matchMedia('(max-width: 780px)').matches) setInterfaceStage('list');
-    else removePanes('interface-detail', 'add-require-list', 'add-require-detail');
+    setInterfaceStage('list');
+    removePanes('interface-detail', 'add-require-list', 'add-require-detail');
+    history.pushState({}, '', `${myPage.dataset.paneUrl}?section=interface`);
   });
   detail.querySelector('[data-open-add-require]')?.addEventListener('click', async (event) => {
     removePanes('add-require-list', 'add-require-detail');
@@ -145,7 +139,7 @@ function bindInterfaceDetail(detail) {
     interfaceTrack().append(loading);
     setInterfaceStage('add-list');
     let pane;
-    try { pane = await fetchPane(event.currentTarget.dataset.url); } catch { showPaneError(loading); return; }
+    try { pane = await NiixyUI.fetchFragment(event.currentTarget.dataset.url); } catch { NiixyUI.showPaneError(loading); return; }
     loading.replaceWith(pane);
     bindAddRequireList(pane);
   });
@@ -156,10 +150,7 @@ function bindInterfaceDetail(detail) {
 }
 
 function bindAddRequireList(pane) {
-  pane.querySelectorAll('[data-require-tab]').forEach((tab) => tab.addEventListener('click', () => {
-    pane.querySelectorAll('[data-require-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
-    pane.querySelectorAll('[data-require-list]').forEach((list) => list.classList.toggle('is-active', list.dataset.requireList === tab.dataset.requireTab));
-  }));
+  NiixyUI.bindTabs(pane);
   pane.querySelector('[data-close-add-require]')?.addEventListener('click', () => setInterfaceStage('detail'));
   pane.querySelectorAll('[data-detail-url]').forEach((item) => item.addEventListener('click', async () => {
     removePanes('add-require-detail');
@@ -167,7 +158,7 @@ function bindAddRequireList(pane) {
     interfaceTrack().append(loading);
     setInterfaceStage('add-detail');
     let detail;
-    try { detail = await fetchPane(item.dataset.detailUrl); } catch { showPaneError(loading); return; }
+    try { detail = await NiixyUI.fetchFragment(item.dataset.detailUrl); } catch { NiixyUI.showPaneError(loading); return; }
     loading.replaceWith(detail);
     bindAddRequireDetail(detail);
   }));

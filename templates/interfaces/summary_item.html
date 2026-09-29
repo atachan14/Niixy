@@ -1,16 +1,19 @@
 {% if summary_action == 'require' %}
-<button class="interface-summary-item require-candidate" type="button" data-require-candidate="{{ interface.pk }}" data-detail-url="{% url 'interfaces:add-require-detail' draft_id interface.pk %}">
-  <strong>{{ interface.name }}@{{ interface.creator.username }}</strong>
-  <small>{{ interface.get_kind_display }} / v{{ interface.current_version.version_number }}</small>
+<button class="ui-summary-item interface-summary-item require-candidate" type="button" data-require-candidate="{{ interface.pk }}" data-detail-url="{% url 'interfaces:add-require-detail' draft_id interface.pk %}">
+  <span class="ui-summary-item-context" aria-hidden="true"></span>
+  <strong class="ui-summary-item-title">{{ interface.name }}@{{ interface.creator.username }} v{{ interface.current_version.version_number }}/{{ interface.get_kind_display }}</strong>
+  <small class="ui-summary-item-updated">最終更新 {{ interface.updated_at|date:'Y/m/d H:i' }}</small>
 </button>
 {% elif draft %}
-<a class="interface-summary-item{% if selected_id == draft.pk %} is-selected{% endif %}" href="{% url 'mypage' %}?section=interface&amp;draft={{ draft.pk }}" data-detail-url="{% url 'interfaces:draft-detail' draft.pk %}">
-  <strong>{{ draft.name }}@{{ draft.creator.username }}</strong>
-  <small>{% if draft.interface %}次のVersionを編集中{% else %}v1公開前{% endif %}</small>
+<a class="ui-summary-item interface-summary-item{% if selected_id == draft.pk %} is-selected{% endif %}" href="{% url 'mypage' %}?section=interface&amp;draft={{ draft.pk }}" data-detail-url="{% url 'interfaces:draft-detail' draft.pk %}">
+  <span class="ui-summary-item-context" aria-hidden="true"></span>
+  <strong class="ui-summary-item-title">{{ draft.name }}@{{ draft.creator.username }} v{{ draft.publication_version_number }}/{{ draft.get_kind_display }}</strong>
+  <small class="ui-summary-item-updated">最終更新 {{ draft.updated_at|date:'Y/m/d H:i' }}</small>
 </a>
 {% else %}
-<a class="interface-summary-item{% if selected_id == interface.pk %} is-selected{% endif %}" href="{% url 'mypage' %}?section=interface&amp;interface={{ interface.pk }}" data-detail-url="{% url 'interfaces:published-detail' interface.pk %}">
-  <strong>{{ interface.name }}@{{ interface.creator.username }}</strong>
-  <small>{% if deleted %}削除済み{% else %}v{{ interface.current_version.version_number }} / {{ interface.get_kind_display }}{% endif %}</small>
+<a class="ui-summary-item interface-summary-item{% if selected_id == interface.pk %} is-selected{% endif %}" href="{% url 'mypage' %}?section=interface&amp;interface={{ interface.pk }}" data-detail-url="{% url 'interfaces:published-detail' interface.pk %}">
+  <span class="ui-summary-item-context" aria-hidden="true"></span>
+  <strong class="ui-summary-item-title">{{ interface.name }}@{{ interface.creator.username }} v{{ interface.current_version.version_number }}/{{ interface.get_kind_display }}</strong>
+  <small class="ui-summary-item-updated">最終更新 {{ interface.updated_at|date:'Y/m/d H:i' }}</small>
 </a>
 {% endif %}

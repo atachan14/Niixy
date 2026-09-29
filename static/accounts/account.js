@@ -2,8 +2,8 @@ const accountPage = document.querySelector('.account-page');
 const accountWorkspace = document.querySelector('.account-workspace');
 const threadWorkspace = document.querySelector('.account-thread-workspace');
 const accountId = accountPage.dataset.accountId;
-const paneStorageKey = `niixy:account:${accountId}:thread-pane`;
-const threadDetailStorageKey = `niixy:account:${accountId}:thread-detail`;
+sessionStorage.removeItem(`niixy:account:${accountId}:thread-pane`);
+sessionStorage.removeItem(`niixy:account:${accountId}:thread-detail`);
 const paneContainer = document.querySelector('[data-thread-pane-container]');
 const threadDetailContainer = document.querySelector('[data-thread-detail-container]');
 const paneUrls = {thread: threadWorkspace.dataset.threadPaneUrl, response: threadWorkspace.dataset.responsePaneUrl};
@@ -13,15 +13,23 @@ let requestedPaneKey = null;
 let activePane = 'thread';
 let highlightTimer = null;
 let isApplyingHistory = false;
+let detailRequestId = 0;
 const detailTitle = document.getElementById('account-thread-detail-title');
 const detailEmpty = document.getElementById('account-thread-detail-empty');
 const accountContext = document.getElementById('account-page-context');
 const accountIdentity = document.getElementById('account-page-identity');
+const accountListTitle = document.getElementById('account-list-title');
+const profileStack = NiixyUI.createWorkspace(accountWorkspace, {
+  overview: {root: true},
+  list: {target: '.account-thread-pane'},
+  detail: {target: '.account-thread-detail-pane'},
+}, {track: document.querySelector('.account-track')});
 
 function updateAccountContext() {
-  const isPaneOpen = accountWorkspace.classList.contains('is-thread-pane-open');
+  const isPaneOpen = !profileStack.is('overview');
   accountContext.hidden = !isPaneOpen;
   accountContext.textContent = ` > ${activePane === 'response' ? 'Response' : 'Thread'}`;
+  accountListTitle.textContent = `${activePane === 'response' ? 'Response' : 'Thread'}一覧`;
   accountIdentity.disabled = !isPaneOpen;
 }
 
@@ -59,6 +67,7 @@ async function loadPane(pane, query = '') {
   requestedPaneKey = cacheKey;
   if (paneCache.has(cacheKey)) {
     paneContainer.innerHTML = paneCache.get(cacheKey);
+    NiixyUI.bindTabs(paneContainer);
     return true;
   }
   paneContainer.innerHTML = '<p class="account-pane-loading">読み込み中...</p>';
@@ -67,7 +76,10 @@ async function loadPane(pane, query = '') {
     if (!response.ok) throw new Error('Account pane request failed');
     const html = await response.text();
     paneCache.set(cacheKey, html);
-    if (requestedPaneKey === cacheKey) paneContainer.innerHTML = html;
+    if (requestedPaneKey === cacheKey) {
+      paneContainer.innerHTML = html;
+      NiixyUI.bindTabs(paneContainer);
+    }
     return true;
   } catch {
     if (requestedPaneKey === cacheKey) renderPaneError(paneContainer);
@@ -75,10 +87,9 @@ async function loadPane(pane, query = '') {
   }
 }
 
-function openPane(pane, shouldPersist = true, query = '', shouldUpdateUrl = true) {
+function openPane(pane, query = '', shouldUpdateUrl = true) {
   activePane = pane;
-  accountWorkspace.classList.add('is-thread-pane-open');
-  if (shouldPersist) sessionStorage.setItem(paneStorageKey, pane);
+  profileStack.set('list');
   updateAccountContext();
   if (shouldUpdateUrl) updateUrl(paneParams({pane, query}));
   loadPane(pane, query);
@@ -90,47 +101,53 @@ function clearTargetHighlight() {
 }
 
 function closeDetail(shouldUpdateUrl = true) {
-  threadWorkspace.classList.remove('is-detail-open');
+  detailRequestId += 1;
+  profileStack.set('list');
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   clearTargetHighlight();
   detailEmpty.hidden = false;
   detailEmpty.textContent = 'Threadを選択してください';
   detailTitle.textContent = '';
-  sessionStorage.removeItem(threadDetailStorageKey);
-  if (shouldUpdateUrl && accountWorkspace.classList.contains('is-thread-pane-open')) {
+  if (shouldUpdateUrl && !profileStack.is('overview')) {
     updateUrl(paneParams({query: paneQueryFromParams(new URLSearchParams(window.location.search))}));
   }
 }
 
 function closePane() {
   closeDetail(false);
-  accountWorkspace.classList.remove('is-thread-pane-open');
-  sessionStorage.removeItem(paneStorageKey);
+  profileStack.set('overview');
   updateAccountContext();
   updateUrl(new URLSearchParams());
 }
 
-async function openDetail(threadId, postNumber = null, shouldPersist = true, shouldUpdateUrl = true) {
+async function openDetail(threadId, postNumber = null, shouldUpdateUrl = true) {
+  const requestId = ++detailRequestId;
   let detail = document.querySelector(`[data-thread-detail-pane="${threadId}"]`);
+  document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
+  clearTargetHighlight();
+  detailTitle.textContent = '';
+  detailEmpty.hidden = false;
+  detailEmpty.textContent = '読み込み中...';
+  profileStack.set('detail');
+  document.querySelector('.account-thread-detail-pane').scrollTo({top: 0});
   if (!detail) {
-    detailEmpty.hidden = false;
-    detailEmpty.textContent = '読み込み中...';
     try {
       const response = await fetch(detailUrl(threadId), {headers: {'X-Requested-With': 'fetch'}});
       if (!response.ok) throw new Error('Thread detail request failed');
-      threadDetailContainer.insertAdjacentHTML('beforeend', await response.text());
+      const html = await response.text();
+      if (requestId !== detailRequestId) return false;
+      threadDetailContainer.insertAdjacentHTML('beforeend', html);
       detail = document.querySelector(`[data-thread-detail-pane="${threadId}"]`);
     } catch {
+      if (requestId !== detailRequestId) return false;
       detailEmpty.textContent = '読み込みに失敗しました。';
       return false;
     }
   }
-  if (!detail) return false;
+  if (!detail || requestId !== detailRequestId) return false;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = pane !== detail; });
   detailEmpty.hidden = true;
   detailTitle.textContent = `${detail.dataset.threadTitle} (${detail.dataset.threadPostCount})`;
-  threadWorkspace.classList.add('is-detail-open');
-  clearTargetHighlight();
   const target = postNumber ? detail.querySelector(`[data-thread-post-number="${postNumber}"]`) : null;
   if (target) {
     target.classList.add('is-response-target');
@@ -139,7 +156,6 @@ async function openDetail(threadId, postNumber = null, shouldPersist = true, sho
   } else {
     document.querySelector('.account-thread-detail-pane').scrollTo({top: 0});
   }
-  if (shouldPersist) sessionStorage.setItem(threadDetailStorageKey, JSON.stringify({threadId, postNumber}));
   if (shouldUpdateUrl) updateUrl(paneParams({threadId, postNumber, query: paneQueryFromParams(new URLSearchParams(window.location.search))}));
   return true;
 }
@@ -147,6 +163,7 @@ async function openDetail(threadId, postNumber = null, shouldPersist = true, sho
 document.querySelectorAll('[data-open-account-threads]').forEach((button) => button.addEventListener('click', () => openPane('thread')));
 document.querySelectorAll('[data-open-account-responses]').forEach((button) => button.addEventListener('click', () => openPane('response')));
 accountIdentity.addEventListener('click', closePane);
+document.getElementById('close-account-list').addEventListener('click', closePane);
 document.getElementById('close-account-thread-detail').addEventListener('click', () => closeDetail());
 
 paneContainer.addEventListener('click', (event) => {
@@ -163,14 +180,6 @@ paneContainer.addEventListener('click', (event) => {
   if (detailTrigger) openDetail(detailTrigger.dataset.threadDetail);
   const responseHeader = event.target.closest('[data-response-thread]');
   if (responseHeader) openDetail(responseHeader.dataset.responseThread, responseHeader.dataset.responsePost);
-  const tab = event.target.closest('[data-thread-tab]');
-  if (!tab) return;
-  paneContainer.querySelectorAll('[data-thread-tab]').forEach((item) => {
-    const selected = item === tab;
-    item.classList.toggle('is-active', selected);
-    item.setAttribute('aria-selected', String(selected));
-  });
-  paneContainer.querySelectorAll('.account-thread-column').forEach((column) => column.classList.toggle('is-tab-active', column.dataset.threadColumn === tab.dataset.threadTab));
 });
 
 threadDetailContainer.addEventListener('submit', async (event) => {
@@ -192,7 +201,6 @@ threadDetailContainer.addEventListener('submit', async (event) => {
     const result = await response.json();
     if (response.ok) {
       sent = true;
-      sessionStorage.setItem(paneStorageKey, activePane);
       location.reload();
       return;
     }
@@ -215,17 +223,15 @@ function applyStateFromUrl() {
   isApplyingHistory = true;
   if (pane === 'thread' || pane === 'response') {
     activePane = pane;
-    accountWorkspace.classList.add('is-thread-pane-open');
-    sessionStorage.setItem(paneStorageKey, pane);
+    profileStack.set('list');
     updateAccountContext();
     loadPane(pane, paneQueryFromParams(params, pane));
     const threadId = params.get('thread');
-    if (threadId) openDetail(threadId, params.get('post'), false, false);
+    if (threadId) openDetail(threadId, params.get('post'), false);
     else closeDetail(false);
   } else {
     closeDetail(false);
-    accountWorkspace.classList.remove('is-thread-pane-open');
-    sessionStorage.removeItem(paneStorageKey);
+    profileStack.set('overview');
     updateAccountContext();
   }
   isApplyingHistory = false;
@@ -234,17 +240,12 @@ function applyStateFromUrl() {
 window.addEventListener('popstate', applyStateFromUrl);
 
 const initialParams = new URLSearchParams(window.location.search);
-const storedPane = sessionStorage.getItem(paneStorageKey);
-if (storedPane || ['thread', 'response'].includes(initialParams.get('pane'))) {
-  const pane = ['thread', 'response'].includes(initialParams.get('pane')) ? initialParams.get('pane') : (storedPane === 'response' ? 'response' : 'thread');
+if (['thread', 'response'].includes(initialParams.get('pane'))) {
+  const pane = initialParams.get('pane');
   const query = paneQueryFromParams(initialParams, pane);
-  openPane(pane, false, query, initialParams.get('pane') !== pane);
-  let restoredDetail = null;
-  try { restoredDetail = JSON.parse(sessionStorage.getItem(threadDetailStorageKey)); } catch { restoredDetail = {threadId: sessionStorage.getItem(threadDetailStorageKey)}; }
-  if (restoredDetail && typeof restoredDetail !== 'object') restoredDetail = {threadId: restoredDetail};
-  const threadId = initialParams.get('thread') || restoredDetail?.threadId;
-  const postNumber = initialParams.get('post') || restoredDetail?.postNumber;
-  if (threadId) openDetail(threadId, postNumber, false, initialParams.get('thread') !== String(threadId));
+  openPane(pane, query, false);
+  const threadId = initialParams.get('thread');
+  if (threadId) openDetail(threadId, initialParams.get('post'), false);
 } else {
   updateAccountContext();
 }

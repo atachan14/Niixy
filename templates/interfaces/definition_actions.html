@@ -1,0 +1,7 @@
+<section class="interface-detail-actions owner-interface-actions interface-definition-actions" aria-label="Action">
+  <div class="interface-action-buttons">
+    <button class="button secondary" type="submit" form="interface-draft-form" name="action" value="save">中断</button>
+    <button class="button" type="submit" form="interface-draft-form" name="action" value="publish">公開</button>
+    <form method="post" action="{% url 'interfaces:draft-discard' interface_draft.pk %}">{% csrf_token %}<button class="button event-delete-button" type="submit">破棄</button></form>
+  </div>
+</section>

@@ -1,71 +1,105 @@
 const markers = JSON.parse(document.getElementById('thread-markers').textContent);
 const interfaceCatalog = JSON.parse(document.getElementById('thread-interface-catalog-data').textContent);
 const workspace = document.querySelector('.thread-workspace');
+const threadStack = NiixyUI.createPaneStack(workspace, {
+  list: null,
+  detail: 'is-detail-open',
+  'interface-list': 'is-interface-list-open',
+  'interface-detail': 'is-interface-detail-open',
+});
+const threadMotion = NiixyUI.createWorkspace(workspace, {
+  list: {root: true},
+  detail: {target: '.thread-detail-pane'},
+  'interface-list': {target: '.thread-interface-list-pane'},
+  'interface-detail': {target: '.thread-interface-detail-pane'},
+}, {track: document.querySelector('.thread-track')});
 const list = document.getElementById('thread-list');
 const createForm = document.getElementById('thread-create-form');
 const createTrigger = document.getElementById('thread-create-trigger');
 const createCancel = document.getElementById('thread-create-cancel');
 const ruleDialog = document.getElementById('thread-rule-dialog');
 const map = new geolonia.Map('#map');
+function setThreadStage(stage) {
+  threadStack.set(stage);
+  threadMotion.set(stage);
+  window.setTimeout(() => map.resize(), 260);
+}
 const markerById = new Map();
-const openThreadStorageKey = 'niimap:open-thread';
-const animateThreadStorageKey = 'niimap:animate-thread';
-const mapViewStorageKey = 'niimap:map-view';
+const resumeStorageKey = 'niixy:resume:niimap';
 let draftMarker;
 let creating = false;
 let activeRuleCapability;
 const selectedInterfaceIds = new Set();
 const interfaceValueStore = new Map();
 let previewInterfaceId = null;
+let previewRequestId = 0;
 
-const restoredThreadId = sessionStorage.getItem(openThreadStorageKey);
-const animateRestoredThread = sessionStorage.getItem(animateThreadStorageKey) === restoredThreadId;
-const restoredThreadPane = restoredThreadId && document.querySelector(`[data-thread-detail-pane="${restoredThreadId}"]`);
+function ensureInterfaceSelectorPanes() {
+  if (document.getElementById('thread-interface-selector')) return;
+  document.querySelector('.thread-track').append(document.getElementById('thread-interface-selector-template').content.cloneNode(true));
+  NiixyUI.bindTabs(document.querySelector('.thread-interface-catalog'));
+  document.getElementById('close-thread-interface-selector').addEventListener('click', closeInterfaceSelector);
+  document.getElementById('back-thread-interface-selector').addEventListener('click', () => setThreadStage('interface-list'));
+  document.querySelectorAll('[data-select-thread-interface]').forEach((button) => button.addEventListener('click', () => renderInterfacePreview(Number(button.dataset.selectThreadInterface))));
+}
+
+function consumeResumeState() {
+  const stored = sessionStorage.getItem(resumeStorageKey);
+  sessionStorage.removeItem(resumeStorageKey);
+  sessionStorage.removeItem('niimap:open-thread');
+  sessionStorage.removeItem('niimap:animate-thread');
+  sessionStorage.removeItem('niimap:map-view');
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch { return null; }
+}
+function threadIdFromUrl() {
+  const value = new URLSearchParams(location.search).get('thread');
+  return /^\d+$/.test(value || '') ? value : null;
+}
+const resumeState = consumeResumeState();
+const initialThreadId = threadIdFromUrl();
+const activeResumeState = initialThreadId && String(resumeState?.threadId) === initialThreadId ? resumeState : null;
+const animateInitialThread = Boolean(activeResumeState?.animate);
+const initialThreadPane = initialThreadId && document.querySelector(`[data-thread-detail-pane="${initialThreadId}"]`);
 const detailTitle = document.getElementById('thread-detail-title');
-if (restoredThreadPane) {
-  if (!animateRestoredThread) {
-    workspace.classList.add('is-detail-open');
+if (initialThreadPane) {
+  if (!animateInitialThread) {
+    setThreadStage('detail');
     workspace.classList.add('is-restoring-detail');
   }
-  restoredThreadPane.hidden = false;
-  detailTitle.textContent = `${restoredThreadPane.dataset.threadTitle} (${restoredThreadPane.dataset.threadPostCount})`;
+  initialThreadPane.hidden = false;
+  detailTitle.textContent = `${initialThreadPane.dataset.threadTitle} (${initialThreadPane.dataset.threadPostCount})`;
 } else {
-  sessionStorage.removeItem(openThreadStorageKey);
+  const url = new URL(location.href);
+  url.searchParams.delete('thread');
+  history.replaceState({}, '', url);
 }
-sessionStorage.removeItem(animateThreadStorageKey);
 document.documentElement.classList.remove('has-restored-thread-detail');
-if (restoredThreadPane) {
+if (initialThreadPane) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (animateRestoredThread) workspace.classList.add('is-detail-open');
+    if (animateInitialThread) setThreadStage('detail');
     else workspace.classList.remove('is-restoring-detail');
   }));
 }
 
 document.getElementById('niimap-home-link')?.addEventListener('click', () => {
-  sessionStorage.removeItem(openThreadStorageKey);
+  sessionStorage.removeItem(resumeStorageKey);
 });
 
 function csrf(form) { return new FormData(form); }
-function saveMapView() {
+function saveResumeState(threadId, animate = false) {
   const center = map.getCenter();
-  sessionStorage.setItem(mapViewStorageKey, JSON.stringify({
-    latitude: center.lat,
-    longitude: center.lng,
-    zoom: map.getZoom(),
+  sessionStorage.setItem(resumeStorageKey, JSON.stringify({
+    threadId: String(threadId),
+    animate,
+    mapView: {latitude: center.lat, longitude: center.lng, zoom: map.getZoom()},
   }));
 }
 function restoreMapView() {
-  const storedView = sessionStorage.getItem(mapViewStorageKey);
-  if (!storedView) return false;
-
-  try {
-    const view = JSON.parse(storedView);
-    if (![view.latitude, view.longitude, view.zoom].every(Number.isFinite)) return false;
-    map.jumpTo({center: [view.longitude, view.latitude], zoom: view.zoom});
-    return true;
-  } catch {
-    return false;
-  }
+  const view = activeResumeState?.mapView;
+  if (!view || ![view.latitude, view.longitude, view.zoom].every(Number.isFinite)) return false;
+  map.jumpTo({center: [view.longitude, view.latitude], zoom: view.zoom});
+  return true;
 }
 function addRule(capability, audience) {
   const list = document.querySelector(`.thread-rule[data-capability="${capability}"] .thread-rule-list`);
@@ -161,40 +195,45 @@ function renderSelectedInterfaces() {
   });
   selectedImplementations().forEach((implementation) => appendImplementation(container, implementation, selectedInterfaceIds.has(implementation.id)));
 }
-function renderInterfacePreview(id) {
+async function renderInterfacePreview(id) {
   previewInterfaceId = id;
+  const requestId = ++previewRequestId;
   const item = interfaceCatalog.find((candidate) => candidate.id === id);
-  const detail = document.getElementById('thread-interface-selector-detail'); detail.replaceChildren();
-  const title = document.createElement('h3'); title.textContent = `${item.name}@${item.creator} v${item.version}`; detail.append(title);
-  if (item.description) { const description = document.createElement('p'); description.textContent = item.description; detail.append(description); }
-  if (item.requires.length) { const requires = document.createElement('p'); requires.className = 'thread-interface-requires'; requires.textContent = `Require: ${item.requires.map((required) => `${required.name}@${required.creator} v${required.version}`).join(', ')}`; detail.append(requires); }
-  item.implementations.forEach((implementation) => appendImplementation(detail, implementation));
-  const use = document.createElement('button'); use.className = 'button primary'; use.type = 'button'; use.textContent = selectedInterfaceIds.has(id) ? '入力内容を反映' : 'このInterfaceを使用';
+  document.getElementById('thread-interface-detail-title').textContent = `${item.name}@${item.creator} v${item.version}/${item.kind}`;
+  const detail = document.getElementById('thread-interface-selector-detail');
+  const loading = document.createElement('p'); loading.className = 'ui-pane-loading'; loading.textContent = '読み込み中...';
+  detail.replaceChildren(loading);
+  setThreadStage('interface-detail');
+  try {
+    const fragment = await NiixyUI.fetchFragment(item.detail_url);
+    if (requestId !== previewRequestId || previewInterfaceId !== id) return;
+    detail.replaceChildren(fragment);
+  } catch (error) {
+    if (requestId !== previewRequestId || previewInterfaceId !== id) return;
+    const message = document.createElement('p'); message.className = 'ui-pane-error'; message.textContent = 'ThreadIFの詳細を読み込めませんでした。';
+    detail.replaceChildren(message);
+    return;
+  }
+  const editor = document.createElement('section'); editor.className = 'interface-implementation-editor';
+  const editorTitle = document.createElement('h3'); editorTitle.textContent = '実装内容'; editor.append(editorTitle);
+  item.implementations.forEach((implementation) => appendImplementation(editor, implementation));
+  detail.append(editor);
+  const actions = document.createElement('div'); actions.className = 'interface-detail-actions';
+  const use = document.createElement('button'); use.className = 'button primary'; use.type = 'button'; use.textContent = selectedInterfaceIds.has(id) ? '入力内容を反映' : 'このThreadIFを実装する';
   use.addEventListener('click', () => { detail.querySelectorAll('.thread-interface-field').forEach((field) => field.dispatchEvent(new Event('input'))); selectedInterfaceIds.add(id); renderSelectedInterfaces(); closeInterfaceSelector(); });
-  detail.append(use);
+  actions.append(use); detail.append(actions);
 }
 function openInterfaceSelector(id = null) {
-  const selector = document.getElementById('thread-interface-selector'); selector.hidden = false;
-  requestAnimationFrame(() => selector.classList.add('is-open'));
+  ensureInterfaceSelectorPanes();
   if (id) renderInterfacePreview(id);
+  else setThreadStage('interface-list');
 }
 function closeInterfaceSelector() {
-  const selector = document.getElementById('thread-interface-selector'); selector.classList.remove('is-open');
-  window.setTimeout(() => { selector.hidden = true; }, 260);
+  previewRequestId += 1;
+  previewInterfaceId = null;
+  setThreadStage('list');
 }
 document.getElementById('open-thread-interface-selector').addEventListener('click', () => openInterfaceSelector());
-document.getElementById('close-thread-interface-selector').addEventListener('click', closeInterfaceSelector);
-document.querySelectorAll('[data-thread-interface-tab]').forEach((tab) => tab.addEventListener('click', () => {
-  document.querySelectorAll('[data-thread-interface-tab]').forEach((item) => {
-    const active = item === tab;
-    item.classList.toggle('is-active', active);
-    item.setAttribute('aria-selected', String(active));
-  });
-  document.querySelectorAll('[data-thread-interface-list]').forEach((list) => {
-    list.classList.toggle('is-active', list.dataset.threadInterfaceList === tab.dataset.threadInterfaceTab);
-  });
-}));
-document.querySelectorAll('[data-select-thread-interface]').forEach((button) => button.addEventListener('click', () => renderInterfacePreview(Number(button.dataset.selectThreadInterface))));
 function accountIds() { return new Set(document.getElementById('filter-account-ids').value.toLowerCase().split(/[\s,]+/).filter(Boolean)); }
 function applyFilters() {
   const guests = document.getElementById('filter-show-guests').checked;
@@ -251,19 +290,53 @@ function showThreadMarker(id) {
     padding: 48,
   });
 }
-function openDetail(id) {
-  workspace.classList.add('is-detail-open');
+function updateThreadUrl(id, replace = false) {
+  const url = new URL(location.href);
+  const threadId = id ? String(id) : null;
+  if (url.searchParams.get('thread') === threadId) return;
+  if (threadId) url.searchParams.set('thread', threadId);
+  else url.searchParams.delete('thread');
+  history[replace ? 'replaceState' : 'pushState']({}, '', url);
+}
+function openDetail(id, shouldUpdateUrl = true) {
+  const pane = document.querySelector(`[data-thread-detail-pane="${id}"]`);
+  if (!pane) return false;
+  setThreadStage('detail');
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => {
     const selected = pane.dataset.threadDetailPane === String(id);
     pane.hidden = !selected;
     if (selected) detailTitle.textContent = `${pane.dataset.threadTitle} (${pane.dataset.threadPostCount})`;
   });
-  sessionStorage.setItem(openThreadStorageKey, String(id));
   document.querySelector('.thread-detail-pane').scrollTo({top: 0});
+  if (shouldUpdateUrl) updateThreadUrl(id);
+  return true;
+}
+function closeDetail(shouldUpdateUrl = true) {
+  setThreadStage('list');
+  document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
+  markerById.forEach((marker) => marker.getElement().classList.remove('is-highlighted'));
+  list.querySelectorAll('.thread-item').forEach((item) => item.classList.remove('is-open'));
+  detailTitle.textContent = '';
+  if (shouldUpdateUrl) updateThreadUrl(null);
+}
+function applyThreadStateFromUrl() {
+  const url = new URL(location.href);
+  const threadId = threadIdFromUrl();
+  if (!threadId) {
+    closeDetail(false);
+    if (url.searchParams.has('thread')) updateThreadUrl(null, true);
+    return;
+  }
+  if (!openDetail(threadId, false)) {
+    closeDetail(false);
+    updateThreadUrl(null, true);
+    return;
+  }
+  selectThread(threadId, true);
 }
 createTrigger.addEventListener('click', () => {
-  workspace.classList.remove('is-detail-open');
-  sessionStorage.removeItem(openThreadStorageKey);
+  closeDetail();
+  sessionStorage.removeItem(resumeStorageKey);
   creating = true;
   createForm.hidden = false;
   list.hidden = true;
@@ -281,13 +354,13 @@ createCancel.addEventListener('click', () => {
   selectedInterfaceIds.clear();
   interfaceValueStore.clear();
   renderSelectedInterfaces();
-  workspace.classList.remove('is-detail-open');
+  setThreadStage('list');
   draftMarker?.remove();
   draftMarker = undefined;
 });
 document.getElementById('close-thread-detail').addEventListener('click', () => {
-  workspace.classList.remove('is-detail-open');
-  sessionStorage.removeItem(openThreadStorageKey);
+  closeDetail();
+  sessionStorage.removeItem(resumeStorageKey);
 });
 list.addEventListener('click', (event) => {
   const summary = event.target.closest('.thread-summary');
@@ -308,9 +381,7 @@ createForm.addEventListener('submit', async (event) => {
     const data = await response.json();
     if (response.ok) {
       created = true;
-      saveMapView();
-      sessionStorage.setItem(openThreadStorageKey, String(data.thread_id));
-      sessionStorage.setItem(animateThreadStorageKey, String(data.thread_id));
+      saveResumeState(data.thread_id, true);
       location.assign(data.redirect_url);
       return;
     }
@@ -335,7 +406,8 @@ document.querySelectorAll('.thread-reply-form').forEach((form) => form.addEventL
     const result = await response.json();
     if (response.ok) {
       sent = true;
-      saveMapView();
+      const threadId = form.closest('[data-thread-detail-pane]')?.dataset.threadDetailPane;
+      if (threadId) saveResumeState(threadId);
       location.assign(result.redirect_url);
       return;
     }
@@ -383,7 +455,7 @@ map.on('load', () => {
   applyFilters();
   map.on('moveend', () => {
     sortByDistance();
-    saveMapView();
   });
-  if (restoredThreadPane) selectThread(restoredThreadId);
+  if (initialThreadPane) selectThread(initialThreadId);
 });
+window.addEventListener('popstate', applyThreadStateFromUrl);

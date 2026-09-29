@@ -1,0 +1,15 @@
+{% if request.user == interface_item.creator %}
+<section class="interface-detail-actions owner-interface-actions" aria-label="Action">
+  {% if interface_item.status == 'active' %}
+    {% if interface_dependents %}<p class="interface-action-note">{{ interface_dependents }}件のInterfaceがこのInterfaceをRequireしています。</p>{% endif %}
+    <div class="interface-action-buttons">
+      <form method="post" action="{% url 'interfaces:draft-edit' interface_item.pk %}">{% csrf_token %}<button class="button" type="submit">定義を編集</button></form>
+      <form method="post" action="{% url 'interfaces:delete' interface_item.pk %}" data-refresh-interface-list>{% csrf_token %}<button class="button event-delete-button" type="submit">Interfaceを削除</button></form>
+    </div>
+  {% else %}
+    <div class="interface-action-buttons">
+      <form method="post" action="{% url 'interfaces:restore' interface_item.pk %}" data-refresh-interface-list>{% csrf_token %}<button class="button" type="submit">Interfaceを復元</button></form>
+    </div>
+  {% endif %}
+</section>
+{% endif %}

@@ -26,6 +26,7 @@ class ThreadViewTests(TestCase):
         thread = Thread.objects.get()
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(thread.creator)
+        self.assertEqual(response.json()['redirect_url'], f"{reverse('events:map')}?thread={thread.pk}")
         self.assertEqual(thread.posts.get().number, 1)
         self.assertEqual(thread.placements.get().kind, ThreadPlacement.NII_MAP)
         self.assertEqual(thread.access_rules.count(), 6)
@@ -77,9 +78,9 @@ class ThreadViewTests(TestCase):
         self.assertEqual(catalog[0]['creator'], owner.username)
         self.assertEqual(catalog[0]['id'], interface.pk)
         self.assertEqual(created_catalog[0]['id'], interface.pk)
-        self.assertContains(response, 'data-thread-interface-tab="search"')
-        self.assertContains(response, 'data-thread-interface-tab="created"')
-        self.assertContains(response, 'data-thread-interface-tab="saved"')
+        self.assertContains(response, 'data-ui-tab="search"')
+        self.assertContains(response, 'data-ui-tab="created"')
+        self.assertContains(response, 'data-ui-tab="saved"')
         self.assertContains(response, 'data-select-thread-interface')
 
     def test_guest_can_reply_when_write_rule_allows_it(self):
@@ -89,6 +90,7 @@ class ThreadViewTests(TestCase):
             ThreadAccessRule.objects.create(thread=thread, capability=capability, audience='guest')
         response = self.client.post(reverse('events:thread-post-create', args=[thread.pk]), {'body': '返信'})
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['redirect_url'], f"{reverse('events:map')}?thread={thread.pk}")
         self.assertEqual(thread.posts.count(), 2)
 
     def test_duplicate_reply_submission_creates_one_post(self):
@@ -124,11 +126,13 @@ class ThreadViewTests(TestCase):
 
         content = response.content.decode()
         list_start = content.index('<aside class="thread-list-pane"')
-        detail_start = content.index('<aside class="thread-detail-pane"')
+        detail_start = content.index('class="ui-detail-pane thread-detail-pane"')
         form_start = content.index('id="thread-create-form"')
         self.assertGreater(form_start, list_start)
         self.assertLess(form_start, detail_start)
         self.assertNotContains(response, 'id="thread-create-detail"')
+        self.assertContains(response, 'niixy:resume:niimap')
+        self.assertNotContains(response, 'niimap:open-thread')
 
     def test_guest_threads_are_shown_by_default_for_an_account(self):
         user = get_user_model().objects.create_user('niixy_user', password='eightchars')

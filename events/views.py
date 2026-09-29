@@ -135,7 +135,7 @@ def thread_create(request):
 
     thread, _ = run_once(Thread, submission_id, create_thread)
 
-    return JsonResponse({'redirect_url': reverse('events:map'), 'thread_id': thread.pk})
+    return JsonResponse({'redirect_url': f"{reverse('events:map')}?thread={thread.pk}", 'thread_id': thread.pk})
 
 
 @require_POST
@@ -160,7 +160,7 @@ def thread_post_create(request, thread_id):
         return post
 
     run_once(ThreadPost, submission_id, create_post)
-    return JsonResponse({'redirect_url': reverse('events:map')})
+    return JsonResponse({'redirect_url': f"{reverse('events:map')}?thread={thread.pk}"})
 
 
 @require_POST

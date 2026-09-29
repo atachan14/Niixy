@@ -1,0 +1,6 @@
+<article class="interface-definition-detail {{ definition_detail_class }}">
+  {% if interface_item.status == 'deleted' %}<p class="interface-definition-status"><span class="interface-status">削除済み</span></p>{% endif %}
+  {% if interface_item.current_version.description %}<p class="interface-description">{{ interface_item.current_version.description|linebreaksbr }}</p>{% endif %}
+  <section class="interface-form-section"><h3>Require</h3>{% for requirement in interface_item.current_version.requirements.all %}<div class="published-requirement"><strong>{{ requirement.required_interface.name }}@{{ requirement.required_interface.creator.username }}</strong><small>v{{ requirement.required_version.version_number }}</small></div>{% empty %}<p class="empty">Requireはありません。</p>{% endfor %}</section>
+  <section class="interface-form-section"><h3>Field</h3>{% for field in interface_item.current_version.fields.all %}<div class="published-field"><div><strong>{{ field.label }}</strong>{% if field.required %}<span>必須</span>{% endif %}</div><small>{{ field.get_field_type_display }}</small>{% if field.settings.options %}<p>{{ field.settings.options|join:' / ' }}</p>{% endif %}</div>{% empty %}<p class="empty">Fieldはありません。</p>{% endfor %}</section>
+</article>

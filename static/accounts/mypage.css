@@ -49,23 +49,14 @@
 }
 
 .mypage-workspace {
+  --ui-workspace-fixed-width: 360px;
   display: flex;
   height: 100%;
-  transition: transform 260ms ease;
-  width: 200vw;
-}
-
-.mypage.is-basic-info-open .mypage-workspace {
-  transform: translateX(-100vw);
-}
-
-.mypage.is-interface-open .mypage-workspace {
-  transform: translateX(-100vw);
+  width: max-content;
 }
 
 .mypage-overview,
-.basic-info-pane,
-.interface-management {
+.basic-info-pane {
   background: var(--panel);
   flex: 0 0 100vw;
   min-width: 0;
@@ -74,22 +65,11 @@
 }
 
 .interface-management {
-  overflow: hidden;
+  display: contents;
 }
 
 .interface-track {
-  display: flex;
-  height: 100%;
-  transition: transform 260ms ease;
-  width: 200vw;
-}
-
-.interface-track.is-require-list-open {
-  transform: translateX(-40vw);
-}
-
-.interface-track.is-require-detail-open {
-  transform: translateX(-100vw);
+  display: contents;
 }
 
 .interface-list-pane,
@@ -102,12 +82,14 @@
 
 .interface-list-pane,
 .add-require-list-pane {
-  flex: 0 0 40vw;
+  flex: 0 0 var(--ui-workspace-fixed-width);
+  width: var(--ui-workspace-fixed-width);
 }
 
 .interface-detail-pane,
 .add-require-detail-pane {
-  flex: 0 0 60vw;
+  flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width));
+  width: calc(100vw - var(--ui-workspace-fixed-width));
 }
 
 .interface-list-pane {
@@ -120,89 +102,27 @@
   padding: 0 24px 36px;
 }
 
-.interface-pane-header {
-  align-items: center;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  justify-content: space-between;
-  min-height: 60px;
-  padding: 0 20px;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
 .interface-detail-pane .interface-pane-header {
   margin: 0 -24px;
   padding: 0 24px;
 }
 
-.interface-pane-header h2,
+.interface-detail-pane > .interface-definition-detail {
+  padding-top: 24px;
+}
+
 .interface-form-section h3 {
   font-size: 18px;
   margin: 0;
 }
 
-.interface-pane-header h2 {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.interface-tabs {
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  overflow-x: auto;
-}
-
-.interface-tabs button {
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--muted);
-  cursor: pointer;
-  flex: 0 0 auto;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  min-height: 48px;
-  padding: 0 14px;
-}
-
-.interface-tabs button.is-active {
-  border-bottom-color: var(--accent);
-  color: var(--accent-dark);
-}
-
 .interface-list-section {
-  display: none;
   padding: 16px 20px 28px;
 }
 
-.interface-list-section.is-active {
-  display: block;
-}
-
-.interface-summary-item {
-  background: transparent;
-  border: 0;
+.interface-create-action {
   border-bottom: 1px solid var(--line);
-  color: var(--text);
-  display: grid;
-  gap: 4px;
-  padding: 14px 0;
-  text-align: left;
-  text-decoration: none;
-  width: 100%;
-}
-
-a.interface-summary-item:hover,
-.interface-summary-item.is-selected {
-  color: var(--accent-dark);
-}
-
-.interface-summary-item small {
-  color: var(--muted);
+  padding-bottom: 14px;
 }
 
 .interface-detail-empty {
@@ -211,21 +131,8 @@ a.interface-summary-item:hover,
   text-align: center;
 }
 
-.mypage-pane-status {
-  color: var(--muted);
-  margin: 0;
-}
-
 .basic-info-pane.is-loading,
-.basic-info-pane.has-load-error,
-.interface-list-pane.is-loading,
-.interface-list-pane.has-load-error,
-.interface-detail-pane.is-loading,
-.interface-detail-pane.has-load-error,
-.add-require-list-pane.is-loading,
-.add-require-list-pane.has-load-error,
-.add-require-detail-pane.is-loading,
-.add-require-detail-pane.has-load-error {
+.basic-info-pane.has-load-error {
   display: grid;
   place-items: center;
 }
@@ -322,8 +229,7 @@ a.interface-summary-item:hover,
 }
 
 .interface-section-heading,
-.interface-field-editor-header,
-.interface-form-actions {
+.interface-field-editor-header {
   align-items: center;
   display: flex;
   justify-content: space-between;
@@ -492,113 +398,23 @@ a.interface-summary-item:hover,
   margin-top: 4px;
 }
 
-.interface-form-actions {
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.published-interface-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.discard-interface-draft {
-  margin: 24px auto 0;
-  max-width: 760px;
-  text-align: right;
-}
-
-.discard-interface-draft button {
-  background: transparent;
-  border: 0;
-  color: #b42318;
-  cursor: pointer;
-  font: inherit;
-  text-decoration: underline;
-}
-
-.published-interface-detail {
-  display: grid;
-  gap: 28px;
-  margin: 0 auto;
-  max-width: 760px;
-  padding-top: 24px;
-}
-
-.published-interface-detail > header {
-  align-items: flex-start;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-}
-
-.published-interface-detail > header h3,
-.published-interface-detail > header p,
-.interface-description,
-.published-field p {
-  margin: 0;
-}
-
-.published-interface-detail > header h3 {
-  font-size: 22px;
-}
-
-.published-interface-detail > header p,
-.published-requirement small,
-.published-field small {
-  color: var(--muted);
-}
-
-.interface-status,
-.published-field span {
-  background: #ece9e4;
-  border-radius: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 3px 6px;
-}
-
-.published-requirement,
-.published-field {
+.owner-interface-actions {
   border-top: 1px solid var(--line);
-  display: grid;
-  gap: 5px;
-  padding: 14px 0;
+  padding-top: 18px;
 }
 
-.published-field > div {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.interface-delete-form {
-  border-top: 1px solid var(--line);
+.interface-action-note {
   color: var(--muted);
-  display: grid;
   font-size: 14px;
-  gap: 10px;
-  justify-items: end;
-  padding-top: 18px;
-}
-
-.interface-delete-form p {
   margin: 0;
-}
-
-.interface-delete-form button {
-  background: transparent;
-  border: 0;
-  color: #b42318;
-  cursor: pointer;
-  font: inherit;
-  text-decoration: underline;
-}
-
-.interface-restore-form {
-  border-top: 1px solid var(--line);
-  padding-top: 18px;
   text-align: right;
+}
+
+.interface-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .mypage-overview-content {
@@ -704,6 +520,9 @@ a.interface-summary-item:hover,
 }
 
 @media (max-width: 780px) {
+  .mypage-workspace {
+    --ui-workspace-fixed-width: 100vw;
+  }
   .mypage-header {
     padding: 0 16px;
   }
@@ -725,24 +544,6 @@ a.interface-summary-item:hover,
 
   .basic-info-pane {
     padding: 0 16px calc(32px + env(safe-area-inset-bottom));
-  }
-
-  .interface-track {
-    display: flex;
-    transition: transform 260ms ease;
-    width: 400vw;
-  }
-
-  .interface-track.is-detail-open {
-    transform: translateX(-100vw);
-  }
-
-  .interface-track.is-require-list-open {
-    transform: translateX(-200vw);
-  }
-
-  .interface-track.is-require-detail-open {
-    transform: translateX(-300vw);
   }
 
   .interface-list-pane,
