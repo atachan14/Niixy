@@ -1306,12 +1306,15 @@ function createRoomPane(className, title, closeLabel) {
   close.type = 'button';
   close.textContent = '×';
   close.setAttribute('aria-label', closeLabel);
+  const actions = document.createElement('div');
+  actions.className = 'ui-pane-header-actions';
+  actions.append(close);
   const content = document.createElement('div');
   content.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
-  header.append(heading, close);
+  header.append(heading, actions);
   pane.append(header, content);
   document.querySelector('.thread-track').append(pane);
-  return {pane, heading, close, content};
+  return {pane, heading, actions, close, content};
 }
 function activeRoomFragment() {
   return document.querySelector('.thread-detail-pane [data-room-fragment]');
@@ -1355,7 +1358,7 @@ async function openEmbeddedRoomList(title, url, kind, shouldUpdateUrl = true) {
   setThreadStage('room-list');
   if (shouldUpdateUrl) updateRoomUrl(activeRoomId, {room_list: kind});
   try {
-    const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
+    const response = await fetch(url, {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error();
     const html = await response.text();
     if (current !== roomRequestId) return;
@@ -1385,12 +1388,24 @@ async function openEmbeddedBoard(boardId, title, url, shouldUpdateUrl = true) {
   setThreadStage('room-board');
   if (shouldUpdateUrl) updateRoomUrl(activeRoomId, {room_list: 'boards', board: activeRoomBoard.id});
   try {
-    const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
+    const response = await fetch(url, {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error();
     const html = await response.text();
     if (current !== roomRequestId) return;
     ui.content.innerHTML = html;
     NiixyRoomForms.initialize(ui.content, fieldCatalog, interfaceCatalog);
+    const boardPane = ui.content.querySelector('.room-board-thread-list');
+    if (boardPane?.dataset.boardManageable === 'true') {
+      const edit = document.createElement('button');
+      edit.className = 'button secondary';
+      edit.type = 'button';
+      edit.textContent = '編集';
+      edit.addEventListener('click', () => {
+        const actions = ui.content.querySelector('.room-board-actions');
+        if (actions) actions.hidden = !actions.hidden;
+      });
+      ui.actions.prepend(edit);
+    }
     ui.content.addEventListener('click', (event) => {
       const thread = event.target.closest('[data-room-thread]');
       if (thread) openEmbeddedRoomThread(thread.dataset.roomThread);
@@ -1625,6 +1640,7 @@ workspace.addEventListener('click', (event) => {
 });
 workspace.addEventListener('submit', async (event) => {
   const roomAction = event.target.closest('[data-room-fragment] [data-room-action]');
+  const boardAction = event.target.closest('.niimap-room-list-pane [data-board-action], .niimap-room-thread-list-pane [data-board-action]');
   const boardCreate = event.target.closest('.niimap-room-thread-list-pane [data-board-thread-create]');
   const roomReply = event.target.closest('.niimap-room-thread-detail-pane .thread-reply-form');
   if (roomReply) {
@@ -1634,9 +1650,10 @@ workspace.addEventListener('submit', async (event) => {
     if (result && threadId) await openEmbeddedRoomThread(threadId, false);
     return;
   }
-  const form = roomAction || boardCreate || roomReply;
+  const form = roomAction || boardAction || boardCreate || roomReply;
   if (!form) return;
   event.preventDefault();
+  if (form.dataset.confirmMessage && !window.confirm(form.dataset.confirmMessage)) return;
   const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
   if (!pending) return;
   const data = new FormData(form);
@@ -1650,6 +1667,16 @@ workspace.addEventListener('submit', async (event) => {
       const roomId = activeRoomId;
       await openRoom(roomId, false);
       updateRoomUrl(roomId, {}, true);
+    }
+    else if (boardAction) {
+      const fragment = activeRoomFragment();
+      if (!fragment) return;
+      await openEmbeddedRoomList('Board一覧', fragment.dataset.boardsUrl, 'boards', false);
+      if (boardAction.dataset.boardActionKind !== 'delete') {
+        const board = document.querySelector(`.niimap-room-list-pane [data-open-board="${result.board_id}"]`);
+        if (board) await openEmbeddedBoard(result.board_id, board.querySelector('.ui-summary-item-title').textContent, board.dataset.boardUrl, false);
+      }
+      updateRoomUrl(activeRoomId, boardAction.dataset.boardActionKind === 'delete' ? {room_list: 'boards'} : {room_list: 'boards', board: result.board_id}, true);
     }
     else if (boardCreate) {
       const board = {...activeRoomBoard};

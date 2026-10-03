@@ -11,6 +11,15 @@ from interfaces.services import publish_draft, publish_field_definition
 
 
 class ThreadViewTests(TestCase):
+    def place_on_map(self, *threads):
+        for index, thread in enumerate(threads):
+            ThreadPlacement.objects.create(
+                thread=thread,
+                kind=ThreadPlacement.NII_MAP,
+                latitude=f'35.{index + 1:06d}',
+                longitude=f'139.{index + 1:06d}',
+            )
+
     def payload(self, **overrides):
         data = {
             'submission_id': str(uuid4()), 'title': '地図上のThread', 'body': '最初の本文',
@@ -119,6 +128,7 @@ class ThreadViewTests(TestCase):
             capability=ThreadAccessRule.VIEW,
             audience=ThreadAccessRule.GUEST,
         )
+        self.place_on_map(thread)
         response = self.client.get(reverse('events:map'))
 
         self.assertContains(response, 'class="thread-information-entry thread-policy-entry"')
@@ -220,6 +230,20 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, '非公開Thread')
         self.assertContains(response, 'このThreadは閲覧できません。')
 
+    def test_map_and_search_exclude_unplaced_threads(self):
+        placed = Thread.objects.create(title='配置済みThread')
+        unplaced = Thread.objects.create(title='未配置Thread')
+        self.place_on_map(placed)
+        for thread in (placed, unplaced):
+            ThreadAccessRule.objects.create(thread=thread, capability='view', audience='guest')
+
+        map_response = self.client.get(reverse('events:map'))
+        search_response = self.client.post(reverse('events:thread-search'), self.search_payload())
+
+        self.assertContains(map_response, '配置済みThread')
+        self.assertNotContains(map_response, '未配置Thread')
+        self.assertEqual(search_response.json()['thread_ids'], [placed.pk])
+
     def test_map_uses_list_controls_and_opens_thread_creation_in_detail_pane(self):
         response = self.client.get(reverse('events:map'))
 
@@ -293,6 +317,7 @@ class ThreadViewTests(TestCase):
     def test_thread_search_uses_effective_view_policy(self):
         public = Thread.objects.create(title='公開')
         hidden = Thread.objects.create(title='非公開')
+        self.place_on_map(public, hidden)
         ThreadAccessRule.objects.create(thread=public, capability='view', audience='guest')
 
         response = self.client.post(reverse('events:thread-search'), self.search_payload(
@@ -337,6 +362,7 @@ class ThreadViewTests(TestCase):
         owner_thread = Thread.objects.create(creator=owner, title='本人')
         other_thread = Thread.objects.create(creator=other, title='他人')
         guest_thread = Thread.objects.create(title='Guest')
+        self.place_on_map(owner_thread, other_thread, guest_thread)
         for thread in (owner_thread, other_thread, guest_thread):
             ThreadAccessRule.objects.create(thread=thread, capability='view', audience='guest')
         self.client.force_login(owner)
@@ -357,6 +383,7 @@ class ThreadViewTests(TestCase):
     def test_thread_search_policy_accepts_account_condition_groups(self):
         public = Thread.objects.create(title='公開')
         account_only = Thread.objects.create(title='Account限定')
+        self.place_on_map(public, account_only)
         ThreadAccessRule.objects.create(thread=public, capability='view', audience='guest')
         ThreadAccessRule.objects.create(thread=account_only, capability='view', audience='account')
 
@@ -373,6 +400,7 @@ class ThreadViewTests(TestCase):
 
     def test_thread_search_does_not_match_hidden_post_body(self):
         hidden = Thread.objects.create(title='通常タイトル')
+        self.place_on_map(hidden)
         ThreadPost.objects.create(thread=hidden, number=1, body='秘密の検索語')
 
         response = self.client.post(reverse('events:thread-search'), self.search_payload(

@@ -117,42 +117,13 @@ class Collection(models.Model):
 
 
 class Board(models.Model):
+    submission_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField('Board名', max_length=120)
-    owner_account = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        blank=True,
-        null=True,
-        on_delete=models.PROTECT,
-        related_name='owned_boards',
-    )
-    owner_room = models.ForeignKey(
-        Room,
-        blank=True,
-        null=True,
-        on_delete=models.PROTECT,
-        related_name='owned_boards',
-    )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name='created_boards',
-    )
     created_at = models.DateTimeField('作成日時', auto_now_add=True)
     updated_at = models.DateTimeField('更新日時', auto_now=True)
     last_activity_at = models.DateTimeField('最終活動日時', auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    models.Q(owner_account__isnull=False, owner_room__isnull=True)
-                    | models.Q(owner_account__isnull=True, owner_room__isnull=False)
-                ),
-                name='board_has_one_owner',
-            ),
-        ]
         ordering = ['-last_activity_at', '-created_at']
 
     def __str__(self):

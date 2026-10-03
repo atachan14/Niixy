@@ -2,7 +2,10 @@
   <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="Collection一覧">
     {% for collection in collections %}<button class="{% if forloop.first %}is-active{% endif %}" type="button" role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" data-ui-tab="collection-{{ collection.pk }}">{{ collection.name }}</button>{% endfor %}
   </div>
-  {% for collection in collections %}<div class="ui-tab-panel room-board-list ui-summary-list{% if forloop.first %} is-active{% endif %}" data-ui-tab-panel="collection-{{ collection.pk }}">
-    {% for board in collection.visible_boards %}<button class="ui-summary-item" type="button" data-open-board="{{ board.pk }}" data-board-url="{% url 'rooms:board-threads' room.pk board.pk %}"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ board.name }}</strong><small class="ui-summary-item-updated">最終更新 {{ board.last_activity_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">Boardはありません。</p>{% endfor %}
-  </div>{% empty %}<p class="empty">Collectionはありません。</p>{% endfor %}
+  {% for collection in collections %}<section class="ui-tab-panel room-collection-panel{% if forloop.first %} is-active{% endif %}" data-ui-tab-panel="collection-{{ collection.pk }}">
+    <div class="room-board-list ui-summary-list">
+      {% if room.is_owner %}<details class="ui-control-accordion room-board-create"><summary>Board作成</summary><div class="ui-control-accordion-body"><form action="{% url 'rooms:board-create' room.pk %}" data-board-action data-board-action-kind="create">{% csrf_token %}<input name="submission_id" type="hidden" value="{{ board_submission_id }}"><label>Board名<input name="name" maxlength="120" required></label><p class="room-form-error" hidden></p><button class="button primary" type="submit" data-pending-label="作成中...">作成する</button></form></div></details>{% endif %}
+      {% for board in collection.visible_boards %}<button class="ui-summary-item" type="button" data-open-board="{{ board.pk }}" data-board-url="{% url 'rooms:board-threads' room.pk board.pk %}"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ board.name }}</strong><small class="ui-summary-item-updated">最終更新 {{ board.last_activity_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">Boardはありません。</p>{% endfor %}
+    </div>
+  </section>{% empty %}<p class="empty">Collectionはありません。</p>{% endfor %}
 </div>

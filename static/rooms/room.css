@@ -4,6 +4,7 @@
 .room-page { height: 100%; }
 .room-page-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; height: var(--room-header-height); justify-content: space-between; padding: 0 24px; position: relative; z-index: 4; }
 .room-page-header h1 { font-size: 15px; margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-pane-header-actions { align-items: center; display: flex; gap: 8px; }
 .room-header-actions { align-items: center; display: flex; gap: 8px; }
 .room-header-actions > .icon-button { color: var(--text); text-decoration: none; }
 #room-page-identity { background: transparent; border: 0; color: var(--text); font: inherit; padding: 0; }
@@ -29,6 +30,16 @@
 .room-thread-detail-pane > header { position: sticky; top: 0; z-index: 2; }
 .room-pane-loading, .room-list-pane .empty { color: var(--muted); margin: 32px 20px; text-align: center; }
 .room-board-list, .room-board-thread-list, .room-member-list { padding: 16px 20px 28px; }
+.room-board-create { margin: 0 0 12px; }
+.room-board-create form, .room-board-edit form { display: grid; gap: 10px; }
+.room-board-create label, .room-board-edit label { display: grid; font-weight: 700; gap: 5px; }
+.room-board-create input, .room-board-edit input { border: 1px solid var(--line); border-radius: 6px; font: inherit; padding: 9px; }
+.room-board-actions { align-items: start; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; padding-bottom: 12px; }
+.room-board-actions form { margin: 0; }
+.room-board-edit { position: relative; }
+.room-board-edit > summary { cursor: pointer; list-style: none; }
+.room-board-edit > summary::-webkit-details-marker { display: none; }
+.room-board-edit form { background: var(--panel); border: 1px solid var(--line); box-shadow: 0 8px 24px rgb(0 0 0 / 12%); left: 0; padding: 14px; position: absolute; top: calc(100% + 6px); width: min(300px, calc(100vw - 48px)); z-index: 3; }
 .room-thread-create { margin: 0 0 12px; }
 .room-thread-create form { display: grid; gap: 12px; }
 .room-thread-create label { display: grid; font-weight: 700; gap: 5px; }

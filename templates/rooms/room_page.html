@@ -3,7 +3,7 @@
 
 {% block title %}{{ room.name }} | Niixy{% endblock %}
 {% block main_class %}room-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261002-1"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-2">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261002-1"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-5">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
@@ -16,11 +16,11 @@
   <div class="room-workspace"><div class="room-track ui-workspace-track">
     <section class="room-overview-pane" aria-label="Room概要">{% include 'rooms/partials/room_overview.html' with room=room %}</section>
     <section class="ui-list-pane room-list-pane" aria-label="Room内一覧"><header class="ui-pane-header ui-list-pane-header"><h2 id="room-list-title"></h2><button id="close-room-list" class="icon-button" type="button" aria-label="Roomに戻る">×</button></header><div id="room-list-content"><p class="room-pane-loading">読み込み中...</p></div></section>
-    <section class="ui-list-pane room-thread-list-pane" aria-label="Board内Thread一覧"><header class="ui-pane-header ui-list-pane-header"><h2 id="room-thread-list-title"></h2><button id="close-room-thread-list" class="icon-button" type="button" aria-label="Board一覧に戻る">×</button></header><div id="room-thread-list-content"><p class="room-pane-loading">読み込み中...</p></div></section>
+    <section class="ui-list-pane room-thread-list-pane" aria-label="Board内Thread一覧"><header class="ui-pane-header ui-list-pane-header"><h2 id="room-thread-list-title"></h2><div class="ui-pane-header-actions"><button id="edit-room-board" class="button secondary" type="button" hidden>編集</button><button id="close-room-thread-list" class="icon-button" type="button" aria-label="Board一覧に戻る">×</button></div></header><div id="room-thread-list-content"><p class="room-pane-loading">読み込み中...</p></div></section>
     <aside class="ui-detail-pane room-thread-detail-pane" aria-label="Thread詳細"><header class="ui-pane-header ui-detail-pane-header"><h2 id="room-thread-detail-title"></h2><button id="close-room-thread-detail" class="icon-button" type="button" aria-label="一覧に戻る">×</button></header><div id="room-thread-detail-content"><p class="empty">Threadを選択してください。</p></div></aside>
   </div></div>
 </section>
 {{ thread_field_catalog|json_script:'room-thread-field-catalog' }}
 {{ thread_interface_catalog|json_script:'room-thread-interface-catalog' }}
 {% endblock %}
-{% block scripts %}<script src="{% static 'rooms/forms.js' %}?v=20261004-1"></script><script src="{% static 'rooms/room.js' %}?v=20261004-3"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'rooms/forms.js' %}?v=20261004-1"></script><script src="{% static 'rooms/room.js' %}?v=20261004-7"></script>{% endblock %}

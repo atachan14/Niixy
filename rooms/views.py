@@ -9,12 +9,12 @@ from django.views.decorators.http import require_POST
 
 from events.idempotency import run_once, submission_id_from
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
-from events.services import prepare_thread_modules, thread_queryset
+from events.services import prepare_thread_for_view, prepare_thread_modules, thread_queryset
 from interfaces.services import save_thread_fields, thread_field_catalog, thread_interface_catalog
 
-from .forms import BoardThreadCreateForm, RoomCreateForm, RoomEditForm
+from .forms import BoardForm, BoardThreadCreateForm, RoomCreateForm, RoomEditForm
 from .models import Board, Room, RoomMembership
-from .services import create_room, touch_thread_containers
+from .services import create_board, create_room, touch_thread_containers
 
 
 def _room(request, room_id):
@@ -32,9 +32,21 @@ def _room(request, room_id):
 def _room_boards(room):
     return (
         Board.objects.filter(placement__collection__room=room)
-        .select_related('owner_room', 'placement__collection')
+        .select_related('placement__collection')
         .order_by('-last_activity_at', '-created_at')
     )
+
+
+def _managed_board(room, board_id):
+    return get_object_or_404(_room_boards(room), pk=board_id)
+
+
+def _require_room_owner(request, room):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Boardの管理にはログインが必要です。'}, status=401)
+    if not room.is_owner:
+        return JsonResponse({'error': 'Boardを管理できるのはRoomOwnerだけです。'}, status=403)
+    return None
 
 
 @require_POST
@@ -116,22 +128,76 @@ def room_boards(request, room_id):
     for collection in collections:
         collection.visible_boards = list(
             Board.objects.filter(placement__collection=collection)
-            .select_related('owner_room', 'placement__collection')
+            .select_related('placement__collection')
             .order_by('-last_activity_at', '-created_at')
         )
     return render(request, 'rooms/partials/board_list.html', {
         'room': room,
         'collections': collections,
+        'board_submission_id': uuid.uuid4(),
+    })
+
+
+@require_POST
+def board_create(request, room_id):
+    room = _room(request, room_id)
+    denied = _require_room_owner(request, room)
+    if denied:
+        return denied
+    form = BoardForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
+    board, _ = create_board(
+        submission_id=submission_id_from(request.POST.get('submission_id')),
+        room=room,
+        name=form.cleaned_data['name'],
+    )
+    return JsonResponse({
+        'board_id': board.pk,
+        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&board={board.pk}',
+    })
+
+
+@require_POST
+def board_edit(request, room_id, board_id):
+    room = _room(request, room_id)
+    denied = _require_room_owner(request, room)
+    if denied:
+        return denied
+    board = _managed_board(room, board_id)
+    form = BoardForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
+    board.name = form.cleaned_data['name']
+    board.save(update_fields=['name', 'updated_at'])
+    return JsonResponse({
+        'board_id': board.pk,
+        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&board={board.pk}',
+    })
+
+
+@require_POST
+def board_delete(request, room_id, board_id):
+    room = _room(request, room_id)
+    denied = _require_room_owner(request, room)
+    if denied:
+        return denied
+    board = _managed_board(room, board_id)
+    board.delete()
+    return JsonResponse({
+        'board_id': board_id,
+        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1',
     })
 
 
 def board_threads(request, room_id, board_id):
     room = _room(request, room_id)
     board = get_object_or_404(_room_boards(room), pk=board_id)
-    threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.BOARD, placements__board=board))
-    for thread in threads:
+    board_threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.BOARD, placements__board=board))
+    for thread in board_threads:
         thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
         thread.can_write = room.is_member and thread.allows(request.user, ThreadAccessRule.WRITE)
+    threads = [thread for thread in board_threads if thread.can_view]
     return render(request, 'rooms/partials/board_threads.html', {
         'room': room,
         'board': board,
@@ -149,8 +215,7 @@ def room_thread_detail(request, room_id, thread_id):
         ),
         pk=thread_id,
     )
-    thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
-    thread.can_write = room.is_member and thread.allows(request.user, ThreadAccessRule.WRITE)
+    prepare_thread_for_view(thread, request.user)
     return render(request, 'rooms/partials/thread_detail.html', {'room': room, 'thread': thread})
 
 

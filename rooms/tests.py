@@ -11,7 +11,7 @@ from interfaces.models import FieldType, ThreadDirectField
 from interfaces.services import publish_field_definition
 
 from .models import Board, BoardPlacement, Collection, Room, RoomMembership, RoomPlacement
-from .services import create_room
+from .services import create_board, create_room
 
 
 class RoomCreationServiceTests(TestCase):
@@ -43,8 +43,6 @@ class RoomCreationServiceTests(TestCase):
         self.assertTrue(main.is_main)
         board = Board.objects.get()
         self.assertEqual(board.name, '最初のBoard')
-        self.assertEqual(board.owner_room, room)
-        self.assertEqual(board.created_by, self.owner)
         self.assertEqual(board.placement.kind, BoardPlacement.COLLECTION)
         self.assertEqual(board.placement.collection, main)
 
@@ -70,6 +68,24 @@ class RoomCreationServiceTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             RoomMembership.objects.create(room=room, account=self.owner)
 
+    def test_create_board_is_idempotent_and_uses_main_collection(self):
+        room, _ = self.create()
+        submission_id = uuid4()
+
+        first, first_created = create_board(
+            submission_id=submission_id, room=room, name='お知らせ',
+        )
+        second, second_created = create_board(
+            submission_id=submission_id, room=room, name='重複送信',
+        )
+
+        self.assertTrue(first_created)
+        self.assertFalse(second_created)
+        self.assertEqual(first, second)
+        self.assertEqual(second.name, 'お知らせ')
+        self.assertTrue(second.placement.collection.is_main)
+        self.assertEqual(Board.objects.filter(placement__collection__room=room).count(), 2)
+
 
 class PlacementConstraintTests(TestCase):
     def setUp(self):
@@ -82,7 +98,7 @@ class PlacementConstraintTests(TestCase):
             latitude='35.0',
             longitude='139.0',
         )
-        self.board = Board.objects.get(owner_room=self.room)
+        self.board = Board.objects.get(placement__collection__room=self.room)
 
     def test_board_thread_placement_uses_board_without_coordinates(self):
         thread = Thread.objects.create(creator=self.owner, title='Room Thread')
@@ -123,7 +139,7 @@ class RoomViewTests(TestCase):
             submission_id=uuid4(), owner=self.owner, name='View Room', description='Roomの説明',
             latitude='35.0', longitude='139.0',
         )
-        self.board = Board.objects.get(owner_room=self.room)
+        self.board = Board.objects.get(placement__collection__room=self.room)
 
     def test_logged_in_account_creates_room_and_initial_structure(self):
         self.client.force_login(self.member)
@@ -175,6 +191,85 @@ class RoomViewTests(TestCase):
         self.assertEqual(self.room.name, 'Renamed Room')
         self.room.placement.refresh_from_db()
         self.assertEqual(self.room.placement.latitude, Decimal('34.700000'))
+
+    def test_only_owner_can_create_edit_and_delete_board(self):
+        create_url = reverse('rooms:board-create', args=[self.room.pk])
+        submission_id = str(uuid4())
+        self.client.force_login(self.outsider)
+        denied = self.client.post(create_url, {'submission_id': submission_id, 'name': 'Denied'})
+
+        self.client.force_login(self.owner)
+        created = self.client.post(create_url, {'submission_id': submission_id, 'name': 'お知らせ'})
+        duplicate = self.client.post(create_url, {'submission_id': submission_id, 'name': '重複'})
+        board = Board.objects.get(name='お知らせ')
+        edited = self.client.post(
+            reverse('rooms:board-edit', args=[self.room.pk, board.pk]),
+            {'name': '更新済みBoard'},
+        )
+        board.refresh_from_db()
+        self.assertEqual(board.name, '更新済みBoard')
+        deleted = self.client.post(reverse('rooms:board-delete', args=[self.room.pk, board.pk]))
+
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(duplicate.json()['board_id'], board.pk)
+        self.assertEqual(edited.status_code, 200)
+        self.assertEqual(deleted.json()['redirect_url'], f'{reverse("rooms:detail", args=[self.room.pk])}?boards=1')
+        self.assertFalse(Board.objects.filter(pk=board.pk).exists())
+
+    def test_board_list_has_create_action_without_status_tabs(self):
+        self.client.force_login(self.owner)
+        owner_response = self.client.get(reverse('rooms:boards', args=[self.room.pk]))
+        self.client.force_login(self.member)
+        member_response = self.client.get(reverse('rooms:boards', args=[self.room.pk]))
+
+        self.assertContains(owner_response, reverse('rooms:board-create', args=[self.room.pk]))
+        owner_html = owner_response.content.decode()
+        self.assertLess(owner_html.index('room-board-create'), owner_html.index(f'data-open-board="{self.board.pk}"'))
+        self.assertNotContains(owner_response, 'data-board-status-tab')
+        self.assertNotContains(owner_response, '削除済み')
+        self.assertNotContains(member_response, reverse('rooms:board-create', args=[self.room.pk]))
+
+    def test_board_edit_action_is_exposed_from_owner_header(self):
+        self.client.force_login(self.owner)
+
+        room_response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
+        board_response = self.client.get(reverse('rooms:board-threads', args=[self.room.pk, self.board.pk]))
+
+        room_html = room_response.content.decode()
+        self.assertLess(room_html.index('id="edit-room-board"'), room_html.index('id="close-room-thread-list"'))
+        self.assertContains(board_response, 'data-board-manageable="true"')
+        self.assertContains(board_response, 'class="room-board-actions" hidden')
+        self.assertContains(board_response, 'Boardの削除は取り消せません。')
+
+    def test_deleting_board_keeps_thread_and_allows_policy_authorized_reply(self):
+        thread = Thread.objects.create(creator=self.owner, title='Unplaced Thread')
+        post = ThreadPost.objects.create(thread=thread, number=1, creator=self.owner, body='残る本文')
+        ThreadPlacement.objects.create(thread=thread, kind=ThreadPlacement.BOARD, board=self.board)
+        ThreadAccessRule.objects.create(thread=thread, capability='view', audience='account')
+        ThreadAccessRule.objects.create(thread=thread, capability='write', audience='account')
+        self.client.force_login(self.owner)
+
+        delete_response = self.client.post(reverse('rooms:board-delete', args=[self.room.pk, self.board.pk]))
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(Board.objects.filter(pk=self.board.pk).exists())
+        self.assertTrue(Thread.objects.filter(pk=thread.pk).exists())
+        self.assertTrue(ThreadPost.objects.filter(pk=post.pk).exists())
+        self.assertFalse(ThreadPlacement.objects.filter(thread=thread).exists())
+
+        self.client.force_login(self.outsider)
+        reply_response = self.client.post(
+            reverse('events:thread-post-create', args=[thread.pk]),
+            {'submission_id': str(uuid4()), 'body': 'Board削除後の返信'},
+        )
+        detail_response = self.client.get(
+            reverse('accounts:thread-detail', args=[self.owner.username, thread.pk]),
+        )
+
+        self.assertEqual(reply_response.status_code, 200)
+        self.assertContains(detail_response, '残る本文')
+        self.assertContains(detail_response, 'Board削除後の返信')
+        self.assertContains(detail_response, 'class="thread-reply-form"')
 
     def test_member_creates_board_thread_and_outsider_cannot(self):
         url = reverse('rooms:board-thread-create', args=[self.room.pk, self.board.pk])

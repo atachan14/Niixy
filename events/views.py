@@ -40,12 +40,7 @@ def map_view(request):
     if request.user.is_authenticated:
         preference, _ = NiiMapFilterPreference.objects.get_or_create(user=request.user)
         search_state = preference.search_state
-    threads = list(
-        thread_queryset().exclude(
-            placements__kind=ThreadPlacement.BOARD,
-            placements__is_primary=True,
-        ).distinct()
-    )
+    threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.NII_MAP).distinct())
     rooms = list(Room.objects.select_related('owner__niixy_profile', 'placement'))
     for thread in threads:
         prepare_thread_for_view(thread, request.user)
@@ -348,12 +343,7 @@ def thread_search(request):
     except ValidationError as error:
         return JsonResponse({'errors': error.message_dict}, status=400)
 
-    threads = list(
-        thread_queryset().exclude(
-            placements__kind=ThreadPlacement.BOARD,
-            placements__is_primary=True,
-        ).distinct()
-    )
+    threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.NII_MAP).distinct())
     rooms = list(Room.objects.select_related('owner', 'placement'))
     include_creators = _terms(request.POST.get('creator_include', ''))
     exclude_creators = _terms(request.POST.get('creator_exclude', ''))

@@ -8,6 +8,7 @@ const roomListTitle = document.getElementById('room-list-title');
 const roomListContent = document.getElementById('room-list-content');
 const roomThreadListTitle = document.getElementById('room-thread-list-title');
 const roomThreadListContent = document.getElementById('room-thread-list-content');
+const roomBoardEdit = document.getElementById('edit-room-board');
 const roomDetailTitle = document.getElementById('room-thread-detail-title');
 const roomDetailContent = document.getElementById('room-thread-detail-content');
 const roomIdentity = document.getElementById('room-page-identity');
@@ -37,6 +38,7 @@ function clearThreadPanes() {
   requests.detail += 1;
   activeBoardId = null;
   roomThreadListTitle.textContent = '';
+  roomBoardEdit.hidden = true;
   roomThreadListContent.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
   roomDetailTitle.textContent = '';
   roomDetailContent.innerHTML = '<p class="empty">Threadを選択してください。</p>';
@@ -51,7 +53,7 @@ async function openRoomList(title, url, listKind = 'members', updateHistory = tr
   roomIdentity.disabled = false;
   if (updateHistory) updateUrl({[listKind]: 1});
   try {
-    const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
+    const response = await fetch(url, {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error();
     const html = await response.text();
     if (current !== requests.list) return;
@@ -67,18 +69,21 @@ async function openBoard(boardId, title, url, updateHistory = true) {
   requests.detail += 1;
   activeBoardId = String(boardId);
   roomThreadListTitle.textContent = title;
+  roomBoardEdit.hidden = true;
   roomThreadListContent.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
   roomDetailTitle.textContent = '';
   roomDetailContent.innerHTML = '<p class="empty">Threadを選択してください。</p>';
   roomStack.set('thread-list');
   if (updateHistory) updateUrl({boards: 1, board: activeBoardId});
   try {
-    const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
+    const response = await fetch(url, {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error();
     const html = await response.text();
     if (current !== requests.threads) return;
     roomThreadListContent.innerHTML = html;
     NiixyRoomForms.initialize(roomThreadListContent, roomFieldCatalog, roomInterfaceCatalog);
+    const boardPane = roomThreadListContent.querySelector('.room-board-thread-list');
+    roomBoardEdit.hidden = boardPane?.dataset.boardManageable !== 'true';
   } catch {
     if (current === requests.threads) roomThreadListContent.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
   }
@@ -91,7 +96,7 @@ async function openThread(threadId, updateHistory = true) {
   roomStack.set('detail');
   if (updateHistory) updateUrl({boards: 1, board: activeBoardId, thread: threadId});
   try {
-    const response = await fetch(roomUrl(roomPage.dataset.threadDetailTemplate, threadId), {headers: {'X-Requested-With': 'fetch'}});
+    const response = await fetch(roomUrl(roomPage.dataset.threadDetailTemplate, threadId), {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error();
     const html = await response.text();
     if (current !== requests.detail) return;
@@ -118,8 +123,13 @@ document.getElementById('close-room-thread-list').addEventListener('click', () =
   requests.threads += 1;
   requests.detail += 1;
   activeBoardId = null;
+  roomBoardEdit.hidden = true;
   roomStack.set('list');
   updateUrl({boards: 1});
+});
+roomBoardEdit.addEventListener('click', () => {
+  const actions = roomThreadListContent.querySelector('.room-board-actions');
+  if (actions) actions.hidden = !actions.hidden;
 });
 document.getElementById('close-room-thread-detail').addEventListener('click', () => {
   requests.detail += 1;
@@ -161,6 +171,13 @@ document.addEventListener('submit', (event) => {
   if (roomAction) {
     event.preventDefault();
     submitJsonForm(roomAction, () => location.reload());
+    return;
+  }
+  const boardAction = event.target.closest('[data-board-action]');
+  if (boardAction) {
+    event.preventDefault();
+    if (boardAction.dataset.confirmMessage && !window.confirm(boardAction.dataset.confirmMessage)) return;
+    submitJsonForm(boardAction, (result) => location.assign(result.redirect_url));
     return;
   }
   const create = event.target.closest('[data-board-thread-create]');

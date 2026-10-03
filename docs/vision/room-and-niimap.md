@@ -2,7 +2,7 @@
 
 ## NiiMap
 
-NiiMap はコンテンツを発見・作成する地図上の入口である。現行の地図マーカーは独立した Pin ではなく、ThreadPlacement を表す。
+NiiMap はコンテンツを発見・作成する地図上の入口である。地図マーカーは独立した Pin ではなく、NiiMap へ直接配置された対象を表す。
 
 現行の NiiMap は地図に直接掲載された Thread を表示する。将来は Room、Board、Thread、Timeline、Tweet を NiiMap の座標へ配置できるようにする。Room や Timeline の内部にあるコンテンツを NiiMap でどのように表示するかは、それぞれの公開範囲と掲載関係を踏まえて実装時に決める。
 
@@ -24,11 +24,15 @@ Guestは継続的な参加状態を保持するAccountを持たないため、Ro
 
 Room作成時にはMain Collectionと、その中の`最初のBoard`を自動作成する。RoomPaneへ表示するBoardはMain固定ではなく、Room管理者が選択したCollectionから取得できるようにする。Boardを一つも持たないRoomも認める。
 
-Room内の会話はBoardに配置したThreadで行う。BoardPolicyと個別ThreadPolicyはANDで評価する。v0.6ではBoardPolicyを編集できず、Room参加者だけがBoard内でThread作成とResponse投稿を行える固定ルールから始める。
+Room内の会話はBoardに配置したThreadで行う。Boardは独立したOwnerを持たず、配置先Collectionが属するRoomの管理者が管理する。Collectionを削除した場合、そこに配置されているBoardは同じRoom内のシステムCollection「未分類」へ移す。
 
-## 掲載と共有
+RoomPolicyはRoom自体の閲覧、参加、管理を制限する。BoardPolicyはBoard自体の閲覧やThread作成を制限する。RoomのBoardTemplateとBoardのThreadTemplateは子対象の作成時にだけ作用し、推奨値または強制値を子対象へ確定保存する。作成済みのBoardやThreadは親Templateを継続参照せず、親の変更や削除の影響を受けない。
 
-Thread は一つの主掲載先を持ち、追加の共有先を持てる。NiiMapとBoardはThreadの掲載先になり得る。BoardはCollectionまたはNiiMapへ、CollectionはAccountまたはRoomへ配置する。TimelineもRoomまたはNiiMapに置くことができる。移動は主掲載先の変更、共有は参照の追加として扱い、対象自体を複製しない。
+## 配置と参照
+
+対象は同時に最大一つの配置先を持ち、共有する側が別に参照を持つ。ThreadはNiiMapまたはBoardへ配置でき、作成後に配置先を変更しない。BoardはCollectionまたはNiiMapへ配置できる。RoomはNiiMap座標の変更、未配置化、再配置を認める。TimelineもRoomまたはNiiMapに置くことができる。
+
+Boardの配置先変更は、異なるRoomやAccountの管理者間で申請・承認する用途を中心に後続Versionで実装する。NiiMapへ直接配置したBoardは、配置後の移動、編集、削除ができない。Collectionから参照されたBoardは配置先や管理主体を変更せず、参照解除によって本体を削除しない。
 
 ## v0.6 の範囲
 

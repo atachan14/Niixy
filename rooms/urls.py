@@ -13,7 +13,10 @@ urlpatterns = [
     path('<int:room_id>/leave/', views.room_leave, name='leave'),
     path('<int:room_id>/members/', views.room_members, name='members'),
     path('<int:room_id>/boards/', views.room_boards, name='boards'),
+    path('<int:room_id>/boards/new/', views.board_create, name='board-create'),
     path('<int:room_id>/boards/<int:board_id>/', views.board_threads, name='board-threads'),
+    path('<int:room_id>/boards/<int:board_id>/edit/', views.board_edit, name='board-edit'),
+    path('<int:room_id>/boards/<int:board_id>/delete/', views.board_delete, name='board-delete'),
     path('<int:room_id>/boards/<int:board_id>/threads/new/', views.board_thread_create, name='board-thread-create'),
     path('<int:room_id>/threads/<int:thread_id>/', views.room_thread_detail, name='thread-detail'),
 ]

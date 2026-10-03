@@ -9,8 +9,8 @@ Niixy は次の概念を中心にする。
 - Account: Niixy を利用する人
 - Room: Account が作成・管理する場所
 - Collection: Account または Room に属し、Board や別の Collection を掲載する一覧
-- Board: Collection または NiiMap に配置され、Thread をまとめるコンテナ
-- Thread: NiiMap または Board で作られる会話
+- Board: Collection または NiiMap に一つだけ配置され、Thread をまとめるコンテナ
+- Thread: NiiMap または Board に配置され、配置先を失っても存続する会話
 - ThreadPost: Thread の開始投稿または時系列の返信
 - Tweet: Thread に属さず、Account の資産として蓄積する単独の呟き
 - Timeline: Tweet を収集・表示し、設定によって投稿先にもなる流れ
@@ -21,7 +21,7 @@ Niixy は次の概念を中心にする。
 
 ## 文書
 
-- [コンテンツモデル](content-model.md): Collection、Board、Thread、ThreadPost、掲載、活動日時
+- [コンテンツモデル](content-model.md): Collection、Board、Thread、ThreadPost、配置、参照、活動日時
 - [Room と NiiMap](room-and-niimap.md): Room と内部コンテンツが存在・発見される場所
 - [Tweet と Timeline](tweet-and-timeline.md): 単独の呟きと、それを収集・掲載する Timeline
 - [制限と Policy](access-policy.md): アクセス制御の方向性と v0.3 の範囲

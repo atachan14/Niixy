@@ -15,6 +15,10 @@ class RoomEditForm(forms.Form):
     longitude = forms.DecimalField(max_digits=9, decimal_places=6, min_value=-180, max_value=180)
 
 
+class BoardForm(forms.Form):
+    name = forms.CharField(max_length=120)
+
+
 class BoardThreadCreateForm(forms.Form):
     title = forms.CharField(max_length=120)
     body = forms.CharField(widget=forms.Textarea, max_length=10000)

@@ -109,6 +109,21 @@ NiiMapへRoomを配置し、AccountがRoomへ参加して、Room内のBoardでTh
 
 ---
 
+## v0.7 - Board Management
+
+Status: In Progress
+
+RoomのMain Collection内でBoardを追加・編集・整理できるようにし、複数Boardを用途ごとに使い分けられる状態を目指す。
+
+主な対象:
+
+* RoomOwnerによるBoardの新規作成と名称編集
+* Boardの物理削除と、未配置で存続するThread
+* 配置先から解決するBoard管理権限
+* 複数BoardでのThread作成・閲覧・Response投稿
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。

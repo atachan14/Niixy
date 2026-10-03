@@ -4,7 +4,7 @@
 
 Thread は、誰がコンテンツを閲覧・返信・編集・管理できるかを定義できるようにする。将来の条件には Guest 状態、特定 Account、Room の所属やロール、AccountInterface の値、評価値などが含まれる。Room 自体の公開範囲は Room 実装時に設計する。
 
-Thread の発見制限は持たない。Thread がどこに現れるかは ThreadPlacement と掲載先が決め、閲覧 Policy は本文と投稿一覧を開けるかだけを決める。閲覧できない Thread も掲載先の一覧や検索には存在を表示し、開いた先で必要条件を案内できるようにする。
+Thread の発見制限は持たない。Thread がどこに現れるかは配置先と参照が決め、閲覧 Policy は本文と投稿一覧を開けるかだけを決める。閲覧できない Thread も配置先や参照元の一覧と検索には存在を表示し、開いた先で必要条件を案内できるようにする。
 
 ## v0.3 の最小実装
 
@@ -22,9 +22,11 @@ Thread の発見制限は持たない。Thread がどこに現れるかは Threa
 
 ## Room と Board
 
-Roomは閲覧条件と参加条件をRoomPolicyとして持てる方向で設計する。Guestは参加状態を保持できないため、RoomPolicyにかかわらずRoomへ参加できない。Room参加を必要としない閲覧やGuest投稿の可否は別のPolicyとして扱う。
+Roomは閲覧条件、参加条件、管理条件をRoomPolicyとして持てる方向で設計する。Guestは参加状態を保持できないため、RoomPolicyにかかわらずRoomへ参加できない。Room参加を必要としない閲覧やGuest投稿の可否は別のPolicyとして扱う。
 
-BoardPolicyとBoard内の個別ThreadPolicyはANDで評価する。v0.6ではRoomPolicyとBoardPolicyの編集を実装せず、ログイン済みAccountはRoomへ即時参加でき、Room参加者だけがBoard内でThread作成とResponse投稿を行える固定ルールを使用する。非参加者とGuestの閲覧可否は個別ThreadPolicyに従う。
+BoardPolicyはBoard自体の閲覧、編集、Thread作成などを制限する。Threadの閲覧とResponse投稿は、作成時に確定した個別ThreadPolicyで判定する。BoardPolicyとThreadPolicyを作成後も永続的にAND評価する構造にはしない。
+
+RoomのBoardTemplateとBoardのThreadTemplateは、子対象を作成するときのPolicyやLayoutの初期値を定める。推奨値は作成時に変更でき、強制値は変更できない。どちらも作成時に子対象へ確定保存するため、親Templateの後日変更や親Boardの削除は既存ThreadのPolicyを変えない。
 
 ## Account条件
 

@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.db import transaction
 
 from events.idempotency import run_once
 
@@ -17,29 +18,52 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
         RoomMembership.objects.create(room=room, account=owner)
         RoomPlacement.objects.create(room=room, latitude=latitude, longitude=longitude)
         main = Collection.objects.create(name='Main', room=room, is_main=True)
-        board = Board.objects.create(name='最初のBoard', owner_room=room, created_by=owner)
+        board = Board.objects.create(name='最初のBoard')
         BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
         return room
 
     return run_once(Room, submission_id, operation)
 
 
-def room_for_thread(thread):
+def create_board(*, submission_id, room, name):
+    def operation():
+        with transaction.atomic():
+            main = room.collections.select_for_update().get(is_main=True)
+            board = Board.objects.create(
+                submission_id=submission_id,
+                name=name,
+            )
+            BoardPlacement.objects.create(
+                board=board,
+                kind=BoardPlacement.COLLECTION,
+                collection=main,
+            )
+            return board
+
+    return run_once(Board, submission_id, operation)
+
+
+def board_for_thread(thread):
     placements = thread._prefetched_objects_cache.get('placements')
     if placements is None:
         placements = thread.placements.select_related(
             'board__placement__collection__room',
         ).all()
     for placement in placements:
-        if placement.kind != 'board' or not placement.board_id:
-            continue
-        try:
-            collection = placement.board.placement.collection
-        except (BoardPlacement.DoesNotExist, AttributeError):
-            continue
-        if collection and collection.room_id:
-            return collection.room
+        if placement.kind == 'board' and placement.board_id:
+            return placement.board
     return None
+
+
+def room_for_thread(thread):
+    board = board_for_thread(thread)
+    if board is None:
+        return None
+    try:
+        collection = board.placement.collection
+    except (BoardPlacement.DoesNotExist, AttributeError):
+        return None
+    return collection.room if collection and collection.room_id else None
 
 
 def touch_thread_containers(thread):

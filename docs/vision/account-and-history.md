@@ -18,7 +18,9 @@ MyPage は将来、Album とサムネイルの管理、AccountInterface の実�
 
 AccountはCollectionを作成し、Boardを掲載できる。初期状態ではMain Collectionとブログ用Boardを用意する方向とする。日記やブログは独立したNote投稿形式を作らず、Board内のThreadとBoardの表示方法で表現する。
 
-他者のBoardを自分のCollectionへ追加する操作は参照として扱い、Board本体のOwnerや主配置先を変更しない。BoardのFollowは設けず、Collectionへの追加と将来の通知購読を別の機能として扱う。
+AccountのCollectionに配置されたBoardは、そのAccountが管理する。Boardは独立したOwnerを持たず、管理主体は配置先から決まる。Collectionを削除した場合、そこに配置されているBoardは同じAccount内のシステムCollection「未分類」へ移す。
+
+他者のBoardを自分のCollectionへ追加する操作は参照として扱い、Board本体の配置先や管理主体を変更しない。BoardのFollowは設けず、Collectionへの追加と将来の通知購読を別の機能として扱う。
 
 ## Album とサムネイル
 

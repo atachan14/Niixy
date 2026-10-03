@@ -22,7 +22,7 @@ Thread はタイトルと開始本文を同時に入力して作成する。開�
 
 ## 2026-09-20 - 掲載先を独立モデルにする
 
-状態: 採用
+状態: 置換済み（2026-10-04 の「配置と参照を分離する」を採用）
 
 Thread の掲載と共有は ThreadPlacement 型の中間モデルで表現する。これにより、主掲載先、共有、移動、掲載履歴を Thread の複製なしに扱える。
 
@@ -182,7 +182,7 @@ Thread作成時には、FieldをThreadInterface経由だけでなくDirectField�
 
 状態: 採用（2026-09-20の最小制限と、発見・閲覧を分離する方針を一部置換）
 
-Threadがどこに現れるかはThreadPlacementと掲載先が決める。Thread固有のPolicyは閲覧制限と書込制限を持ち、発見制限は持たない。
+Threadがどこに現れるかは配置先と参照が決める。Thread固有のPolicyは閲覧制限と書込制限を持ち、発見制限は持たない。
 
 閲覧できないThreadも掲載先の一覧、Map、検索、Profileには存在を表示する。本文とThreadPostはサーバー側で返さず、詳細では閲覧できないことを案内する。存在自体を隠す必要が生じた場合は、公開範囲を持つRoomなど掲載先側の仕様として実装時に再設計する。
 
@@ -206,7 +206,7 @@ Account条件一覧のItemは検索元のAccountやFieldそのものではなく
 
 ## 2026-10-03 - Book を Board へ統合する
 
-状態: 採用・詳細保留
+状態: 一部置換（2026-10-04 の「Policy Templateは作成時に確定する」を採用）
 
 Thread をまとめるコンテナは Board に統一し、Book を独立したコンテンツ種別として実装しない。会話用、告知用、ブログ用などの用途差は、BoardPolicy、ThreadPostLayout、Board の表示方法によって表現する。ブログでは、Thread のタイトル、`#1` の一部、続きを開く導線を一つの Item として縦に並べる表示を標準候補とする。
 
@@ -214,7 +214,7 @@ Board は安定 ID と変更可能な名称を持つ。BoardPolicy と Board 内
 
 ## 2026-10-03 - Collection を Account または Room に配置する
 
-状態: 採用・詳細保留
+状態: 一部置換（2026-10-04 の「Boardの管理主体は配置先から決める」を採用）
 
 Collection は Board を掲載する一覧であり、必ず一つの Account または Room に配置する。Collection 自体を NiiMap の座標へ直接配置しない。Account と Room には初期 Collection として `Main` を作成する。通常の Board 新規作成時には配置先 Collection を利用者が選択し、Main へ自動掲載しない。
 
@@ -234,7 +234,7 @@ RoomPane では表示用 Collection から更新の新しい Board を最大三�
 
 ## 2026-10-03 - Collection は Board と Collection を参照できる
 
-状態: 採用・詳細保留
+状態: 一部置換（2026-10-04 の「Boardの管理主体は配置先から決める」を採用）
 
 Collection は、自身を主配置先とする Board に加えて、別の Board および別の Collection を参照できる。参照先は複製せず、参照元から解除しても対象本体を削除しない。参照先 Collection の内容が変わった場合は参照元の表示にも反映する。
 
@@ -276,8 +276,54 @@ RoomOwner の譲渡操作は後続 Version へ回すが、Room は最初から�
 
 状態: 採用
 
-SummaryItem の上段は、全種類に共通する種別や Owner の表示欄として固定せず、一覧の目的に応じて内容を決める補助表示欄とする。表示する内容がない場合も空の行を維持し、SummaryItem の三行構成は変えない。
+SummaryItem の上段は、全種類に共通する種別や管理主体の表示欄として固定せず、一覧の目的に応じて内容を決める補助表示欄とする。表示する内容がない場合も空の行を維持し、SummaryItem の三行構成は変えない。
 
-Spot 一覧では、将来、検索者が選択した Field の値を上段へ表示できるようにする。現段階では Room、Thread などの種別や Owner を上段へ表示しない。種別は色など別の表現で識別する。
+Spot 一覧では、将来、検索者が選択した Field の値を上段へ表示できるようにする。現段階では Room、Thread などの種別や管理主体を上段へ表示しない。種別は色など別の表現で識別する。
 
-Board 一覧では、Collection が外部の Board を参照している場合に限り、参照 Board の Owner を上段へ表示する。閲覧中の Account または Room が所有する Boardと、NiiMapへ直接配置されたBoardでは上段を空にする。NiiMap は Board の参照を保持せず、Board や Collection への参照関係は Collection が保持する。
+Board 一覧では、Collection が外部の Board を参照している場合に限り、参照 Board 本体の配置元である Account または Room を上段へ表示する。閲覧中の Account または Room 配下に配置された Board と、NiiMap へ直接配置された Board では上段を空にする。NiiMap は Board の参照を保持せず、Board や Collection への参照関係は Collection が保持する。
+
+## 2026-10-04 - Boardの削除は過去ログを保持するSoft Deleteとする
+
+状態: 置換済み（2026-10-04 の「Boardは物理削除しThreadを残す」を採用）
+
+Boardを削除してもBoard本体、主配置先、既存Threadは物理削除しない。削除済みBoardは通常のRoomとCollectionの導線から外し、新規Thread作成と既存ThreadへのResponse投稿を禁止する。最後の使用中Boardも削除でき、Boardを一つも使用しないRoomを認める。
+
+削除済みBoard内のThreadは過去ログとして残し、AccountPageなどの履歴や直接URLではThreadPolicyに従って閲覧できる。RoomOwnerは削除済みBoard一覧から復元でき、復元時には既存の主配置先とThreadをそのまま再利用する。
+
+## 2026-10-04 - 配置と参照を分離する
+
+状態: 採用（2026-09-20 の主掲載先・共有先を同じ Placement で扱う方針を置換）
+
+Thread、Board、Roomなどの対象は、同時に最大一つの配置先を持つ。別のBoard、Collection、AccountのList、fav、badなどから対象を共有する場合は、対象自身の配置を増やさず、共有する側が独立した参照を保持する。参照の追加や解除によって対象本体、配置先、ほかの参照を変更しない。
+
+Threadの配置先は作成時に確定し、作成後に変更しない。配置先のBoardが物理削除された場合は未配置となる。未配置ThreadもThread本体、Response、ThreadPolicy、Field、Interfaceを維持し、Accountの活動履歴、fav、bad、List、別のBoardが保持する参照、Thread固有URLなど、配置先以外の導線から継続利用できる。NiiMapのSpot一覧にはNiiMapへ直接配置された対象だけを表示する。
+
+RoomはRoom管理者がNiiMap座標の変更、未配置化、再配置を行える。BoardはAccountまたはRoomに属するCollection、もしくはNiiMap座標のいずれか一つへ配置する。AccountまたはRoom配下に配置されているBoardの配置先変更は、異なる管理者間での移動申請と承認を主用途とし、後続Versionで実装する。NiiMapへ配置したBoardは以後配置先を変更できない。
+
+## 2026-10-04 - Boardの管理主体は配置先から決める
+
+状態: 採用（Board Ownerを配置先と分離する方針を置換）
+
+Boardは独立したOwnerを持たない。Account配下のCollectionに配置されたBoardはそのAccountが、Room配下のCollectionに配置されたBoardはそのRoomの管理者が管理する。NiiMapへ直接配置されたBoardには配置先管理者が存在しないため、配置後の移動、未配置化、編集、削除を認めない。Boardを作成した実Accountを監査情報として残すかは、監査機能の実装時に改めて決める。
+
+Collectionを削除する場合、そのCollectionへ配置されているBoardを未配置にせず、同じAccountまたはRoom配下のシステムCollection「未分類」へ移す。「未分類」がなければ自動作成し、既にあれば再利用する。表示名ではなくシステム上の役割で通常のCollectionと区別する。参照として掲載されているBoardやCollectionは、Collection削除時に参照だけを解除する。
+
+参照先Boardが物理削除された場合、Collection側の参照Itemを対象なしの状態で残すことを認める。参照Itemは「削除されました」と表示し、Collection管理者がそのItemをCollectionから削除できる。参照追加時の名称などを表示し続けるSnapshotの要否は参照機能の実装時に決める。
+
+## 2026-10-04 - Policy Templateは作成時に確定する
+
+状態: 採用（BoardPolicyとThreadPolicyを永続的にAND評価する方針を置換）
+
+RoomPolicyはRoom自体の閲覧、参加、管理を制限する。BoardPolicyはBoard自体の閲覧やThread作成など、Board上の操作を制限する。RoomやBoardが持つTemplateは子対象の作成時にだけ作用し、作成済み対象が親のTemplateを継続参照する構造にはしない。
+
+RoomのBoardTemplateとBoardのThreadTemplateは、子対象を作成するときのPolicyやLayoutなどの初期値を定める。推奨値は作成時に変更でき、強制値は変更できない。いずれも作成時に子対象へ確定保存し、親のTemplateを後から変更しても既存対象へ反映しない。
+
+たとえばRoomが、BoardのThreadTemplateにThreadPolicyの閲覧条件として「RoomAに参加」を強制すれば、その条件は各ThreadPolicyへ保存される。Boardが削除されても条件は残る。反対にThreadPolicyがNiixyAccountの閲覧や書込を許可している場合、RoomやBoardの導線を利用できないAccountでも、別の参照やThread固有URLから到達すればThreadPolicyに従って利用できる。
+
+## 2026-10-04 - Boardは物理削除しThreadを残す
+
+状態: 採用（同日のBoard Soft Delete方針を置換）
+
+Boardの削除は復元を前提としたSoft Deleteではなく物理削除とする。Board本体、Board自身の配置、そのBoardが保持する参照を削除し、削除済みBoard一覧と復元機能は設けない。削除操作は取り消せないことと、Board内のThreadおよびResponseは削除されないことを実行前に案内する。
+
+削除されたBoardに配置されていたThreadは未配置となるが、Thread本体、Response、ThreadPolicy、Field、Interfaceを保持する。Board削除後もThreadPolicyに従ってResponse投稿と編集可能なThread情報の変更を認める。別のBoard、AccountのList、fav、badなどがそのThreadへ持つ参照は維持する。

@@ -30,19 +30,31 @@ Collection は Board を掲載する一覧であり、一つの Account また�
 
 Collection は Board と別の Collection を参照できる。参照先を複製せず、参照解除によって対象本体を削除しない。Collection 間の循環参照は禁止し、複数経路から同じ Board に到達した場合の表示規則は Collection 管理機能の実装時に確定する。
 
+Collection を削除する場合、その Collection に配置されている Board は、同じ Account または Room に属するシステム Collection「未分類」へ移す。「未分類」がなければ自動作成し、既にあれば再利用する。表示名ではなくシステム上の役割で通常の Collection と区別する。Collection が参照している Board や Collection は、対象本体を変更せず参照だけを解除する。
+
 ## Board
 
 Board は Thread をテーマや用途ごとにまとめるコンテナである。会話、告知、日記、ブログ、料理レシピ、ゲームレビューなどを、独立した投稿モデルではなく Board 内の Thread として表す。用途ごとの差は BoardPolicy、ThreadPostLayout、Board の表示方法で表現する。
 
-Board は一つの Owner と、一つの主配置先を持つ。Owner は Account または Room とし、主配置先は Collection または NiiMap の座標とする。Owner、主配置先、追加の参照先は分離し、別の Collection から参照されても Owner を変更しない。
+Board は独立した Owner を持たず、一つの配置先を持つ。配置先は Account または Room に属する Collection、もしくは NiiMap の座標とする。Collection に配置された Board は、その Collection が属する Account または Room の管理者が管理する。NiiMap に直接配置された Board には配置先管理者が存在せず、配置後の編集と削除を認めない。
 
 Room 作成時には、Room の Main Collection 内に `最初のBoard`を自動作成する。Board を使用しない Room も認め、Board 管理機能の実装後は最後の Board も削除できるようにする。Account の初期 Main Collectionにはブログ用 Board を用意する方向とするが、Account側の導入時期と詳細は実装時に決める。
 
-## ThreadPlacement
+Board の配置先変更は後続 Version で扱う。主用途は、異なる管理者間での移動申請と承認である。NiiMap へ直接配置した Board は、それ以降の配置先変更、未配置化、編集、削除を認めない。
 
-ThreadPlacement は Thread の掲載先または共有先を表す。主掲載先、Board への参照、掲載先の移動、掲載履歴を扱うため、Thread から独立したモデルにする。
+Board の削除は物理削除とし、復元機能や削除済み一覧を設けない。削除された Board に配置されていた Thread は未配置になるが、Thread 本体、Response、ThreadPolicy、Field、Interface、その Thread への外部参照は残す。Board が保持していた参照は Board とともに削除する。削除後も ThreadPolicy に従って Response 投稿と編集可能な Thread 情報の変更を認める。
 
-NiiMap への配置は地図表示に必要な地点情報を持つ。Board への配置は Board と Thread を結ぶ。同じ Thread を別の Board から参照する場合も Thread を複製せず、主配置と参照を区別できる関係として保持する。
+削除された Board を参照していた Collection では、参照 Item を対象なしの状態で残せるようにする。「削除されました」と表示し、Collection 管理者が参照 Item を取り除ける。参照時点の名称などを Snapshot として残すかは、参照機能の実装時に決める。
+
+## 配置と参照
+
+Thread、Board、Room などの対象は、同時に最大一つの配置先を持つ。別の Board、Collection、Account の List、fav、bad などから共有する場合は、対象自身の配置を増やさず、共有する側が独立した参照を持つ。参照の追加や解除によって対象本体、配置先、ほかの参照を変更しない。
+
+Thread の配置先は作成時に確定し、作成後に変更しない。NiiMap への配置は座標を、Board への配置は Board との関係を保持する。配置先の Board が削除された場合は未配置となる。未配置 Thread も、Account の活動履歴、fav、bad、List、別の Board が保持する参照、Thread 固有 URL などから継続利用できる。
+
+Board 詳細の Thread 一覧には、その Board に配置された Thread と、その Board が参照する Thread の両方を表示できる。参照は閲覧権限を付与せず、利用可否は参照先 Thread の ThreadPolicy に従う。
+
+Room は Room 管理者による NiiMap 座標の変更、未配置化、再配置を認める。対象ごとに配置変更の可否は異なるため、「配置先は一つ」と「配置先は変更不能」を同じ規則にはしない。
 
 ## 活動日時
 

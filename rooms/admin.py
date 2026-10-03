@@ -26,7 +26,15 @@ class CollectionAdmin(admin.ModelAdmin):
 
 @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
-    list_display = ('name', 'owner_account', 'owner_room', 'last_activity_at')
+    list_display = ('name', 'placement_target', 'last_activity_at')
+
+    @admin.display(description='配置先')
+    def placement_target(self, board):
+        try:
+            placement = board.placement
+        except BoardPlacement.DoesNotExist:
+            return '未配置'
+        return placement.collection or f'{placement.latitude}, {placement.longitude}'
 
 
 @admin.register(BoardPlacement)

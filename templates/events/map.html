@@ -1,7 +1,7 @@
 {% extends 'events/base.html' %}
 {% load static %}
 {% block title %}NiiMap{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-2">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-5">{% endblock %}
 {% block content %}
 <script>try { const threadId = new URLSearchParams(location.search).get('thread'); const resume = JSON.parse(sessionStorage.getItem('niixy:resume:niimap')); if (threadId && !(resume?.threadId === threadId && resume.animate)) document.documentElement.classList.add('has-restored-thread-detail'); } catch { sessionStorage.removeItem('niixy:resume:niimap'); }</script>
 <section class="thread-workspace" data-search-url="{% url 'events:thread-search' %}" data-account-search-url="{% url 'accounts:account-condition-search' %}" data-account-condition-save-url="{% url 'accounts:account-condition-save' %}" data-account-condition-delete-url="{% url 'accounts:account-condition-delete' 0 %}" data-room-pane-template="{% url 'rooms:pane' 0 %}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-current-actor="{{ thread_search_default_actor }}">
@@ -97,4 +97,4 @@
 {{ available_account_condition_catalog|json_script:'available-account-condition-catalog-data' }}
 {{ niimap_search_state|json_script:'niimap-search-state-data' }}
 {% endblock %}
-{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'rooms/forms.js' %}?v=20261004-1"></script><script src="{% static 'events/map.js' %}?v=20261004-18"></script>{% endblock %}
+{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'rooms/forms.js' %}?v=20261004-1"></script><script src="{% static 'events/map.js' %}?v=20261004-22"></script>{% endblock %}
