@@ -1211,7 +1211,7 @@ function updateThreadUrl(id, replace = false) {
 function openDetail(id, shouldUpdateUrl = true) {
   const pane = document.querySelector(`[data-thread-detail-pane="${id}"]`);
   if (!pane) return false;
-  if (createControls.open) createControls.open = false;
+  if (createControls.open) NiixyUI.setAccordionExpanded(createControls, false);
   creating = false;
   createForm.hidden = true;
   setThreadStage('detail');
@@ -1249,14 +1249,14 @@ function applyThreadStateFromUrl() {
   }
   selectThread(threadId, true);
 }
-searchControls.addEventListener('toggle', () => {
-  if (!searchControls.open) return;
-  if (createControls.open) createControls.open = false;
+searchControls.addEventListener('niixy:accordion-change', (event) => {
+  if (!event.detail.expanded) return;
+  if (createControls.open) NiixyUI.setAccordionExpanded(createControls, false);
   creating = false;
 });
-createControls.addEventListener('toggle', () => {
-  creating = createControls.open;
-  if (createControls.open && searchControls.open) searchControls.open = false;
+createControls.addEventListener('niixy:accordion-change', (event) => {
+  creating = event.detail.expanded;
+  if (event.detail.expanded && searchControls.open) NiixyUI.setAccordionExpanded(searchControls, false);
 });
 openThreadCreate.addEventListener('click', () => {
   if (openThreadCreate.disabled) return;
@@ -1312,7 +1312,7 @@ searchForm.addEventListener('submit', async (event) => {
     if (!response.ok) { error.textContent = Object.values(result.errors || {}).flat().join(' '); error.hidden = false; return; }
     appliedSearchOrder = result.thread_ids.map(String); appliedSearchIds = new Set(appliedSearchOrder);
     applyFilters();
-    if (searchControls.open) searchControls.open = false;
+    if (searchControls.open) NiixyUI.setAccordionExpanded(searchControls, false);
   } catch {
     error.textContent = '検索に失敗しました。'; error.hidden = false;
   } finally {

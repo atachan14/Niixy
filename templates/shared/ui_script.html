@@ -1,5 +1,7 @@
 <script>
 window.NiixyUI = (() => {
+  const accordionControllers = new WeakMap();
+
   function beginPendingAction(button, label = button?.dataset.pendingLabel) {
     if (!button || button.dataset.uiPending === 'true') return null;
     const form = button.form;
@@ -274,7 +276,9 @@ window.NiixyUI = (() => {
         content.classList.remove('is-open');
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) details.open = false;
       }
+      details.dispatchEvent(new CustomEvent('niixy:accordion-change', {detail: {expanded}}));
     };
+    accordionControllers.set(details, {setExpanded});
 
     if (details.open) content.classList.add('is-open');
     summary.setAttribute('aria-expanded', String(details.open));
@@ -292,11 +296,17 @@ window.NiixyUI = (() => {
     root.querySelectorAll?.('details').forEach(bindAccordion);
   }
 
+  function setAccordionExpanded(details, expanded) {
+    const controller = accordionControllers.get(details);
+    if (controller) controller.setExpanded(expanded);
+    else details.open = expanded;
+  }
+
   bindAccordions();
   new MutationObserver((mutations) => mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
     if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
   }))).observe(document.body, {childList: true, subtree: true});
 
-  return {beginPendingAction, bindAccordions, bindModuleFilters, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, showPaneError};
+  return {beginPendingAction, bindAccordions, bindModuleFilters, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, setAccordionExpanded, showPaneError};
 })();
 </script>

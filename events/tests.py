@@ -252,6 +252,7 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, 'data-pending-label="作成中..."', count=2)
         self.assertContains(response, 'data-pending-label="ログイン中..."')
         self.assertContains(response, 'function beginPendingAction')
+        self.assertContains(response, 'function setAccordionExpanded')
         self.assertNotContains(response, 'id="thread-search-trigger"')
         self.assertNotContains(response, 'id="thread-create-trigger"')
         create_controls = content.index('id="niimap-create-controls"')
