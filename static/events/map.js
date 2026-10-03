@@ -190,6 +190,25 @@ function restoreMapView() {
   map.jumpTo({center: [view.longitude, view.latitude], zoom: view.zoom});
   return true;
 }
+function mapViewFromUrl() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('latitude') || !params.has('longitude')) return null;
+  const latitude = Number(params.get('latitude'));
+  const longitude = Number(params.get('longitude'));
+  const requestedZoom = Number(params.get('zoom'));
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
+  const zoom = Number.isFinite(requestedZoom) && requestedZoom >= 0 && requestedZoom <= 22 ? requestedZoom : 15;
+  return {latitude, longitude, zoom};
+}
+function focusMapFromUrl(animate = false) {
+  const view = mapViewFromUrl();
+  if (!view) return false;
+  const options = {center: [view.longitude, view.latitude], zoom: view.zoom};
+  if (animate) map.easeTo({...options, duration: 700, essential: true});
+  else map.jumpTo(options);
+  return true;
+}
 function addRule(capability, audience) {
   const list = document.querySelector(`.thread-rule[data-capability="${capability}"] .thread-rule-list`);
   if (list.querySelector(`[data-audience="${audience}"]`)) return;
@@ -1219,6 +1238,7 @@ function applyThreadStateFromUrl() {
   const threadId = threadIdFromUrl();
   if (!threadId) {
     closeDetail(false);
+    focusMapFromUrl(true);
     if (url.searchParams.has('thread')) updateThreadUrl(null, true);
     return;
   }
@@ -1308,6 +1328,19 @@ list.addEventListener('click', (event) => {
     openDetail(id);
   }
 });
+workspace.addEventListener('click', (event) => {
+  const link = event.target.closest('[data-thread-placement-link]');
+  if (!link) return;
+  const latitude = Number(link.dataset.latitude);
+  const longitude = Number(link.dataset.longitude);
+  const zoom = Number(link.dataset.zoom || 15);
+  if (![latitude, longitude, zoom].every(Number.isFinite)) return;
+  event.preventDefault();
+  closeDetail(false);
+  const url = new URL(link.href, location.href);
+  history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  map.easeTo({center: [longitude, latitude], zoom, duration: 700, essential: true});
+});
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const pending = NiixyUI.beginPendingAction(event.submitter || createForm.querySelector('[type="submit"]'));
@@ -1384,7 +1417,7 @@ map.on('click', (event) => {
   document.getElementById('niimap-create-location-status').textContent = '地点を選択しました。'; openThreadCreate.disabled = false;
 });
 map.on('load', () => {
-  restoreMapView();
+  if (!focusMapFromUrl()) restoreMapView();
   markers.forEach((thread) => { const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map); marker.getElement().classList.add('event-map-marker'); marker.getElement().addEventListener('click', () => { selectThread(thread.id, true); openDetail(thread.id); }); markerById.set(String(thread.id), marker); });
   applyFilters();
   map.on('moveend', () => {

@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from accounts.models import AccountCondition, AccountProfile
 from accounts.services import account_condition_catalog, save_account_condition
-from events.models import Thread, ThreadAccessRule, ThreadPost
+from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from interfaces.models import FieldType, Interface, InterfaceDraft
 from interfaces.services import publish_draft, publish_field_definition
 
@@ -322,6 +322,23 @@ class AccountPageTests(TestCase):
         self.assertContains(response, '作成したThread')
         self.assertContains(response, f'data-thread-detail="{thread.pk}"')
         self.assertNotContains(response, '詳細を見る')
+
+    def test_profile_thread_detail_links_niimap_placement_coordinates(self):
+        account = get_user_model().objects.create_user('creator_user', password='eightchars')
+        thread = self.make_public_thread(account, '配置付きThread')
+        ThreadPlacement.objects.create(
+            thread=thread,
+            latitude='35.681236',
+            longitude='139.767125',
+        )
+
+        response = self.client.get(reverse('accounts:thread-detail', args=[account.username, thread.pk]))
+
+        self.assertContains(response, 'data-thread-placement-link')
+        self.assertContains(
+            response,
+            f'href="{reverse("events:map")}?latitude=35.681236&amp;longitude=139.767125&amp;zoom=15"',
+        )
 
     def test_thread_pane_lists_threads_even_when_they_are_not_viewable(self):
         account = get_user_model().objects.create_user('creator_user', password='eightchars')

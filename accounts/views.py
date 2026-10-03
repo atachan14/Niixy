@@ -11,7 +11,7 @@ from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from events.models import Thread, ThreadAccessRule, ThreadPost
+from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 
 from .forms import DisplayNameForm, LoginForm, SignUpForm
 from .models import AccountCondition, AccountProfile
@@ -114,6 +114,7 @@ def prepare_threads(queryset, viewer):
     threads = list(
         queryset.select_related('creator').prefetch_related(
             'access_rules',
+            Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
             Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
             'interface_implementations__version__interface__creator',
             'interface_implementations__values__field',
@@ -218,6 +219,7 @@ def account_thread_detail(request, username, thread_id):
         Thread.objects.select_related('creator')
         .prefetch_related(
             'access_rules',
+            Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
             Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
             'interface_implementations__version__interface__creator',
             'interface_implementations__values__field',

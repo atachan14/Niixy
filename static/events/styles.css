@@ -967,6 +967,9 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-detail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; min-height: 60px; position: sticky; top: 0; z-index: 2; }
 .thread-detail { display: grid; gap: 16px; min-width: 0; }
 .thread-detail[hidden] { display: none !important; }
+.thread-placement-row { align-items: center; border-bottom: 1px solid var(--line); display: flex; font-size: 12px; min-height: 32px; min-width: 0; }
+.thread-placement-row a { color: var(--muted); overflow: hidden; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.thread-placement-row a:hover { color: var(--accent-dark); text-decoration: underline; }
 .thread-post { border-bottom: 1px solid var(--line); min-width: 0; padding: 14px 0; }
 .thread-post-layout-area { display: grid; gap: 12px; grid-template-columns: clamp(56px, 12%, 96px) minmax(0, 1fr); min-width: 0; }
 .thread-post-layout-area > div, .thread-post-info { min-width: 0; }

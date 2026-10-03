@@ -128,6 +128,25 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, '許可なし')
         self.assertNotContains(response, 'Response情報')
 
+    def test_thread_detail_links_niimap_placement_coordinates(self):
+        thread = Thread.objects.create(title='配置付きThread')
+        ThreadPost.objects.create(thread=thread, number=1, body='Opening post')
+        ThreadPlacement.objects.create(
+            thread=thread,
+            latitude='35.681236',
+            longitude='139.767125',
+        )
+
+        response = self.client.get(reverse('events:map'))
+
+        self.assertContains(response, 'data-thread-placement-link')
+        self.assertContains(response, 'data-latitude="35.681236"')
+        self.assertContains(response, 'data-longitude="139.767125"')
+        self.assertContains(
+            response,
+            f'href="{reverse("events:map")}?latitude=35.681236&amp;longitude=139.767125&amp;zoom=15"',
+        )
+
     def test_map_exposes_active_thread_interfaces_to_creation_ui(self):
         owner = get_user_model().objects.create_user('catalog_owner', password='eightchars')
         draft = InterfaceDraft.objects.create(creator=owner, kind=Interface.THREAD, name='募集')
