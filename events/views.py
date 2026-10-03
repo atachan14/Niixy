@@ -430,9 +430,9 @@ def thread_search(request):
             continue
         filtered.append(thread)
 
-    sort_kind = request.POST.get('sort_kind', 'updated')
+    sort_kind = request.POST.get('sort_kind', 'near')
     sort_direction = request.POST.get('sort_direction', 'desc')
-    reverse = sort_direction != 'asc'
+    reverse = sort_kind != 'field' or sort_direction != 'asc'
     if sort_kind == 'field':
         try:
             sort_field_ids = expand_field_definition_ids([int(request.POST.get('sort_field_id'))])

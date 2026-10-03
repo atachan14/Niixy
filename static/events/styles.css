@@ -908,8 +908,8 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .niimap-search-controls label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
 .niimap-search-controls input, .niimap-search-controls select, .niimap-picker-search { border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; min-height: 38px; min-width: 0; padding: 7px 8px; width: 100%; }
 .niimap-search-row { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.niimap-search-row:has(.niimap-module-select:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, .8fr); }
 .niimap-module-select { background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--accent-dark); cursor: pointer; font: inherit; min-width: 0; overflow: hidden; padding: 7px 8px; text-overflow: ellipsis; white-space: nowrap; }
+.niimap-module-select:disabled, .niimap-search-controls select:disabled { background: #f3f1ed; color: var(--muted); cursor: not-allowed; opacity: .72; }
 .niimap-condition-list { display: grid; gap: 7px; }
 .niimap-condition-row { align-items: center; display: grid; gap: 6px; grid-template-columns: minmax(0, .8fr) minmax(0, .8fr) minmax(120px, 1.5fr) auto auto; }
 .niimap-module-condition { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
@@ -963,7 +963,8 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-detail-pane > .map-event-form { padding-top: 18px; }
 .thread-list { margin-top: 12px; }
 .thread-item { border-bottom: 1px solid var(--line); }
-.thread-summary { padding-left: 0; padding-right: 0; }
+.thread-summary { border-radius: 4px; padding-left: 8px; padding-right: 8px; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.thread-summary.is-selected { background: #eef6f4; box-shadow: inset 3px 0 0 var(--accent); color: var(--accent-dark); }
 .thread-detail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; min-height: 60px; position: sticky; top: 0; z-index: 2; }
 .thread-detail { display: grid; gap: 16px; min-width: 0; }
 .thread-detail[hidden] { display: none !important; }

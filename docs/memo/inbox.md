@@ -19,16 +19,7 @@
 
 ## Inbox
 
-- NiiMapの一覧のItemを、Mapに表示されてる範囲内だけにする。
-- Thread詳細のHeaderと#1の間に座標を表示しする（将来的にRoomに配置してる場合はRoom名を表示）。
-    - 座標をクリックでNiiMapを展開して（既にNiiMapの場合はWorkSpace遷移、NiiMap以外の場合はPage遷移）、対象座標を中心とした位置を表示。
-    - （Roomをクリックした場合は対象Roomを展開）
 
-- NiiMapの一覧のHeaderを「検索」「新規作成」にする。
-    - NiiMap上の「絞り込み」は廃止（一覧Paneの検索に機能を移動）
-    - 「検索」ではSummaryListの頭に検索窓を表示する。
-
-- ログイン時にログイン中...みたいな表示。
 
 
 

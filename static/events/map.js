@@ -562,11 +562,10 @@ function applyFilters() {
 function sortByDistance() {
   const center = map.getCenter();
   const distance = (thread) => (thread.latitude - center.lat) ** 2 + (thread.longitude - center.lng) ** 2;
-  const direction = searchForm.elements.sort_direction.value === 'desc' ? -1 : 1;
   Array.from(list.querySelectorAll('.thread-item')).sort((first, second) => {
     const firstThread = markers.find((thread) => String(thread.id) === first.dataset.threadId);
     const secondThread = markers.find((thread) => String(thread.id) === second.dataset.threadId);
-    return (distance(firstThread) - distance(secondThread)) * direction;
+    return distance(firstThread) - distance(secondThread);
   }).forEach((item) => list.append(item));
 }
 
@@ -1161,10 +1160,10 @@ function restoreSearchState(state) {
   }
   const sortButton = searchForm.querySelector('[data-search-select="sort-field"]');
   sortButton.textContent = selectedSortField ? `${selectedSortField.name}@${selectedSortField.creator}` : 'Fieldを選択';
-  sortButton.hidden = searchForm.elements.sort_kind.value !== 'field';
+  updateSortControls();
 }
 function emptySearchState() {
-  return {sort_kind: 'updated', sort_direction: 'desc', target_type: 'all', updated_value: '', updated_operator: 'after', freeword_include: '', freeword_exclude: '', sort_field_id: '', conditions: {creator_include_groups: [], creator_exclude_groups: [], policy: [], fields: [], interfaces: []}};
+  return {sort_kind: 'near', sort_direction: 'desc', target_type: 'all', updated_value: '', updated_operator: 'after', freeword_include: '', freeword_exclude: '', sort_field_id: '', conditions: {creator_include_groups: [], creator_exclude_groups: [], policy: [], fields: [], interfaces: []}};
 }
 function initialSearchState() {
   const empty = emptySearchState();
@@ -1175,15 +1174,34 @@ function initialSearchState() {
     conditions: {...empty.conditions, ...(savedSearchState.conditions || {})},
   };
 }
+function scrollThreadSummaryIntoView(item) {
+  if (!item) return;
+  const isMobile = window.matchMedia('(max-width: 780px)').matches;
+  const container = item.closest(isMobile ? '.thread-map-list-pane' : '.thread-list-pane');
+  if (!container) {
+    item.scrollIntoView({block: 'nearest', inline: 'nearest'});
+    return;
+  }
+  const itemRect = item.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  container.scrollTo({
+    top: Math.max(0, container.scrollTop + itemRect.top - containerRect.top - 12),
+    behavior: reduceMotion ? 'auto' : 'smooth',
+  });
+}
 function selectThread(id, scroll = false) {
   list.querySelectorAll('.thread-item').forEach((item) => {
     const selected = item.dataset.threadId === String(id);
-    item.classList.toggle('is-open', selected);
+    const summary = item.querySelector('.thread-summary');
+    summary?.classList.toggle('is-selected', selected);
+    if (selected) summary?.setAttribute('aria-current', 'true');
+    else summary?.removeAttribute('aria-current');
   });
   markerById.forEach((marker, markerId) => marker.getElement().classList.toggle('is-highlighted', markerId === String(id)));
   showThreadMarker(id);
   const item = list.querySelector(`[data-thread-id="${id}"]`);
-  if (scroll && item) item.scrollIntoView({block: 'nearest'});
+  if (scroll) scrollThreadSummaryIntoView(item);
 }
 function showThreadMarker(id) {
   const thread = markers.find((item) => String(item.id) === String(id));
@@ -1229,7 +1247,10 @@ function closeDetail(shouldUpdateUrl = true) {
   createForm.hidden = true;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   markerById.forEach((marker) => marker.getElement().classList.remove('is-highlighted'));
-  list.querySelectorAll('.thread-item').forEach((item) => item.classList.remove('is-open'));
+  list.querySelectorAll('.thread-summary').forEach((summary) => {
+    summary.classList.remove('is-selected');
+    summary.removeAttribute('aria-current');
+  });
   detailTitle.textContent = '';
   if (shouldUpdateUrl) updateThreadUrl(null);
 }
@@ -1269,9 +1290,12 @@ document.getElementById('close-thread-detail').addEventListener('click', () => {
   closeDetail();
   sessionStorage.removeItem(resumeStorageKey);
 });
-searchForm.elements.sort_kind.addEventListener('change', () => {
-  searchForm.querySelector('[data-search-select="sort-field"]').hidden = searchForm.elements.sort_kind.value !== 'field';
-});
+function updateSortControls() {
+  const fieldSort = searchForm.elements.sort_kind.value === 'field';
+  searchForm.querySelector('[data-search-select="sort-field"]').disabled = !fieldSort;
+  searchForm.elements.sort_direction.disabled = !fieldSort;
+}
+searchForm.elements.sort_kind.addEventListener('change', updateSortControls);
 document.querySelectorAll('[data-open-account-conditions]').forEach((button) => button.addEventListener('click', () => openAccountConditions(button.dataset.openAccountConditions)));
 document.getElementById('close-account-condition-pane').addEventListener('click', closeAccountConditions);
 document.getElementById('browse-account-conditions').addEventListener('click', browseAccountConditions);
@@ -1306,6 +1330,7 @@ searchForm.addEventListener('submit', async (event) => {
   data.append('field_conditions', JSON.stringify(conditions.fields));
   data.append('interface_conditions', JSON.stringify(conditions.interfaces));
   data.append('sort_field_id', selectedSortField?.id || '');
+  data.set('sort_direction', searchForm.elements.sort_direction.value);
   try {
     const response = await fetch(workspace.dataset.searchUrl, {method: 'POST', body: data, headers: {'X-Requested-With': 'XMLHttpRequest'}});
     const result = await response.json();
@@ -1418,7 +1443,15 @@ map.on('click', (event) => {
 });
 map.on('load', () => {
   if (!focusMapFromUrl()) restoreMapView();
-  markers.forEach((thread) => { const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map); marker.getElement().classList.add('event-map-marker'); marker.getElement().addEventListener('click', () => { selectThread(thread.id, true); openDetail(thread.id); }); markerById.set(String(thread.id), marker); });
+  markers.forEach((thread) => {
+    const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map);
+    marker.getElement().classList.add('event-map-marker');
+    marker.getElement().addEventListener('click', (event) => {
+      event.stopPropagation();
+      selectThread(thread.id, true);
+    });
+    markerById.set(String(thread.id), marker);
+  });
   applyFilters();
   map.on('moveend', () => {
     applyFilters();
