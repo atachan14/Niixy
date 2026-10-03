@@ -3,11 +3,13 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
+
+from config.pagination import paginate_summary_list
 
 from .forms import FieldDefinitionForm, InterfaceDraftFieldFormSet, InterfaceDraftForm
 from .models import FieldDefinition, FieldType, Interface, InterfaceDraft, InterfaceDraftField
@@ -118,11 +120,24 @@ def module_list_context(user):
         'active_fields': [item for item in fields if item.status == FieldDefinition.ACTIVE],
         'deleted_fields': [item for item in fields if item.status == FieldDefinition.DELETED],
     })
-    context.update(field_search_context({}))
+    context.update(field_search_context(
+        {},
+        search_url=reverse('interfaces:field-search'),
+        scope='module-field-search',
+    ))
     return context
 
 
-def field_search_context(params):
+def field_search_context(
+    params,
+    *,
+    search_url,
+    scope,
+    purpose='management',
+    queryset=None,
+    fixed_params=None,
+    draft=None,
+):
     filters = {
         'name': params.get('name', ''),
         'description': params.get('description', ''),
@@ -131,12 +146,21 @@ def field_search_context(params):
     valid_field_types = {value for value, _ in FieldType.choices}
     if filters['field_type'] not in valid_field_types:
         filters['field_type'] = ''
-    page = Paginator(search_field_definitions(**filters), 10).get_page(params.get('page'))
+    page = paginate_summary_list(
+        search_field_definitions(queryset=queryset, **filters),
+        params.get('page'),
+    )
+    query = {**(fixed_params or {}), **{key: value for key, value in filters.items() if value}}
     return {
         'field_search_filters': filters,
         'field_search_types': FieldType.choices,
         'field_search_page': page,
-        'field_search_query': urlencode({key: value for key, value in filters.items() if value}),
+        'field_search_query': urlencode(query),
+        'field_search_fixed_params': fixed_params or {},
+        'field_search_url': search_url,
+        'field_search_scope': scope,
+        'field_search_purpose': purpose,
+        'field_search_draft': draft,
     }
 
 
@@ -194,7 +218,11 @@ def module_management_list(request):
 
 @login_required
 def field_search(request):
-    return render(request, 'interfaces/field_search_results.html', field_search_context(request.GET))
+    return render(request, 'interfaces/field_search_results.html', field_search_context(
+        request.GET,
+        search_url=reverse('interfaces:field-search'),
+        scope='module-field-search',
+    ))
 
 
 @login_required
@@ -242,15 +270,20 @@ def definition_detail(request, interface_id):
 @login_required
 def add_field_list(request, draft_id):
     draft = get_object_or_404(InterfaceDraft, pk=draft_id, creator=request.user)
-    fields = list(
-        FieldDefinition.objects.filter(status=FieldDefinition.ACTIVE, current_version__isnull=False)
-        .select_related('creator', 'current_version')
-        .order_by('creator__username', 'name')
-    )
-    return render(request, 'interfaces/add_field_list_pane.html', {
+    fields = FieldDefinition.objects.all()
+    context = {
         'draft': draft,
-        'created_fields': [item for item in fields if item.creator_id == request.user.pk],
-    })
+        'created_fields': list(search_field_definitions(queryset=fields.filter(creator=request.user)).order_by('name')),
+    }
+    context.update(field_search_context(
+        request.GET,
+        search_url=reverse('interfaces:add-field-list', args=[draft.pk]),
+        scope=f'interface-{draft.pk}-field-search',
+        purpose='add-field',
+        queryset=fields,
+        draft=draft,
+    ))
+    return render(request, 'interfaces/add_field_list_pane.html', context)
 
 
 @login_required
@@ -489,16 +522,40 @@ def field_edit(request, field_id):
 @login_required
 def add_synonym_list(request):
     source_id = request.GET.get('source')
-    fields = FieldDefinition.objects.filter(
-        status=FieldDefinition.ACTIVE,
-        current_version__isnull=False,
-    ).select_related('creator', 'current_version')
+    compatible_type = request.GET.get('compatible_type', '')
+    source = None
+    fields = FieldDefinition.objects.all()
+    fixed_params = {}
     if source_id:
-        fields = fields.exclude(pk=source_id)
-    fields = list(fields.order_by('creator__username', 'name'))
-    return render(request, 'interfaces/add_synonym_list_pane.html', {
-        'created_fields': [item for item in fields if item.creator_id == request.user.pk],
-    })
+        source = get_object_or_404(
+            FieldDefinition.objects.select_related('current_version'),
+            pk=source_id,
+            creator=request.user,
+            current_version__isnull=False,
+        )
+        compatible_type = source.current_version.field_type
+        fields = fields.exclude(pk=source.pk)
+        fixed_params['source'] = source.pk
+    elif compatible_type in {value for value, _ in FieldType.choices}:
+        fixed_params['compatible_type'] = compatible_type
+    else:
+        compatible_type = ''
+    if compatible_type:
+        fields = fields.filter(current_version__field_type=compatible_type)
+    context = {
+        'created_fields': list(search_field_definitions(
+            queryset=fields.filter(creator=request.user),
+        ).order_by('name')),
+    }
+    context.update(field_search_context(
+        request.GET,
+        search_url=reverse('interfaces:add-synonym-list'),
+        scope='synonym-field-search',
+        purpose='add-synonym',
+        queryset=fields,
+        fixed_params=fixed_params,
+    ))
+    return render(request, 'interfaces/add_synonym_list_pane.html', context)
 
 
 @login_required

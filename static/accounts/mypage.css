@@ -202,14 +202,6 @@
   pointer-events: none;
 }
 
-.field-search-pagination {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  padding-top: 14px;
-}
-
 .module-summary-entry[hidden],
 .module-list-panel [data-module-empty][hidden] {
   display: none;
@@ -439,6 +431,10 @@
 .add-require-list-pane,
 .add-field-list-pane {
   border-right: 1px solid var(--line);
+}
+
+.add-field-list-pane > .ui-tab-panel {
+  padding: 16px 20px 28px;
 }
 
 .require-picker-list {

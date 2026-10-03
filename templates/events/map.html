@@ -18,7 +18,7 @@
       <header class="thread-pane-header"><h2>Spot一覧</h2></header>
       <details id="niimap-create-controls" class="niimap-search-controls niimap-create-controls">
         <summary>新規作成</summary>
-        <div class="niimap-create-controls-body"><p id="niimap-create-location-status" class="event-location-status">地点を選択してください。</p><div><button id="open-thread-create" class="button primary" type="button" disabled>Thread</button><button class="button secondary" type="button" disabled>Room</button><button class="button secondary" type="button" disabled>Book</button><button class="button secondary" type="button" disabled>Tweet</button><button class="button secondary" type="button" disabled>Timeline</button></div></div>
+        <div class="niimap-create-controls-body"><p id="niimap-create-location-status" class="event-location-status">地点を選択してください。</p><div><button id="open-thread-create" class="button primary" type="button" disabled>Thread</button><button class="button secondary is-unavailable" type="button" disabled title="未対応" aria-label="Room（未対応）">Room</button><button class="button secondary is-unavailable" type="button" disabled title="未対応" aria-label="Book（未対応）">Book</button><button class="button secondary is-unavailable" type="button" disabled title="未対応" aria-label="Tweet（未対応）">Tweet</button><button class="button secondary is-unavailable" type="button" disabled title="未対応" aria-label="Timeline（未対応）">Timeline</button></div></div>
       </details>
       <details id="niimap-search-controls" class="niimap-search-controls">
         <summary>検索</summary>
@@ -44,7 +44,7 @@
     <aside class="ui-detail-pane thread-detail-pane" aria-label="Thread詳細"><header class="ui-pane-header ui-detail-pane-header thread-detail-header"><h2 id="thread-detail-title"></h2><button id="close-thread-detail" class="icon-button" type="button" aria-label="地図に戻る">×</button></header>
       <form id="thread-create-form" class="map-event-form" action="{% url 'events:thread-create' %}" hidden>
         {% csrf_token %}<input type="hidden" name="submission_id" value="{{ thread_submission_id }}"><input id="thread-latitude" name="latitude" type="hidden"><input id="thread-longitude" name="longitude" type="hidden">
-        <p id="thread-location-status" class="event-location-status">地図上の地点を選択してください。</p><p id="thread-form-error" class="event-form-error" hidden></p>
+        <div class="thread-placement-row"><a id="thread-create-placement-link" href="{% url 'events:map' %}" data-thread-placement-link data-zoom="15" aria-label="NiiMapでこの座標を表示"></a></div><p id="thread-form-error" class="event-form-error" hidden></p>
         <div class="field"><label for="thread-title">タイトル</label><input id="thread-title" name="title" maxlength="120" required></div><div class="field"><label for="thread-body">本文</label><textarea id="thread-body" name="body" rows="6" required></textarea></div>
         <details class="thread-interface-input" open><summary>DirectField</summary><div class="thread-interface-input-content"><div id="selected-direct-fields"></div><button id="open-direct-field-selector" type="button">Fieldを追加</button></div></details>
         <details class="thread-interface-input" open><summary>ThreadIF</summary><div class="thread-interface-input-content"><div id="selected-thread-interfaces"></div><button id="open-thread-interface-selector" type="button">ThreadIFを追加</button></div></details>
@@ -88,4 +88,4 @@
 {{ available_account_condition_catalog|json_script:'available-account-condition-catalog-data' }}
 {{ niimap_search_state|json_script:'niimap-search-state-data' }}
 {% endblock %}
-{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'events/map.js' %}?v=20261003-10"></script>{% endblock %}
+{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'events/map.js' %}?v=20261003-11"></script>{% endblock %}

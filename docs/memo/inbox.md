@@ -22,7 +22,11 @@
 
 
 
+## now
 
 
 ## Idea
 
+"Follow"は"watch"にしようかな？
+Profileの機能ボタン上に予定していたボタン群を廃止して、
+Love/Hateは評価、

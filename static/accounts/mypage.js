@@ -128,7 +128,7 @@ function bindModuleList(list, initialState) {
   });
   list.querySelector('[data-close-module-list]')?.addEventListener('click', showOverview);
   list.querySelector('[data-field-create-url]')?.addEventListener('click', (event) => openFieldDetail(event.currentTarget.dataset.fieldCreateUrl));
-  bindFieldSearch(list);
+  NiixyUI.bindSummarySearch(list);
   list.addEventListener('click', (event) => {
     const item = event.target.closest('[data-detail-url]');
     if (!item) return;
@@ -138,40 +138,6 @@ function bindModuleList(list, initialState) {
     else if (type === 'interface') openInterfaceDetail(item.dataset.detailUrl, item.getAttribute('href'));
   });
   bindAjaxForms(list);
-}
-
-function bindFieldSearch(list) {
-  const form = list.querySelector('[data-field-search-form]');
-  if (!form) return;
-
-  const loadResults = async (url) => {
-    const current = list.querySelector('[data-field-search-results]');
-    current.setAttribute('aria-busy', 'true');
-    try {
-      const results = await NiixyUI.fetchFragment(url, '[data-field-search-results]');
-      current.replaceWith(results);
-    } catch {
-      current.removeAttribute('aria-busy');
-    }
-  };
-
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const url = new URL(form.action, location.origin);
-    new FormData(form).forEach((value, key) => {
-      if (String(value).trim()) url.searchParams.set(key, value);
-    });
-    const details = form.closest('details');
-    if (details?.open) details.querySelector(':scope > summary')?.click();
-    loadResults(url);
-  });
-
-  list.addEventListener('click', (event) => {
-    const link = event.target.closest('[data-field-search-page]');
-    if (!link) return;
-    event.preventDefault();
-    loadResults(new URL(link.href, location.origin));
-  });
 }
 
 async function openFieldDetail(url) {
@@ -202,7 +168,12 @@ function bindFieldDetail(detail) {
     moduleTrack().append(loading);
     pageStack.set('synonym-list');
     let pane;
-    try { pane = await NiixyUI.fetchFragment(event.currentTarget.dataset.url); } catch { NiixyUI.showPaneError(loading); return; }
+    const url = new URL(event.currentTarget.dataset.url, location.origin);
+    if (!url.searchParams.has('source')) {
+      const fieldType = detail.querySelector('#id_field_type')?.value;
+      if (fieldType) url.searchParams.set('compatible_type', fieldType);
+    }
+    try { pane = await NiixyUI.fetchFragment(url); } catch { NiixyUI.showPaneError(loading); return; }
     loading.replaceWith(pane);
     bindSynonymList(pane);
   });
@@ -225,8 +196,11 @@ function bindFieldDetail(detail) {
 
 function bindSynonymList(pane) {
   NiixyUI.bindTabs(pane);
+  NiixyUI.bindSummarySearch(pane);
   pane.querySelector('[data-close-add-synonym]')?.addEventListener('click', () => pageStack.set('field-detail'));
-  pane.querySelectorAll('[data-detail-url]').forEach((item) => item.addEventListener('click', async () => {
+  pane.addEventListener('click', async (event) => {
+    const item = event.target.closest('[data-detail-url]');
+    if (!item || !pane.contains(item)) return;
     moduleTrack().querySelector('[data-mypage-pane="add-synonym-detail"]')?.remove();
     const loading = loadingPane('add-field-detail-pane', 'add-synonym-detail');
     moduleTrack().append(loading);
@@ -235,7 +209,7 @@ function bindSynonymList(pane) {
     try { detail = await NiixyUI.fetchFragment(item.dataset.detailUrl); } catch { NiixyUI.showPaneError(loading); return; }
     loading.replaceWith(detail);
     bindSynonymDetail(detail);
-  }));
+  });
 }
 
 function bindSynonymDetail(pane) {
@@ -289,7 +263,7 @@ async function openInterfaceDetail(url, historyUrl = null) {
 }
 
 function bindAjaxForms(root) {
-  root.querySelectorAll('form:not([data-field-search-form])').forEach((form) => form.addEventListener('submit', async (event) => {
+  root.querySelectorAll('form:not([data-summary-search-form])').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const refreshInterfaceList = form.hasAttribute('data-refresh-interface-list');
     const data = new FormData(form);
@@ -343,8 +317,11 @@ function bindInterfaceDetail(detail) {
 
 function bindAddFieldList(pane) {
   NiixyUI.bindTabs(pane);
+  NiixyUI.bindSummarySearch(pane);
   pane.querySelector('[data-close-add-field]')?.addEventListener('click', () => setInterfaceStage('detail'));
-  pane.querySelectorAll('[data-detail-url]').forEach((item) => item.addEventListener('click', async () => {
+  pane.addEventListener('click', async (event) => {
+    const item = event.target.closest('[data-detail-url]');
+    if (!item || !pane.contains(item)) return;
     removePanes('add-field-detail');
     const loading = loadingPane('add-field-detail-pane', 'add-field-detail');
     moduleTrack().append(loading);
@@ -353,7 +330,7 @@ function bindAddFieldList(pane) {
     try { detail = await NiixyUI.fetchFragment(item.dataset.detailUrl); } catch { NiixyUI.showPaneError(loading); return; }
     loading.replaceWith(detail);
     bindAddFieldDetail(detail);
-  }));
+  });
 }
 
 function bindAddFieldDetail(pane) {

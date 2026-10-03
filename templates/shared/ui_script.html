@@ -253,6 +253,46 @@ window.NiixyUI = (() => {
     return {state, apply};
   }
 
+  function bindSummarySearch(root) {
+    if (!root || root.dataset.summarySearchBound === 'true') return;
+    const form = root.querySelector('[data-summary-search-form]');
+    if (!form) return;
+    root.dataset.summarySearchBound = 'true';
+
+    const loadResults = async (url, button = null) => {
+      const current = root.querySelector('[data-summary-search-results]');
+      if (!current) return;
+      const pending = button ? beginPendingAction(button, '検索中...') : null;
+      current.setAttribute('aria-busy', 'true');
+      try {
+        const results = await fetchFragment(url, '[data-summary-search-results]');
+        current.replaceWith(results);
+      } catch {
+        current.removeAttribute('aria-busy');
+      } finally {
+        pending?.restore();
+      }
+    };
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const url = new URL(form.action, location.origin);
+      new FormData(form).forEach((value, key) => {
+        if (String(value).trim()) url.searchParams.set(key, value);
+      });
+      const details = form.closest('details');
+      if (details) setAccordionExpanded(details, false);
+      loadResults(url, event.submitter);
+    });
+
+    root.addEventListener('click', (event) => {
+      const link = event.target.closest('[data-summary-page]');
+      if (!link || !root.contains(link)) return;
+      event.preventDefault();
+      loadResults(new URL(link.href, location.origin));
+    });
+  }
+
   function bindAccordion(details) {
     if (details.dataset.uiAccordionBound || details.matches('.account-menu, .map-filter, [data-ui-accordion="off"]')) return;
     const summary = details.querySelector(':scope > summary');
@@ -307,6 +347,6 @@ window.NiixyUI = (() => {
     if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
   }))).observe(document.body, {childList: true, subtree: true});
 
-  return {beginPendingAction, bindAccordions, bindModuleFilters, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, setAccordionExpanded, showPaneError};
+  return {beginPendingAction, bindAccordions, bindModuleFilters, bindSummarySearch, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, setAccordionExpanded, showPaneError};
 })();
 </script>

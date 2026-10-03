@@ -50,6 +50,10 @@ ProfileのModule一覧では、Profile本人が作成したModuleを「自作」
 
 Interfaceの自作一覧には公開済みInterfaceを表示する。v1公開前の新規Draftと公開済みInterfaceの次回Version Draftは編集中一覧に表示する。
 
+SummaryListのページネーションは共通UIとして扱い、標準表示数を20件とする。一覧固有の事情がある場合だけ内部的に表示数や取得方法を変更し、利用者が表示件数を設定する機能は設けない。Field検索フォーム、検索結果、ページ送りはModule管理、InterfaceへのField追加、片同義Field追加で共用する。
+
+SummaryListのページネーションは共通UIとして扱い、標準表示数を20件とする。一覧固有の事情がある場合だけ内部的に表示数や取得方法を変更し、利用者が表示件数を設定する機能は設けない。Field検索フォーム、検索結果、ページ送りはModule管理、InterfaceへのField追加、片同義Field追加で共用する。
+
 ## Draft と公開
 
 - Draft は InterfaceVersion とは別の変更可能な作業データとして保存する。

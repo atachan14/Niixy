@@ -752,8 +752,8 @@ class FieldManagementViewTests(TestCase):
         self.assertNotContains(response, wrong_description.name)
         self.assertNotContains(response, deleted.name)
 
-    def test_field_search_is_newest_first_and_paginated_by_ten(self):
-        fields = [create_field(self.user, f'検索Field{i:02}') for i in range(11)]
+    def test_field_search_is_newest_first_and_paginated_by_twenty(self):
+        fields = [create_field(self.user, f'検索Field{i:02}') for i in range(21)]
         now = timezone.now()
         for index, field in enumerate(fields):
             FieldDefinition.objects.filter(pk=field.pk).update(
@@ -764,10 +764,48 @@ class FieldManagementViewTests(TestCase):
         second_page = self.client.get(reverse('interfaces:field-search'), {'page': 2})
         first_html = first_page.content.decode()
 
-        self.assertEqual(first_html.count('data-detail-url='), 10)
+        self.assertEqual(first_html.count('data-detail-url='), 20)
         self.assertLess(first_html.index('検索Field00'), first_html.index('検索Field01'))
-        self.assertNotContains(first_page, '検索Field10')
-        self.assertContains(second_page, '検索Field10')
+        self.assertNotContains(first_page, '検索Field20')
+        self.assertContains(first_page, 'data-summary-page')
+        self.assertContains(second_page, '検索Field20')
+
+    def test_interface_field_picker_uses_shared_search_results(self):
+        other = get_user_model().objects.create_user('picker_owner', password='eightchars')
+        candidate = create_field(other, '追加候補')
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Picker')
+
+        response = self.client.get(
+            reverse('interfaces:add-field-list', args=[draft.pk]),
+            {'name': '追加候補'},
+        )
+
+        self.assertContains(response, 'data-summary-search-form')
+        self.assertContains(response, '追加候補@picker_owner v1/Field')
+        self.assertContains(
+            response,
+            reverse('interfaces:add-field-detail', args=[draft.pk, candidate.pk]),
+        )
+        self.assertNotContains(response, '検索は後続で実装します。')
+
+    def test_synonym_picker_excludes_source_and_fields_with_another_type(self):
+        source = create_field(self.user, '片同義元', FieldType.SHORT_TEXT)
+        compatible = create_field(self.user, '同じ型', FieldType.SHORT_TEXT)
+        incompatible = create_field(self.user, '異なる型', FieldType.INTEGER)
+
+        response = self.client.get(
+            reverse('interfaces:add-synonym-list'),
+            {'source': source.pk},
+        )
+
+        self.assertContains(response, 'data-summary-search-form')
+        self.assertContains(response, compatible.name)
+        self.assertNotContains(response, source.name)
+        self.assertNotContains(response, incompatible.name)
+        self.assertContains(
+            response,
+            reverse('interfaces:add-synonym-detail', args=[compatible.pk]),
+        )
 
     def test_module_field_search_panel_is_open_and_has_expected_filters(self):
         response = self.client.get(reverse('interfaces:module-management-list'))

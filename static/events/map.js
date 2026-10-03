@@ -1283,7 +1283,6 @@ openThreadCreate.addEventListener('click', () => {
   if (openThreadCreate.disabled) return;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   createForm.hidden = false; detailTitle.textContent = 'Threadを作成';
-  document.getElementById('thread-location-status').textContent = '地点を選択しました。';
   setThreadStage('detail');
 });
 document.getElementById('close-thread-detail').addEventListener('click', () => {
@@ -1438,7 +1437,19 @@ document.getElementById('location-search-form').addEventListener('submit', async
 map.on('click', (event) => {
   if (!creating) return;
   const coordinates = [event.lngLat.lng, event.lngLat.lat]; draftMarker?.remove(); draftMarker = new geolonia.Marker({color: '#d05b32'}).setLngLat(coordinates).addTo(map);
-  document.getElementById('thread-latitude').value = event.lngLat.lat.toFixed(6); document.getElementById('thread-longitude').value = event.lngLat.lng.toFixed(6); document.getElementById('thread-location-status').textContent = '地点を選択しました。';
+  const latitude = event.lngLat.lat.toFixed(6);
+  const longitude = event.lngLat.lng.toFixed(6);
+  document.getElementById('thread-latitude').value = latitude;
+  document.getElementById('thread-longitude').value = longitude;
+  const placementLink = document.getElementById('thread-create-placement-link');
+  const placementUrl = new URL(placementLink.href, location.href);
+  placementUrl.searchParams.set('latitude', latitude);
+  placementUrl.searchParams.set('longitude', longitude);
+  placementUrl.searchParams.set('zoom', '15');
+  placementLink.href = placementUrl;
+  placementLink.dataset.latitude = latitude;
+  placementLink.dataset.longitude = longitude;
+  placementLink.textContent = `${latitude}, ${longitude}`;
   document.getElementById('niimap-create-location-status').textContent = '地点を選択しました。'; openThreadCreate.disabled = false;
 });
 map.on('load', () => {

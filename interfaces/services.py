@@ -24,8 +24,8 @@ from .models import (
 )
 
 
-def search_field_definitions(*, name='', description='', field_type=''):
-    fields = FieldDefinition.objects.filter(
+def search_field_definitions(*, name='', description='', field_type='', queryset=None):
+    fields = (queryset if queryset is not None else FieldDefinition.objects.all()).filter(
         status=FieldDefinition.ACTIVE,
         current_version__isnull=False,
     ).select_related('creator', 'current_version')

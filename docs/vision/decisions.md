@@ -193,3 +193,13 @@ Threadがどこに現れるかはThreadPlacementと掲載先が決める。Threa
 作成者検索とPolicyで使うAccount条件は、Default、Account、AccountIF、Field、Roomを同じ一覧から選択する。Accountごとに一覧と使用順を保持し、既存条件の再追加では重複させず先頭へ移動する。削除したDefault条件はDefault一覧から復元できる。
 
 呼び出し元に追加した条件Item同士はOR、ANDグループ内の条件同士はANDとして評価する。ANDグループは条件種別をまたいで作成でき、成立不能な組み合わせも当面は利用者の判断に委ねる。
+
+## 2026-10-03 - SummaryListの取得形式を共通化する
+
+状態: 採用
+
+SummaryListのページネーションUIとAjax差し替え処理を共通化し、標準表示数を20件とする。一覧固有の事情がある場合だけ内部的に上書きできる余地を残す。NiiMapのように表示範囲と連動する一覧では、同じSummaryListを使いながらページ送り以外の取得方法を採用できる。
+
+検索条件、権限、ソートが異なるため、Field、Interface、Accountなどを一つの巨大な検索処理へ統合しない。検索処理は対象種別ごとに分け、検索結果の表示形式とページネーション契約を揃える。Thread、Room、Book、Timeline、TweetはNiiMapへ並ぶSpotという共通用途を持つため、Spot検索として横断的に扱う。
+
+Account条件一覧のItemは検索元のAccountやFieldそのものではなく、再利用可能なAccountConditionとする。新しい条件を探す導線では対象別検索を利用し、履歴へ追加した時点で条件定義として扱う。
