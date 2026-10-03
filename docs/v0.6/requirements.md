@@ -1,5 +1,7 @@
 # v0.6 Room Foundation 要件
 
+Status: Complete
+
 ## 目的
 
 AccountがNiiMapへRoomを作成し、別のAccountがRoomへ参加して、Room内のBoardでThreadとResponseをやり取りできる最小の共同利用を完成させる。

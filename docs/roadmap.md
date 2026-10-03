@@ -94,7 +94,7 @@ Status: Complete
 
 ## v0.6 - Room Foundation
 
-Status: Planned
+Status: Complete
 
 NiiMapへRoomを配置し、AccountがRoomへ参加して、Room内のBoardでThreadとResponseをやり取りできる最小の共同利用を完成させる。
 
@@ -127,16 +127,16 @@ v0.1以降のVersion番号や実装順序は固定しない。
 
 ### Account
 
-* Account Profile
+* ProfileArea / ProfileLayout
 * Account情報管理
 * Password Recovery
 * Social Login
-* My Page
+* MyPageの拡張
 
 ### Interface
 
-* Interface作成
-* Interface編集
+* AccountInterface / ResponseInterface
+* ComputedField / Action / Layout
 * EventとInterfaceの連携
 * RoomとInterfaceの連携
 
@@ -150,8 +150,7 @@ v0.1以降のVersion番号や実装順序は固定しない。
 
 ### Service Integration
 
-* NiiMapとRoomの連携
-* ThreadからRoomへの接続
+* 外部Serviceとの連携
 * Niixy Accountによる各Serviceの共通利用
 
 実装順序は、各Versionの開発経験と必要性を基に決定する。
