@@ -1,0 +1,4 @@
+{% load l10n %}
+<div class="ui-placement-row">
+  <a href="{{ placement_url }}{% if placement_board_id %}?board={{ placement_board_id }}{% endif %}"{% if placement_on_map %} data-thread-placement-link data-latitude="{{ placement_latitude|unlocalize }}" data-longitude="{{ placement_longitude|unlocalize }}" data-zoom="{{ placement_zoom|default:'15' }}" aria-label="NiiMapでこの座標を表示"{% endif %}>{{ placement_label }}</a>
+</div>

@@ -57,7 +57,7 @@ async function openBasic(updateHistory = true) {
   const url = new URL(myPage.dataset.paneUrl, location.origin);
   url.searchParams.set('_panes', '1');
   workspace.querySelector('.basic-info-pane, .module-management, .interface-management')?.remove();
-  const loading = loadingPane('basic-info-pane', 'basic-info');
+  const loading = loadingPane('ui-detail-pane basic-info-pane', 'basic-info');
   workspace.append(loading);
   pageStack.set('basic');
   updateHeaderNavigation('basic');

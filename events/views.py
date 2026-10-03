@@ -11,21 +11,23 @@ from django.db.models import Max, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.services import account_condition_catalog
 from interfaces.models import FieldType
 from interfaces.services import (
     expand_field_definition_ids,
-    prepare_thread_fields,
     save_thread_fields,
     thread_field_catalog,
     thread_interface_catalog,
 )
+from rooms.models import Room
 
 from .forms import ThreadCreateForm, ThreadPostForm
 from .idempotency import run_once, submission_id_from
 from .models import Locality, NiiMapFilterPreference, Station, Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
+from .services import prepare_thread_modules
 
 
 CAPABILITIES = (ThreadAccessRule.VIEW, ThreadAccessRule.WRITE)
@@ -36,7 +38,12 @@ def thread_queryset():
         Thread.objects.select_related('creator__niixy_profile')
         .prefetch_related(
             'access_rules',
-            Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
+            Prefetch(
+                'placements',
+                queryset=ThreadPlacement.objects.select_related(
+                    'board__placement__collection__room',
+                ),
+            ),
             Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
             'interface_implementations__version__interface__creator',
             'interface_implementations__values__field',
@@ -54,7 +61,13 @@ def map_view(request):
     if request.user.is_authenticated:
         preference, _ = NiiMapFilterPreference.objects.get_or_create(user=request.user)
         search_state = preference.search_state
-    threads = list(thread_queryset())
+    threads = list(
+        thread_queryset().exclude(
+            placements__kind=ThreadPlacement.BOARD,
+            placements__is_primary=True,
+        ).distinct()
+    )
+    rooms = list(Room.objects.select_related('owner__niixy_profile', 'placement'))
     for thread in threads:
         thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
         thread.can_write = thread.allows(request.user, ThreadAccessRule.WRITE)
@@ -62,6 +75,8 @@ def map_view(request):
     markers = []
     for thread in threads:
         for placement in thread.placements.all():
+            if placement.kind != ThreadPlacement.NII_MAP:
+                continue
             markers.append({
                 'id': thread.pk,
                 'title': thread.title,
@@ -70,11 +85,25 @@ def map_view(request):
                 'longitude': float(placement.longitude),
             })
 
+    room_markers = [
+        {
+            'id': room.pk,
+            'name': room.name,
+            'owner_id': room.owner.username,
+            'latitude': float(room.placement.latitude),
+            'longitude': float(room.placement.longitude),
+        }
+        for room in rooms
+    ]
+
     return render(request, 'events/map.html', {
         'threads': threads,
+        'rooms': rooms,
         'thread_markers': markers,
+        'room_markers': room_markers,
         'geolonia_api_key': settings.GEOLONIA_API_KEY,
         'thread_submission_id': uuid.uuid4(),
+        'room_submission_id': uuid.uuid4(),
         'rule_capabilities': [
             (ThreadAccessRule.VIEW, '閲覧制限'),
             (ThreadAccessRule.WRITE, '書込制限'),
@@ -119,30 +148,7 @@ def thread_create(request):
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
 
     try:
-        direct_field_ids = [int(value) for value in request.POST.getlist('direct_field_ids')]
-        interface_ids = [int(value) for value in request.POST.getlist('interface_ids')]
-    except ValueError:
-        return JsonResponse({'errors': {'fields': ['FieldまたはInterfaceの指定が正しくありません。']}}, status=400)
-    direct_value_lists = {}
-    interface_value_lists = {}
-    for key in request.POST:
-        if key.startswith('direct_field_value_'):
-            direct_value_lists[key.removeprefix('direct_field_value_')] = request.POST.getlist(key)
-            continue
-        if not key.startswith('interface_value_'):
-            continue
-        _, _, interface_id, field_key = key.split('_', 3)
-        try:
-            interface_value_lists[(int(interface_id), field_key)] = request.POST.getlist(key)
-        except ValueError:
-            return JsonResponse({'errors': {'interfaces': ['Interfaceの入力値が正しくありません。']}}, status=400)
-    try:
-        prepared_direct_fields, prepared_interfaces = prepare_thread_fields(
-            direct_field_ids,
-            direct_value_lists,
-            interface_ids,
-            interface_value_lists,
-        )
+        prepared_direct_fields, prepared_interfaces = prepare_thread_modules(request.POST)
     except ValidationError as error:
         return JsonResponse({'errors': error.message_dict}, status=400)
 
@@ -177,6 +183,11 @@ def thread_post_create(request, thread_id):
         return JsonResponse({'error': 'このThreadは閲覧できません。'}, status=403)
     if not thread.allows(request.user, ThreadAccessRule.WRITE):
         return JsonResponse({'error': 'このThreadには書き込めません。'}, status=403)
+    from rooms.services import room_for_thread
+
+    room = room_for_thread(thread)
+    if room is not None and not room.has_member(request.user):
+        return JsonResponse({'error': 'このThreadへの書き込みにはRoomへの参加が必要です。'}, status=403)
 
     form = ThreadPostForm(request.POST)
     if not form.is_valid():
@@ -188,7 +199,11 @@ def thread_post_create(request, thread_id):
         locked_thread = Thread.objects.select_for_update().get(pk=thread_id)
         number = (locked_thread.posts.aggregate(max_number=Max('number'))['max_number'] or 0) + 1
         post = ThreadPost.objects.create(submission_id=submission_id, thread=locked_thread, number=number, creator=request.user if request.user.is_authenticated else None, body=form.cleaned_data['body'])
+        locked_thread.last_activity_at = timezone.now()
         locked_thread.save(update_fields=['last_activity_at', 'updated_at'])
+        from rooms.services import touch_thread_containers
+
+        touch_thread_containers(locked_thread)
         return post
 
     run_once(ThreadPost, submission_id, create_post)
@@ -355,7 +370,13 @@ def thread_search(request):
     except ValidationError as error:
         return JsonResponse({'errors': error.message_dict}, status=400)
 
-    threads = list(thread_queryset())
+    threads = list(
+        thread_queryset().exclude(
+            placements__kind=ThreadPlacement.BOARD,
+            placements__is_primary=True,
+        ).distinct()
+    )
+    rooms = list(Room.objects.select_related('owner', 'placement'))
     include_creators = _terms(request.POST.get('creator_include', ''))
     exclude_creators = _terms(request.POST.get('creator_exclude', ''))
     include_words = _terms(request.POST.get('freeword_include', ''))
@@ -430,6 +451,46 @@ def thread_search(request):
             continue
         filtered.append(thread)
 
+    target_type = request.POST.get('target_type', 'all')
+    filtered_rooms = []
+    room_search_allowed = target_type in {'all', 'room'} and not (
+        policy_conditions or resolved_field_conditions or interface_conditions
+        or request.POST.get('sort_kind') == 'field'
+    )
+    if room_search_allowed:
+        for room in rooms:
+            if creator_include_groups and not _account_groups_match(room.owner, request.user, creator_include_groups):
+                continue
+            if creator_exclude_groups and _account_groups_match(room.owner, request.user, creator_exclude_groups):
+                continue
+            if not creator_include_groups and include_creators and not any(
+                room.owner and room.owner.username.casefold() == term.removeprefix('@')
+                for term in include_creators
+            ):
+                continue
+            if not creator_exclude_groups and any(
+                room.owner and room.owner.username.casefold() == term.removeprefix('@')
+                for term in exclude_creators
+            ):
+                continue
+            if updated_date:
+                room_date = room.last_activity_at.date()
+                if updated_operator == 'before' and room_date > updated_date:
+                    continue
+                if updated_operator != 'before' and room_date < updated_date:
+                    continue
+            searchable_text = f'{room.name} {room.description}'.casefold()
+            if any(term not in searchable_text for term in include_words):
+                continue
+            if any(term in searchable_text for term in exclude_words):
+                continue
+            filtered_rooms.append(room)
+
+    if target_type == 'room':
+        filtered = []
+    elif target_type not in {'all', 'thread'}:
+        filtered = []
+
     sort_kind = request.POST.get('sort_kind', 'near')
     sort_direction = request.POST.get('sort_direction', 'desc')
     reverse = sort_kind != 'field' or sort_direction != 'asc'
@@ -453,6 +514,7 @@ def thread_search(request):
         filtered = sorted(present, key=field_sort_key, reverse=reverse) + missing
     elif sort_kind == 'updated':
         filtered.sort(key=lambda thread: (thread.last_activity_at, thread.pk), reverse=reverse)
+        filtered_rooms.sort(key=lambda room: (room.last_activity_at, room.pk), reverse=reverse)
 
     if request.user.is_authenticated:
         preference, _ = NiiMapFilterPreference.objects.get_or_create(user=request.user)
@@ -475,7 +537,21 @@ def thread_search(request):
         }
         preference.save(update_fields=['search_state'])
 
-    return JsonResponse({'thread_ids': [thread.pk for thread in filtered], 'count': len(filtered)})
+    spot_order = [
+        {'kind': kind, 'id': item.pk}
+        for kind, item in sorted(
+            [('thread', thread) for thread in filtered] + [('room', room) for room in filtered_rooms],
+            key=lambda pair: (pair[1].last_activity_at, pair[1].pk),
+            reverse=reverse,
+        )
+    ] if sort_kind == 'updated' else []
+
+    return JsonResponse({
+        'thread_ids': [thread.pk for thread in filtered],
+        'room_ids': [room.pk for room in filtered_rooms],
+        'spot_order': spot_order,
+        'count': len(filtered) + len(filtered_rooms),
+    })
 
 
 def location_search(request):

@@ -1,4 +1,5 @@
 const markers = JSON.parse(document.getElementById('thread-markers').textContent);
+const roomMarkers = JSON.parse(document.getElementById('room-markers').textContent);
 const interfaceCatalog = JSON.parse(document.getElementById('thread-interface-catalog-data').textContent);
 const fieldCatalog = JSON.parse(document.getElementById('thread-field-catalog-data').textContent);
 let accountConditionCatalog = JSON.parse(document.getElementById('account-condition-catalog-data').textContent);
@@ -16,27 +17,40 @@ const threadStack = NiixyUI.createPaneStack(workspace, {
   'account-selector': 'is-account-selector-open',
   'account-condition-detail': 'is-account-condition-detail-open',
   'account-condition-history-edit': 'is-account-condition-history-edit-open',
+  room: 'is-room-open',
+  'room-list': 'is-room-list-open',
+  'room-board': 'is-room-board-open',
+  'room-thread': 'is-room-thread-open',
 });
 const threadMotion = NiixyUI.createWorkspace(workspace, {
   list: {root: true},
-  detail: {target: '.thread-detail-pane'},
-  'interface-list': {target: '.thread-interface-list-pane:not(.thread-field-list-pane)'},
-  'interface-detail': {target: '.thread-interface-detail-pane:not(.thread-field-detail-pane)'},
-  'field-list': {target: '.thread-field-list-pane'},
-  'field-detail': {target: '.thread-field-detail-pane'},
-  'account-conditions': {target: '.account-condition-pane'},
-  'account-selector': {target: '.account-selector-pane'},
-  'account-condition-detail': {target: '.account-condition-detail-pane'},
-  'account-condition-history-edit': {target: '.account-condition-detail-pane'},
+  detail: {target: '.thread-detail-pane', width: 'remaining'},
+  'interface-list': {target: '.thread-interface-list-pane:not(.thread-field-list-pane)', width: 'fixed'},
+  'interface-detail': {target: '.thread-interface-detail-pane:not(.thread-field-detail-pane)', width: 'remaining'},
+  'field-list': {target: '.thread-field-list-pane', width: 'fixed'},
+  'field-detail': {target: '.thread-field-detail-pane', width: 'remaining'},
+  'account-conditions': {target: '.account-condition-pane', width: 'fixed'},
+  'account-selector': {target: '.account-selector-pane', width: 'fixed'},
+  'account-condition-detail': {target: '.account-condition-detail-pane', width: 'remaining'},
+  'account-condition-history-edit': {target: '.account-condition-detail-pane', width: 'remaining'},
+  room: {target: '.thread-detail-pane', width: 'full'},
+  'room-list': {target: '.niimap-room-list-pane', width: 'fixed'},
+  'room-board': {target: '.niimap-room-thread-list-pane', width: 'fixed'},
+  'room-thread': {target: '.niimap-room-thread-detail-pane', width: 'remaining'},
 }, {track: document.querySelector('.thread-track')});
 const list = document.getElementById('thread-list');
 const createForm = document.getElementById('thread-create-form');
+const roomCreateForm = document.getElementById('room-create-form');
 const searchControls = document.getElementById('niimap-search-controls');
 const searchForm = document.getElementById('niimap-search-form');
 const createControls = document.getElementById('niimap-create-controls');
 const openThreadCreate = document.getElementById('open-thread-create');
+const openRoomCreate = document.getElementById('open-room-create');
 const ruleDialog = document.getElementById('thread-rule-dialog');
 const map = new geolonia.Map('#map');
+const rootStyles = getComputedStyle(document.documentElement);
+const threadMarkerColor = rootStyles.getPropertyValue('--spot-thread-color').trim() || '#0f766e';
+const roomMarkerColor = rootStyles.getPropertyValue('--spot-room-color').trim() || '#a33b50';
 function setThreadStage(stage) {
   threadStack.set(stage);
   threadMotion.set(stage);
@@ -58,7 +72,8 @@ let selectorPurpose = 'create';
 let selectorReturnStage = 'detail';
 let searchSelectionTarget = null;
 let appliedSearchIds = null;
-let appliedSearchOrder = null;
+let appliedRoomSearchIds = null;
+let appliedSpotOrder = null;
 let selectedSortField = null;
 let activeAccountConditionTarget = null;
 let accountConditionGroupMode = false;
@@ -66,6 +81,9 @@ const selectedAccountConditionIds = new Set();
 const accountConditionGroups = new Map();
 let accountConditionBrowserKind = 'default';
 let accountConditionDetailReturnStage = 'account-selector';
+let activeRoomId = null;
+let activeRoomBoard = null;
+let roomRequestId = 0;
 
 function stableConditionValue(value) {
   if (Array.isArray(value)) return value.map(stableConditionValue);
@@ -146,7 +164,8 @@ function threadIdFromUrl() {
   return /^\d+$/.test(value || '') ? value : null;
 }
 const resumeState = consumeResumeState();
-const initialThreadId = threadIdFromUrl();
+const initialRoomId = new URLSearchParams(location.search).get('room');
+const initialThreadId = /^\d+$/.test(initialRoomId || '') ? null : threadIdFromUrl();
 const activeResumeState = initialThreadId && String(resumeState?.threadId) === initialThreadId ? resumeState : null;
 const animateInitialThread = Boolean(activeResumeState?.animate);
 const initialThreadPane = initialThreadId && document.querySelector(`[data-thread-detail-pane="${initialThreadId}"]`);
@@ -158,7 +177,7 @@ if (initialThreadPane) {
   }
   initialThreadPane.hidden = false;
   detailTitle.textContent = `${initialThreadPane.dataset.threadTitle} (${initialThreadPane.dataset.threadPostCount})`;
-} else {
+} else if (!initialRoomId) {
   const url = new URL(location.href);
   url.searchParams.delete('thread');
   history.replaceState({}, '', url);
@@ -552,20 +571,36 @@ function applyFilters() {
     const visible = inSearch && inBounds;
     item.hidden = !visible;
     if (visible) visibleCount += 1;
-    const marker = markerById.get(item.dataset.threadId);
+    const marker = markerById.get(`thread:${item.dataset.threadId}`);
+    if (marker) marker.getElement().hidden = !visible;
+  });
+  list.querySelectorAll('.room-item').forEach((item) => {
+    const room = roomMarkers.find((candidate) => String(candidate.id) === item.dataset.roomId);
+    const inSearch = appliedRoomSearchIds === null || appliedRoomSearchIds.has(item.dataset.roomId);
+    const inBounds = room && bounds.contains([room.longitude, room.latitude]);
+    const visible = inSearch && inBounds;
+    item.hidden = !visible;
+    if (visible) visibleCount += 1;
+    const marker = markerById.get(`room:${item.dataset.roomId}`);
     if (marker) marker.getElement().hidden = !visible;
   });
   document.getElementById('thread-search-empty').hidden = visibleCount !== 0;
   if (searchForm.elements.sort_kind.value === 'near') sortByDistance();
-  else if (appliedSearchOrder) appliedSearchOrder.forEach((id) => { const item = list.querySelector(`[data-thread-id="${id}"]`); if (item) list.append(item); });
+  else if (appliedSpotOrder) {
+    appliedSpotOrder.forEach(({kind, id}) => {
+      const item = list.querySelector(`[data-${kind}-id="${id}"]`);
+      if (item) list.append(item);
+    });
+  }
 }
 function sortByDistance() {
   const center = map.getCenter();
-  const distance = (thread) => (thread.latitude - center.lat) ** 2 + (thread.longitude - center.lng) ** 2;
-  Array.from(list.querySelectorAll('.thread-item')).sort((first, second) => {
-    const firstThread = markers.find((thread) => String(thread.id) === first.dataset.threadId);
-    const secondThread = markers.find((thread) => String(thread.id) === second.dataset.threadId);
-    return distance(firstThread) - distance(secondThread);
+  const distance = (spot) => (spot.latitude - center.lat) ** 2 + (spot.longitude - center.lng) ** 2;
+  const spotFor = (item) => item.classList.contains('room-item')
+    ? roomMarkers.find((room) => String(room.id) === item.dataset.roomId)
+    : markers.find((thread) => String(thread.id) === item.dataset.threadId);
+  Array.from(list.querySelectorAll('.thread-item, .room-item')).sort((first, second) => {
+    return distance(spotFor(first)) - distance(spotFor(second));
   }).forEach((item) => list.append(item));
 }
 
@@ -1198,9 +1233,29 @@ function selectThread(id, scroll = false) {
     if (selected) summary?.setAttribute('aria-current', 'true');
     else summary?.removeAttribute('aria-current');
   });
-  markerById.forEach((marker, markerId) => marker.getElement().classList.toggle('is-highlighted', markerId === String(id)));
+  list.querySelectorAll('.room-summary').forEach((summary) => {
+    summary.classList.remove('is-selected');
+    summary.removeAttribute('aria-current');
+  });
+  markerById.forEach((marker, markerId) => marker.getElement().classList.toggle('is-highlighted', markerId === `thread:${id}`));
   showThreadMarker(id);
   const item = list.querySelector(`[data-thread-id="${id}"]`);
+  if (scroll) scrollThreadSummaryIntoView(item);
+}
+function selectRoom(id, scroll = false) {
+  list.querySelectorAll('.thread-summary').forEach((summary) => {
+    summary.classList.remove('is-selected');
+    summary.removeAttribute('aria-current');
+  });
+  list.querySelectorAll('.room-item').forEach((item) => {
+    const selected = item.dataset.roomId === String(id);
+    const summary = item.querySelector('.room-summary');
+    summary?.classList.toggle('is-selected', selected);
+    if (selected) summary?.setAttribute('aria-current', 'true');
+    else summary?.removeAttribute('aria-current');
+  });
+  markerById.forEach((marker, markerId) => marker.getElement().classList.toggle('is-highlighted', markerId === `room:${id}`));
+  const item = list.querySelector(`[data-room-id="${id}"]`);
   if (scroll) scrollThreadSummaryIntoView(item);
 }
 function showThreadMarker(id) {
@@ -1218,9 +1273,163 @@ function showThreadMarker(id) {
     padding: 48,
   });
 }
+function roomTemplateUrl(template, id) {
+  return template.replace('/0/', `/${id}/`);
+}
+function removeEmbeddedRoomPanes(includeOverview = true) {
+  roomRequestId += 1;
+  document.querySelectorAll('.niimap-room-list-pane, .niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach((pane) => pane.remove());
+  if (includeOverview) document.querySelector('.thread-detail-pane [data-room-fragment]')?.remove();
+  activeRoomBoard = null;
+  if (includeOverview) activeRoomId = null;
+}
+function updateRoomUrl(roomId, values = {}, replace = false) {
+  const url = new URL(location.href);
+  ['thread', 'room', 'room_list', 'board'].forEach((name) => url.searchParams.delete(name));
+  if (roomId) {
+    url.searchParams.set('room', roomId);
+    Object.entries(values).forEach(([name, value]) => {
+      if (value !== null && value !== undefined && value !== '') url.searchParams.set(name, value);
+    });
+  }
+  history[replace ? 'replaceState' : 'pushState']({}, '', url);
+}
+function createRoomPane(className, title, closeLabel) {
+  const pane = document.createElement('section');
+  pane.className = `ui-list-pane ${className}`;
+  const header = document.createElement('header');
+  header.className = 'ui-pane-header ui-list-pane-header';
+  const heading = document.createElement('h2');
+  heading.textContent = title;
+  const close = document.createElement('button');
+  close.className = 'icon-button';
+  close.type = 'button';
+  close.textContent = '×';
+  close.setAttribute('aria-label', closeLabel);
+  const content = document.createElement('div');
+  content.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
+  header.append(heading, close);
+  pane.append(header, content);
+  document.querySelector('.thread-track').append(pane);
+  return {pane, heading, close, content};
+}
+function activeRoomFragment() {
+  return document.querySelector('.thread-detail-pane [data-room-fragment]');
+}
+async function openRoom(id, shouldUpdateUrl = true) {
+  removeEmbeddedRoomPanes();
+  const current = ++roomRequestId;
+  activeRoomId = String(id);
+  creating = false;
+  createForm.hidden = true;
+  roomCreateForm.hidden = true;
+  document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
+  detailTitle.textContent = '読み込み中...';
+  setThreadStage('room');
+  document.querySelector('.thread-detail-pane').scrollTo({top: 0});
+  if (shouldUpdateUrl) updateRoomUrl(activeRoomId);
+  try {
+    const pane = await NiixyUI.fetchFragment(roomTemplateUrl(workspace.dataset.roomPaneTemplate, activeRoomId));
+    if (current !== roomRequestId || activeRoomId !== String(id)) return false;
+    document.querySelector('.thread-detail-pane').append(pane);
+    detailTitle.textContent = pane.dataset.roomTitle;
+    pane.querySelector('[data-open-room-members]')?.addEventListener('click', () => openEmbeddedRoomList('参加者一覧', pane.dataset.membersUrl, 'members'));
+    pane.querySelector('[data-open-room-boards]')?.addEventListener('click', () => openEmbeddedRoomList('Board一覧', pane.dataset.boardsUrl, 'boards'));
+    return true;
+  } catch {
+    if (current === roomRequestId) detailTitle.textContent = 'Roomの読み込みに失敗しました';
+    return false;
+  }
+}
+async function openEmbeddedRoomList(title, url, kind, shouldUpdateUrl = true) {
+  const current = ++roomRequestId;
+  document.querySelectorAll('.niimap-room-list-pane, .niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach((pane) => pane.remove());
+  activeRoomBoard = null;
+  const ui = createRoomPane('niimap-room-list-pane', title, 'Roomに戻る');
+  ui.close.addEventListener('click', () => {
+    roomRequestId += 1;
+    ui.pane.remove();
+    setThreadStage('room');
+    updateRoomUrl(activeRoomId);
+  });
+  setThreadStage('room-list');
+  if (shouldUpdateUrl) updateRoomUrl(activeRoomId, {room_list: kind});
+  try {
+    const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
+    if (!response.ok) throw new Error();
+    const html = await response.text();
+    if (current !== roomRequestId) return;
+    ui.content.innerHTML = html;
+    NiixyUI.bindTabs(ui.content);
+    ui.content.addEventListener('click', (event) => {
+      const board = event.target.closest('[data-open-board]');
+      if (board) openEmbeddedBoard(board.dataset.openBoard, board.querySelector('.ui-summary-item-title').textContent, board.dataset.boardUrl);
+    });
+  } catch {
+    if (current === roomRequestId) ui.content.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
+  }
+}
+async function openEmbeddedBoard(boardId, title, url, shouldUpdateUrl = true) {
+  const current = ++roomRequestId;
+  document.querySelectorAll('.niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach((pane) => pane.remove());
+  activeRoomBoard = {id: String(boardId), title, url};
+  const ui = createRoomPane('niimap-room-thread-list-pane', title, 'Board一覧に戻る');
+  ui.close.addEventListener('click', () => {
+    roomRequestId += 1;
+    ui.pane.remove();
+    document.querySelector('.niimap-room-thread-detail-pane')?.remove();
+    activeRoomBoard = null;
+    setThreadStage('room-list');
+    updateRoomUrl(activeRoomId, {room_list: 'boards'});
+  });
+  setThreadStage('room-board');
+  if (shouldUpdateUrl) updateRoomUrl(activeRoomId, {room_list: 'boards', board: activeRoomBoard.id});
+  try {
+    const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
+    if (!response.ok) throw new Error();
+    const html = await response.text();
+    if (current !== roomRequestId) return;
+    ui.content.innerHTML = html;
+    NiixyRoomForms.initialize(ui.content, fieldCatalog, interfaceCatalog);
+    ui.content.addEventListener('click', (event) => {
+      const thread = event.target.closest('[data-room-thread]');
+      if (thread) openEmbeddedRoomThread(thread.dataset.roomThread);
+    });
+  } catch {
+    if (current === roomRequestId) ui.content.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
+  }
+}
+async function openEmbeddedRoomThread(threadId, shouldUpdateUrl = true) {
+  const fragment = activeRoomFragment();
+  if (!fragment || !activeRoomBoard) return;
+  const current = ++roomRequestId;
+  document.querySelector('.niimap-room-thread-detail-pane')?.remove();
+  const ui = createRoomPane('niimap-room-thread-detail-pane', '', 'Thread一覧に戻る');
+  ui.pane.classList.remove('ui-list-pane');
+  ui.pane.classList.add('ui-detail-pane');
+  ui.close.addEventListener('click', () => {
+    roomRequestId += 1;
+    ui.pane.remove();
+    setThreadStage('room-board');
+    updateRoomUrl(activeRoomId, {room_list: 'boards', board: activeRoomBoard.id});
+  });
+  setThreadStage('room-thread');
+  if (shouldUpdateUrl) updateRoomUrl(activeRoomId, {room_list: 'boards', board: activeRoomBoard.id, thread: threadId});
+  try {
+    const response = await fetch(roomTemplateUrl(fragment.dataset.threadDetailTemplate, threadId), {headers: {'X-Requested-With': 'fetch'}});
+    if (!response.ok) throw new Error();
+    const html = await response.text();
+    if (current !== roomRequestId) return;
+    ui.content.innerHTML = html;
+    ui.heading.textContent = ui.content.querySelector('[data-thread-title]')?.dataset.threadTitle || '';
+  } catch {
+    if (current === roomRequestId) ui.content.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
+  }
+}
 function updateThreadUrl(id, replace = false) {
   const url = new URL(location.href);
   const threadId = id ? String(id) : null;
+  ['room', 'room_list', 'board'].forEach((name) => url.searchParams.delete(name));
   if (url.searchParams.get('thread') === threadId) return;
   if (threadId) url.searchParams.set('thread', threadId);
   else url.searchParams.delete('thread');
@@ -1229,9 +1438,11 @@ function updateThreadUrl(id, replace = false) {
 function openDetail(id, shouldUpdateUrl = true) {
   const pane = document.querySelector(`[data-thread-detail-pane="${id}"]`);
   if (!pane) return false;
+  removeEmbeddedRoomPanes();
   if (createControls.open) NiixyUI.setAccordionExpanded(createControls, false);
   creating = false;
   createForm.hidden = true;
+  roomCreateForm.hidden = true;
   setThreadStage('detail');
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => {
     const selected = pane.dataset.threadDetailPane === String(id);
@@ -1243,19 +1454,47 @@ function openDetail(id, shouldUpdateUrl = true) {
   return true;
 }
 function closeDetail(shouldUpdateUrl = true) {
+  removeEmbeddedRoomPanes();
   setThreadStage('list');
   createForm.hidden = true;
+  roomCreateForm.hidden = true;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   markerById.forEach((marker) => marker.getElement().classList.remove('is-highlighted'));
   list.querySelectorAll('.thread-summary').forEach((summary) => {
     summary.classList.remove('is-selected');
     summary.removeAttribute('aria-current');
   });
+  list.querySelectorAll('.room-summary').forEach((summary) => {
+    summary.classList.remove('is-selected');
+    summary.removeAttribute('aria-current');
+  });
   detailTitle.textContent = '';
-  if (shouldUpdateUrl) updateThreadUrl(null);
+  if (shouldUpdateUrl) updateRoomUrl(null);
 }
-function applyThreadStateFromUrl() {
+async function applyThreadStateFromUrl() {
   const url = new URL(location.href);
+  const roomId = url.searchParams.get('room');
+  if (/^\d+$/.test(roomId || '')) {
+    selectRoom(roomId, true);
+    if (!await openRoom(roomId, false)) {
+      closeDetail(false);
+      updateRoomUrl(null, {}, true);
+      return;
+    }
+    const listKind = url.searchParams.get('room_list');
+    const fragment = activeRoomFragment();
+    if (!listKind || !fragment) return;
+    const listUrl = listKind === 'members' ? fragment.dataset.membersUrl : fragment.dataset.boardsUrl;
+    await openEmbeddedRoomList(listKind === 'members' ? '参加者一覧' : 'Board一覧', listUrl, listKind, false);
+    const boardId = url.searchParams.get('board');
+    if (!boardId) return;
+    const board = document.querySelector(`.niimap-room-list-pane [data-open-board="${boardId}"]`);
+    if (!board) return;
+    await openEmbeddedBoard(boardId, board.querySelector('.ui-summary-item-title').textContent, board.dataset.boardUrl, false);
+    const roomThreadId = url.searchParams.get('thread');
+    if (roomThreadId) await openEmbeddedRoomThread(roomThreadId, false);
+    return;
+  }
   const threadId = threadIdFromUrl();
   if (!threadId) {
     closeDetail(false);
@@ -1282,7 +1521,16 @@ createControls.addEventListener('niixy:accordion-change', (event) => {
 openThreadCreate.addEventListener('click', () => {
   if (openThreadCreate.disabled) return;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
+  roomCreateForm.hidden = true;
   createForm.hidden = false; detailTitle.textContent = 'Threadを作成';
+  setThreadStage('detail');
+});
+openRoomCreate.addEventListener('click', () => {
+  if (openRoomCreate.disabled) return;
+  document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
+  createForm.hidden = true;
+  roomCreateForm.hidden = false;
+  detailTitle.textContent = 'Roomを作成';
   setThreadStage('detail');
 });
 document.getElementById('close-thread-detail').addEventListener('click', () => {
@@ -1334,7 +1582,9 @@ searchForm.addEventListener('submit', async (event) => {
     const response = await fetch(workspace.dataset.searchUrl, {method: 'POST', body: data, headers: {'X-Requested-With': 'XMLHttpRequest'}});
     const result = await response.json();
     if (!response.ok) { error.textContent = Object.values(result.errors || {}).flat().join(' '); error.hidden = false; return; }
-    appliedSearchOrder = result.thread_ids.map(String); appliedSearchIds = new Set(appliedSearchOrder);
+    appliedSearchIds = new Set(result.thread_ids.map(String));
+    appliedRoomSearchIds = new Set((result.room_ids || []).map(String));
+    appliedSpotOrder = (result.spot_order || []).map((spot) => ({kind: spot.kind, id: String(spot.id)}));
     applyFilters();
     if (searchControls.open) NiixyUI.setAccordionExpanded(searchControls, false);
   } catch {
@@ -1345,6 +1595,14 @@ searchForm.addEventListener('submit', async (event) => {
 });
 restoreSearchState(initialSearchState());
 list.addEventListener('click', (event) => {
+  const roomSummary = event.target.closest('.room-summary');
+  if (roomSummary) {
+    event.preventDefault();
+    const id = roomSummary.closest('.room-item').dataset.roomId;
+    selectRoom(id);
+    openRoom(id);
+    return;
+  }
   const summary = event.target.closest('.thread-summary');
   if (summary) {
     const id = summary.closest('.thread-item').dataset.threadId;
@@ -1365,6 +1623,47 @@ workspace.addEventListener('click', (event) => {
   history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
   map.easeTo({center: [longitude, latitude], zoom, duration: 700, essential: true});
 });
+workspace.addEventListener('submit', async (event) => {
+  const roomAction = event.target.closest('[data-room-fragment] [data-room-action]');
+  const boardCreate = event.target.closest('.niimap-room-thread-list-pane [data-board-thread-create]');
+  const roomReply = event.target.closest('.niimap-room-thread-detail-pane .room-thread-reply-form');
+  const form = roomAction || boardCreate || roomReply;
+  if (!form) return;
+  event.preventDefault();
+  const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
+  if (!pending) return;
+  const data = new FormData(form);
+  if (roomReply) {
+    form.dataset.submissionId ||= crypto.randomUUID();
+    data.append('submission_id', form.dataset.submissionId);
+  }
+  const error = form.querySelector('.room-form-error, .reply-form-error');
+  if (error) error.hidden = true;
+  try {
+    const response = await fetch(form.action, {method: 'POST', body: data});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || Object.values(result.errors || {}).flat().join(' '));
+    if (roomAction) {
+      const roomId = activeRoomId;
+      await openRoom(roomId, false);
+      updateRoomUrl(roomId, {}, true);
+    }
+    else if (boardCreate) {
+      const board = {...activeRoomBoard};
+      await openEmbeddedBoard(board.id, board.title, board.url, false);
+      await openEmbeddedRoomThread(result.thread_id);
+    } else {
+      const threadId = roomReply.closest('[data-thread-id]')?.dataset.threadId;
+      if (threadId) await openEmbeddedRoomThread(threadId, false);
+    }
+  } catch (exception) {
+    if (error) {
+      error.textContent = exception.message || '処理に失敗しました。';
+      error.hidden = false;
+    }
+    pending.restore();
+  }
+});
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const pending = NiixyUI.beginPendingAction(event.submitter || createForm.querySelector('[type="submit"]'));
@@ -1381,6 +1680,26 @@ createForm.addEventListener('submit', async (event) => {
     }
     const error = document.getElementById('thread-form-error');
     error.textContent = Object.values(data.errors || {}).flat().join(' ');
+    error.hidden = false;
+  } finally {
+    if (!created) pending.restore();
+  }
+});
+roomCreateForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const pending = NiixyUI.beginPendingAction(event.submitter || roomCreateForm.querySelector('[type="submit"]'));
+  if (!pending) return;
+  let created = false;
+  try {
+    const response = await fetch(roomCreateForm.action, {method: 'POST', body: new FormData(roomCreateForm), headers: {'X-Requested-With': 'XMLHttpRequest'}});
+    const data = await response.json();
+    if (response.ok) {
+      created = true;
+      location.assign(data.redirect_url);
+      return;
+    }
+    const error = document.getElementById('room-form-error');
+    error.textContent = data.error || Object.values(data.errors || {}).flat().join(' ');
     error.hidden = false;
   } finally {
     if (!created) pending.restore();
@@ -1441,27 +1760,42 @@ map.on('click', (event) => {
   const longitude = event.lngLat.lng.toFixed(6);
   document.getElementById('thread-latitude').value = latitude;
   document.getElementById('thread-longitude').value = longitude;
-  const placementLink = document.getElementById('thread-create-placement-link');
-  const placementUrl = new URL(placementLink.href, location.href);
-  placementUrl.searchParams.set('latitude', latitude);
-  placementUrl.searchParams.set('longitude', longitude);
-  placementUrl.searchParams.set('zoom', '15');
-  placementLink.href = placementUrl;
-  placementLink.dataset.latitude = latitude;
-  placementLink.dataset.longitude = longitude;
-  placementLink.textContent = `${latitude}, ${longitude}`;
-  document.getElementById('niimap-create-location-status').textContent = '地点を選択しました。'; openThreadCreate.disabled = false;
+  document.getElementById('room-latitude').value = latitude;
+  document.getElementById('room-longitude').value = longitude;
+  ['thread', 'room'].forEach((kind) => {
+    const placementLink = document.getElementById(`${kind}-create-placement-link`);
+    const placementUrl = new URL(placementLink.href, location.href);
+    placementUrl.searchParams.set('latitude', latitude);
+    placementUrl.searchParams.set('longitude', longitude);
+    placementUrl.searchParams.set('zoom', '15');
+    placementLink.href = placementUrl;
+    placementLink.dataset.latitude = latitude;
+    placementLink.dataset.longitude = longitude;
+    placementLink.textContent = `${latitude}, ${longitude}`;
+  });
+  document.getElementById('niimap-create-location-status').textContent = '地点を選択しました。';
+  openThreadCreate.disabled = false;
+  openRoomCreate.disabled = workspace.dataset.authenticated !== 'true';
 });
 map.on('load', () => {
   if (!focusMapFromUrl()) restoreMapView();
   markers.forEach((thread) => {
-    const marker = new geolonia.Marker({color: '#0f766e'}).setLngLat([thread.longitude, thread.latitude]).addTo(map);
+    const marker = new geolonia.Marker({color: threadMarkerColor}).setLngLat([thread.longitude, thread.latitude]).addTo(map);
     marker.getElement().classList.add('event-map-marker');
     marker.getElement().addEventListener('click', (event) => {
       event.stopPropagation();
       selectThread(thread.id, true);
     });
-    markerById.set(String(thread.id), marker);
+    markerById.set(`thread:${thread.id}`, marker);
+  });
+  roomMarkers.forEach((room) => {
+    const marker = new geolonia.Marker({color: roomMarkerColor}).setLngLat([room.longitude, room.latitude]).addTo(map);
+    marker.getElement().classList.add('event-map-marker', 'room-map-marker');
+    marker.getElement().addEventListener('click', (event) => {
+      event.stopPropagation();
+      selectRoom(room.id, true);
+    });
+    markerById.set(`room:${room.id}`, marker);
   });
   applyFilters();
   map.on('moveend', () => {
@@ -1470,3 +1804,4 @@ map.on('load', () => {
   if (initialThreadPane) selectThread(initialThreadId);
 });
 window.addEventListener('popstate', applyThreadStateFromUrl);
+if (/^\d+$/.test(initialRoomId || '')) applyThreadStateFromUrl();

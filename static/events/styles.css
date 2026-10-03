@@ -6,6 +6,8 @@
   --line: #ded9d1;
   --accent: #0f766e;
   --accent-dark: #115e59;
+  --spot-thread-color: #0f766e;
+  --spot-room-color: #a33b50;
   --header-height: 64px;
   --footer-height: 33px;
 }
@@ -863,10 +865,10 @@ a {
   z-index: 2;
 }
 .ui-pane-header h2 { font-size: 18px; margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.ui-list-pane { background: var(--panel); min-width: 0; overflow-y: auto; }
+.ui-list-pane { background: var(--panel); border-left: 1px solid var(--line); box-sizing: border-box; min-width: 0; overflow-y: auto; }
 .ui-list-pane-header { flex: 0 0 auto; }
 .ui-summary-list { min-width: 0; }
-.ui-detail-pane { background: var(--panel); min-width: 0; overflow-y: auto; }
+.ui-detail-pane { background: var(--panel); border-left: 1px solid var(--line); box-sizing: border-box; min-width: 0; overflow-y: auto; }
 .ui-detail-pane-header { flex: 0 0 auto; }
 .ui-tabs { border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; }
 .ui-tabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; flex: 0 0 auto; font: inherit; font-size: 14px; font-weight: 700; min-height: 48px; padding: 0 14px; }
@@ -882,6 +884,13 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .ui-pane-status { color: var(--muted); margin: 0; }
 .ui-feature-workspace[hidden] { display: none !important; }
 .ui-pane.is-loading, .ui-pane.has-load-error { display: grid; place-items: center; }
+.ui-placement-row { align-items: center; border-bottom: 1px solid var(--line); display: flex; font-size: 12px; min-height: 32px; min-width: 0; }
+.ui-placement-row a { color: var(--muted); overflow: hidden; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.ui-placement-row a:hover { color: var(--accent-dark); text-decoration: underline; }
+.ui-control-accordion { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-top: 12px; }
+.ui-control-accordion > summary { cursor: pointer; font-weight: 700; list-style: none; padding: 12px; }
+.ui-control-accordion > summary::-webkit-details-marker { display: none; }
+.ui-control-accordion-body { display: grid; gap: 10px; padding: 0 12px 12px; }
 .ui-workspace-track { transform: translateX(calc(-1 * var(--ui-workspace-offset, 0px))); transition: transform 260ms ease; }
 .ui-accordion-content { display: grid; grid-template-rows: 0fr; opacity: 0; overflow: hidden; transition: grid-template-rows 240ms ease, opacity 180ms ease; }
 .ui-accordion-content.is-open { grid-template-rows: 1fr; opacity: 1; }
@@ -900,6 +909,10 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .thread-workspace.is-account-selector-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(3, var(--list-width)); width: calc(100vw + (2 * var(--list-width))); }
 .thread-workspace.is-account-condition-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(3, var(--list-width)) minmax(0, var(--main-width)); width: calc(200vw + var(--list-width)); }
 .thread-workspace.is-account-condition-history-edit-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(2, var(--list-width)) minmax(0, var(--main-width)); width: 200vw; }
+.thread-workspace.is-room-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw; width: 200vw; }
+.thread-workspace.is-room-list-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw var(--list-width); width: calc(200vw + var(--list-width)); }
+.thread-workspace.is-room-board-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw repeat(2, var(--list-width)); width: calc(200vw + (2 * var(--list-width))); }
+.thread-workspace.is-room-thread-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw repeat(2, var(--list-width)) minmax(0, var(--main-width)); width: calc(300vw + var(--list-width)); }
 .thread-workspace.is-account-conditions-open .thread-detail-pane, .thread-workspace.is-account-selector-open .thread-detail-pane, .thread-workspace.is-account-condition-detail-open .thread-detail-pane, .thread-workspace.is-account-condition-history-edit-open .thread-detail-pane { display: none; }
 .thread-workspace.is-interface-list-open .thread-interface-list-pane:not(.thread-field-list-pane), .thread-workspace.is-interface-list-open .thread-interface-detail-pane:not(.thread-field-detail-pane), .thread-workspace.is-interface-detail-open .thread-interface-list-pane:not(.thread-field-list-pane), .thread-workspace.is-interface-detail-open .thread-interface-detail-pane:not(.thread-field-detail-pane) { display: block; }
 .thread-workspace.is-field-list-open .thread-field-list-pane, .thread-workspace.is-field-list-open .thread-field-detail-pane, .thread-workspace.is-field-detail-open .thread-field-list-pane, .thread-workspace.is-field-detail-open .thread-field-detail-pane { display: block; }
@@ -915,8 +928,7 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-pane-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 40px; }
 .thread-pane-header h2, .thread-detail-header h2 { font-size: 18px; margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .niimap-search-controls { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-top: 12px; }
-.niimap-search-controls > summary { cursor: pointer; font-weight: 700; padding: 12px; }
-.niimap-search-controls > summary { list-style: none; }
+.niimap-search-controls > summary { cursor: pointer; font-weight: 700; list-style: none; padding: 12px; }
 .niimap-search-controls > summary::-webkit-details-marker { display: none; }
 .niimap-search-controls form { display: grid; padding: 0 12px 12px; }
 .niimap-search-section { border-top: 1px solid var(--line); }
@@ -948,6 +960,9 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .niimap-selected-account-condition button { background: transparent; border: 0; cursor: pointer; flex: 0 0 auto; font: inherit; padding: 0 2px; }
 .account-condition-pane, .account-selector-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; min-height: 0; min-width: 0; overflow-y: auto; width: var(--list-width); }
 .account-condition-detail-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; min-height: 0; min-width: 0; overflow-y: auto; width: var(--main-width); }
+.niimap-room-list-pane, .niimap-room-thread-list-pane { width: var(--list-width); }
+.niimap-room-thread-detail-pane { min-height: 0; overflow-y: auto; padding: 0 20px 24px; width: var(--main-width); }
+.niimap-room-thread-detail-pane > div:last-child { min-width: 0; }
 .account-condition-controls { display: grid; gap: 12px; padding: 16px 20px 20px; }
 #browse-account-conditions { justify-content: center; margin: 0; width: 100%; }
 .account-condition-group-actions { align-items: stretch; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(92px, auto); }
@@ -980,20 +995,19 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-detail-pane > .map-event-form { padding-top: 0; }
 .thread-list { margin-top: 12px; }
 .thread-item { border-bottom: 1px solid var(--line); }
-.thread-summary { border-radius: 4px; padding-left: 8px; padding-right: 8px; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.spot-summary { border-radius: 4px; padding-left: 8px; padding-right: 8px; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.thread-item .thread-summary { border-left: 3px solid var(--spot-thread-color); }
+.room-item .room-summary { border-left: 3px solid var(--spot-room-color); }
 .thread-summary.is-selected { background: #eef6f4; box-shadow: inset 3px 0 0 var(--accent); color: var(--accent-dark); }
 .thread-detail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; min-height: 60px; position: sticky; top: 0; z-index: 2; }
 .thread-detail { display: grid; gap: 16px; min-width: 0; }
 .thread-detail[hidden] { display: none !important; }
-.thread-placement-row { align-items: center; border-bottom: 1px solid var(--line); display: flex; font-size: 12px; min-height: 32px; min-width: 0; }
-.thread-placement-row a { color: var(--muted); overflow: hidden; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
-.thread-placement-row a:hover { color: var(--accent-dark); text-decoration: underline; }
 .thread-post { border-bottom: 1px solid var(--line); min-width: 0; padding: 14px 0; }
 .thread-post-layout-area { display: grid; gap: 12px; grid-template-columns: clamp(56px, 12%, 96px) minmax(0, 1fr); min-width: 0; }
 .thread-post-layout-area > div, .thread-post-info { min-width: 0; }
 .thread-thumbnail { aspect-ratio: 1; background: #e7e4df; border: 1px solid var(--line); border-radius: 6px; }
-.thread-post-info { align-items: center; display: flex; gap: 8px; font-size: 14px; font-weight: 700; }
-.thread-post-info time { color: var(--muted); font-weight: 400; margin-left: auto; }
+.thread-post-info { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; font-weight: 700; }
+.thread-post-info time { color: var(--muted); font-weight: 400; margin-left: auto; white-space: nowrap; }
 .thread-post-body { line-height: 1.7; margin-top: 8px; white-space: pre-wrap; }
 .thread-reply-form { display: grid; gap: 10px; min-width: 0; }
 .thread-reply-form textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; max-width: 100%; min-height: 110px; min-width: 0; padding: 10px; resize: vertical; width: 100%; }
@@ -1080,11 +1094,13 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
   .thread-detail-pane { box-sizing: border-box; flex: 0 0 100vw; min-height: 0; min-width: 0; overflow-y: auto; padding-bottom: calc(24px + env(safe-area-inset-bottom)); position: relative; transform: none; width: 100vw; z-index: auto; }
   .thread-detail-header { top: 0; }
   .thread-post-layout-area { grid-template-columns: clamp(44px, 18%, 64px) minmax(0, 1fr); }
-  .thread-workspace.is-interface-list-open .thread-track, .thread-workspace.is-interface-detail-open .thread-track, .thread-workspace.is-field-list-open .thread-track, .thread-workspace.is-field-detail-open .thread-track, .thread-workspace.is-account-conditions-open .thread-track, .thread-workspace.is-account-selector-open .thread-track, .thread-workspace.is-account-condition-detail-open .thread-track, .thread-workspace.is-account-condition-history-edit-open .thread-track { width: 600vw; }
+  .thread-post-info time { flex-basis: 100%; margin-left: 0; }
+  .thread-workspace.is-interface-list-open .thread-track, .thread-workspace.is-interface-detail-open .thread-track, .thread-workspace.is-field-list-open .thread-track, .thread-workspace.is-field-detail-open .thread-track, .thread-workspace.is-account-conditions-open .thread-track, .thread-workspace.is-account-selector-open .thread-track, .thread-workspace.is-account-condition-detail-open .thread-track, .thread-workspace.is-account-condition-history-edit-open .thread-track, .thread-workspace.is-room-open .thread-track, .thread-workspace.is-room-list-open .thread-track, .thread-workspace.is-room-board-open .thread-track, .thread-workspace.is-room-thread-open .thread-track { width: 700vw; }
   .thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane, .thread-workspace.is-field-list-open .thread-detail-pane, .thread-workspace.is-field-detail-open .thread-detail-pane { display: block; }
   .thread-interface-list-pane, .thread-interface-detail-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
   .account-condition-pane, .account-selector-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
   .account-condition-detail-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
+  .niimap-room-list-pane, .niimap-room-thread-list-pane, .niimap-room-thread-detail-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
   .account-condition-detail-body { padding: 20px 16px 40px; }
   .account-field-condition-controls { grid-template-columns: 1fr; }
   .thread-interface-catalog { padding: 0 16px 24px; }

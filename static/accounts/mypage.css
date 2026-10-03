@@ -98,10 +98,6 @@
   width: calc(100vw - var(--ui-workspace-fixed-width));
 }
 
-.module-list-pane {
-  border-right: 1px solid var(--line);
-}
-
 .interface-detail-pane,
 .field-detail-pane {
   overflow-x: hidden;
@@ -426,11 +422,6 @@
   background: var(--panel);
   min-width: 0;
   overflow-y: auto;
-}
-
-.add-require-list-pane,
-.add-field-list-pane {
-  border-right: 1px solid var(--line);
 }
 
 .add-field-list-pane > .ui-tab-panel {

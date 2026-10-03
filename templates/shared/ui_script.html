@@ -109,14 +109,19 @@ window.NiixyUI = (() => {
     const align = () => {
       const definition = stages[currentStage];
       if (!definition || definition.root) {
+        viewport.dataset.uiWorkspaceWidth = 'full';
         track.style.setProperty('--ui-workspace-offset', '0px');
         return;
       }
       const target = typeof definition.target === 'string' ? track.querySelector(definition.target) : definition.target;
       if (!target) return;
+      const width = definition.width || 'remaining';
       const trackRect = track.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
-      const offset = Math.max(0, targetRect.right - trackRect.left - viewport.clientWidth);
+      const offset = width === 'full'
+        ? Math.max(0, targetRect.left - trackRect.left)
+        : Math.max(0, targetRect.right - trackRect.left - viewport.clientWidth);
+      viewport.dataset.uiWorkspaceWidth = width;
       track.style.setProperty('--ui-workspace-offset', `${offset}px`);
     };
 

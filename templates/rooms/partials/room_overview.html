@@ -1,0 +1,16 @@
+{% load l10n %}
+<div class="room-overview-content">
+  {% url 'events:map' as niimap_url %}
+  {% with latitude=room.placement.latitude|unlocalize longitude=room.placement.longitude|unlocalize %}
+    {% include 'shared/placement_row.html' with placement_url=niimap_url|add:'?latitude='|add:latitude|add:'&longitude='|add:longitude|add:'&zoom=15' placement_label=latitude|add:', '|add:longitude placement_on_map=True placement_latitude=room.placement.latitude placement_longitude=room.placement.longitude %}
+  {% endwith %}
+  <section class="room-hero">
+    <div class="room-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
+    <div class="room-controls">
+      <div class="room-control-row"><button class="button secondary" type="button" disabled title="未対応">RoomIF</button><button class="button secondary" type="button" data-open-room-members>メンバー {{ room.memberships.all|length }}</button></div>
+      <div class="room-control-row"><button class="button secondary" type="button" data-open-room-boards>Board</button><button class="button secondary" type="button" disabled title="未対応">Timeline</button></div>
+      <button class="button secondary room-wide-control" type="button" disabled title="未対応">Policy</button>
+      {% if user.is_authenticated %}<div class="room-participation-action">{% if room.is_member %}{% if room.is_owner %}<button class="button secondary" type="button" disabled>参加中</button>{% else %}<form action="{% url 'rooms:leave' room.pk %}" data-room-action>{% csrf_token %}<button class="button secondary" type="submit" data-pending-label="退出中...">退出する</button></form>{% endif %}{% else %}<form action="{% url 'rooms:join' room.pk %}" data-room-action>{% csrf_token %}<button class="button primary" type="submit" data-pending-label="参加中...">参加する</button></form>{% endif %}</div>{% endif %}
+    </div>
+  </section>
+</div>

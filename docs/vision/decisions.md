@@ -271,3 +271,13 @@ v0.6 は、Room の作成と NiiMap 配置、RoomPage、Main Collection と `最
 BoardPolicy と編集可能な RoomPolicy は後続 Version へ回す。v0.6 の Room 内書込は参加者だけに許可する固定ルールとし、Guest と非参加 Account は既存 ThreadPolicy が許す範囲で閲覧だけできる。ProfileArea と ProfileLayout の実装も v0.6 には含めない。
 
 RoomOwner の譲渡操作は後続 Version へ回すが、Room は最初から変更可能な Owner を一人保持するモデルにする。v0.6 では RoomOwner は退出できない。
+
+## 2026-10-04 - SummaryItem の上段を一覧ごとの補助表示欄とする
+
+状態: 採用
+
+SummaryItem の上段は、全種類に共通する種別や Owner の表示欄として固定せず、一覧の目的に応じて内容を決める補助表示欄とする。表示する内容がない場合も空の行を維持し、SummaryItem の三行構成は変えない。
+
+Spot 一覧では、将来、検索者が選択した Field の値を上段へ表示できるようにする。現段階では Room、Thread などの種別や Owner を上段へ表示しない。種別は色など別の表現で識別する。
+
+Board 一覧では、Collection が外部の Board を参照している場合に限り、参照 Board の Owner を上段へ表示する。閲覧中の Account または Room が所有する Boardと、NiiMapへ直接配置されたBoardでは上段を空にする。NiiMap は Board の参照を保持せず、Board や Collection への参照関係は Collection が保持する。

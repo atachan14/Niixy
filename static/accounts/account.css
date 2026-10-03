@@ -163,7 +163,6 @@
 }
 
 .account-thread-pane {
-  border-right: 1px solid var(--line);
   flex: 0 0 var(--ui-workspace-fixed-width);
   width: var(--ui-workspace-fixed-width);
 }

@@ -80,11 +80,62 @@ class ThreadPost(IdempotentSubmission):
 
 class ThreadPlacement(models.Model):
     NII_MAP = 'niimap'
+    BOARD = 'board'
+    KIND_CHOICES = [(NII_MAP, 'NiiMap'), (BOARD, 'Board')]
+
     thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='placements')
-    kind = models.CharField(max_length=24, default=NII_MAP)
-    latitude = models.DecimalField('緯度', max_digits=9, decimal_places=6, validators=[MinValueValidator(-90), MaxValueValidator(90)])
-    longitude = models.DecimalField('経度', max_digits=9, decimal_places=6, validators=[MinValueValidator(-180), MaxValueValidator(180)])
+    kind = models.CharField(max_length=24, choices=KIND_CHOICES, default=NII_MAP)
+    board = models.ForeignKey(
+        'rooms.Board',
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name='thread_placements',
+    )
+    latitude = models.DecimalField(
+        '緯度',
+        blank=True,
+        null=True,
+        max_digits=9,
+        decimal_places=6,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)],
+    )
+    longitude = models.DecimalField(
+        '経度',
+        blank=True,
+        null=True,
+        max_digits=9,
+        decimal_places=6,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)],
+    )
+    is_primary = models.BooleanField(default=True)
     created_at = models.DateTimeField('掲載日時', auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        kind='niimap',
+                        board__isnull=True,
+                        latitude__isnull=False,
+                        longitude__isnull=False,
+                    )
+                    | models.Q(
+                        kind='board',
+                        board__isnull=False,
+                        latitude__isnull=True,
+                        longitude__isnull=True,
+                    )
+                ),
+                name='valid_thread_placement_target',
+            ),
+            models.UniqueConstraint(
+                fields=['thread'],
+                condition=models.Q(is_primary=True),
+                name='unique_primary_thread_placement',
+            ),
+        ]
 
 
 class ThreadAccessRule(models.Model):

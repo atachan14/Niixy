@@ -1,0 +1,26 @@
+{% extends 'events/base.html' %}
+{% load static l10n %}
+
+{% block title %}{{ room.name }} | Niixy{% endblock %}
+{% block main_class %}room-main{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261002-1"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-2">{% endblock %}
+{% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block content %}
+<section class="room-page" data-room-id="{{ room.pk }}" data-members-url="{% url 'rooms:members' room.pk %}" data-boards-url="{% url 'rooms:boards' room.pk %}" data-board-template="{% url 'rooms:board-threads' room.pk 0 %}" data-thread-detail-template="{% url 'rooms:thread-detail' room.pk 0 %}">
+  <header class="room-page-header">
+    <h1><button id="room-page-identity" type="button" disabled>{{ room.name }}</button></h1>
+    <div class="room-header-actions">{% if room.is_owner %}<details class="room-edit-menu"><summary class="button secondary">編集</summary><form action="{% url 'rooms:edit' room.pk %}" data-room-action>{% csrf_token %}<label>Room名<input name="name" maxlength="120" value="{{ room.name }}" required></label><label>説明<textarea name="description" rows="5">{{ room.description }}</textarea></label><label>緯度<input name="latitude" type="number" min="-90" max="90" step="0.000001" value="{{ room.placement.latitude|unlocalize }}" required></label><label>経度<input name="longitude" type="number" min="-180" max="180" step="0.000001" value="{{ room.placement.longitude|unlocalize }}" required></label><p class="room-form-error" hidden></p><button class="button primary" type="submit" data-pending-label="保存中...">保存</button></form></details>{% endif %}<a class="icon-button" href="{% url 'events:map' %}" aria-label="Roomを閉じる">×</a></div>
+  </header>
+  <div class="room-workspace"><div class="room-track ui-workspace-track">
+    <section class="room-overview-pane" aria-label="Room概要">{% include 'rooms/partials/room_overview.html' with room=room %}</section>
+    <section class="ui-list-pane room-list-pane" aria-label="Room内一覧"><header class="ui-pane-header ui-list-pane-header"><h2 id="room-list-title"></h2><button id="close-room-list" class="icon-button" type="button" aria-label="Roomに戻る">×</button></header><div id="room-list-content"><p class="room-pane-loading">読み込み中...</p></div></section>
+    <section class="ui-list-pane room-thread-list-pane" aria-label="Board内Thread一覧"><header class="ui-pane-header ui-list-pane-header"><h2 id="room-thread-list-title"></h2><button id="close-room-thread-list" class="icon-button" type="button" aria-label="Board一覧に戻る">×</button></header><div id="room-thread-list-content"><p class="room-pane-loading">読み込み中...</p></div></section>
+    <aside class="ui-detail-pane room-thread-detail-pane" aria-label="Thread詳細"><header class="ui-pane-header ui-detail-pane-header"><h2 id="room-thread-detail-title"></h2><button id="close-room-thread-detail" class="icon-button" type="button" aria-label="一覧に戻る">×</button></header><div id="room-thread-detail-content"><p class="empty">Threadを選択してください。</p></div></aside>
+  </div></div>
+</section>
+{{ thread_field_catalog|json_script:'room-thread-field-catalog' }}
+{{ thread_interface_catalog|json_script:'room-thread-interface-catalog' }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'rooms/forms.js' %}?v=20261004-1"></script><script src="{% static 'rooms/room.js' %}?v=20261004-2"></script>{% endblock %}
