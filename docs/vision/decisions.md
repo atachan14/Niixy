@@ -64,7 +64,7 @@ Account の Niixy ID とは別に、他者へ表示する名前は「表示名�
 
 ## 2026-09-22 - Book を Thread の公開コレクションにする
 
-状態: 採用
+状態: 置換済み（2026-10-03 の「Book を Board へ統合する」を採用）
 
 Book は Thread をテーマごとにまとめ、公開・購読できるコレクションとする。Room が参加者同士の会話や活動の場であるのに対し、Book は作成者のコンテンツを整理して公開する場である。初期方針では Book 作成者だけが Thread を追加できる。Book 内の Thread は Book が定める ThreadInterface と ThreadPostLayout を使う。
 
@@ -203,3 +203,39 @@ SummaryListのページネーションUIとAjax差し替え処理を共通化し
 検索条件、権限、ソートが異なるため、Field、Interface、Accountなどを一つの巨大な検索処理へ統合しない。検索処理は対象種別ごとに分け、検索結果の表示形式とページネーション契約を揃える。Thread、Room、Book、Timeline、TweetはNiiMapへ並ぶSpotという共通用途を持つため、Spot検索として横断的に扱う。
 
 Account条件一覧のItemは検索元のAccountやFieldそのものではなく、再利用可能なAccountConditionとする。新しい条件を探す導線では対象別検索を利用し、履歴へ追加した時点で条件定義として扱う。
+
+## 2026-10-03 - Book を Board へ統合する
+
+状態: 採用・詳細保留
+
+Thread をまとめるコンテナは Board に統一し、Book を独立したコンテンツ種別として実装しない。会話用、告知用、ブログ用などの用途差は、BoardPolicy、ThreadPostLayout、Board の表示方法によって表現する。ブログでは、Thread のタイトル、`#1` の一部、続きを開く導線を一つの Item として縦に並べる表示を標準候補とする。
+
+Board は安定 ID と変更可能な名称を持つ。BoardPolicy と Board 内の個別 ThreadPolicy は AND で評価し、双方を満たす利用者だけが対象 Thread を利用できる。Board の表示方法、Policy、管理操作の詳細は Board 実装時に確定する。
+
+## 2026-10-03 - Collection を Account または Room に配置する
+
+状態: 採用・詳細保留
+
+Collection は Board を掲載する一覧であり、必ず一つの Account または Room に配置する。Collection 自体を NiiMap の座標へ直接配置しない。Account と Room には初期 Collection として `Main` を作成するが、新しく作成した Board を Main へ自動掲載しない。
+
+Board は一つの主配置先を持ち、主配置先には Collection または NiiMap の座標を指定する。Account や Room を Board の直接の配置先にはせず、Collection を介して掲載する。これにより、Board から Collection、その配置先である Account または Room へ掲載経路を辿れるようにする。
+
+Account の初期状態では、Main Collection 内にブログ用 Board を用意する方向とする。初期 Collection と初期 Board の削除、再作成、名称変更などの詳細は Account と Board の実装時に確定する。
+
+## 2026-10-03 - RoomPane に表示する Collection を選択する
+
+状態: 採用・詳細保留
+
+RoomPane に表示する Board は、Main 固定ではなく、Room 管理者が選択した一つの Collection から取得する。初期状態では Main を表示用 Collection とするが、公式情報や交流などの運用に応じて別の Collection へ変更できるようにする。
+
+RoomPane では表示用 Collection から更新の新しい Board を最大三件表示し、`もっと見る`から Collection ごとの Board 一覧へ遷移する案を初期方針とする。Account と Room の Board 一覧では、Main とカスタム Collection をタブで切り替える。表示件数とタブ構成の具体的な UI は Room 実装時に調整する。
+
+## 2026-10-03 - Collection は Board と Collection を参照できる
+
+状態: 採用・詳細保留
+
+Collection は、自身を主配置先とする Board に加えて、別の Board および別の Collection を参照できる。参照先は複製せず、参照元から解除しても対象本体を削除しない。参照先 Collection の内容が変わった場合は参照元の表示にも反映する。
+
+Collection 間の循環参照は禁止する。複数経路から同じ Board に到達した場合の重複排除、参照 Collection の見出し表示、並び順などは Collection 実装時に確定する。DB では Collection が対象 ID の配列を直接持つ形ではなく、掲載順や関係種別を保持できる中間モデルで表現する。
+
+Board の Owner は Account または Room とし、主配置先や参照先とは分離する。別の Collection から参照されても Owner は変わらない。Board を作成した実 Account は監査用情報として内部に保持する方向とし、管理権限の追加は BoardPolicy で表現する。Owner の移譲と複数管理者の詳細は実装時に確定する。
