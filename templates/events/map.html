@@ -59,7 +59,7 @@
         <details><summary>制限</summary><div class="thread-rules">{% for capability, label in rule_capabilities %}<section class="thread-rule" data-capability="{{ capability }}"><strong>{{ label }}</strong><div class="thread-rule-list"></div><button class="thread-rule-add" type="button">＋ 条件を追加</button></section>{% endfor %}</div></details>
         <button class="button primary" type="submit" data-pending-label="作成中...">作成する</button>
       </form>
-      {% for thread in threads %}<section class="thread-detail" data-thread-detail-pane="{{ thread.pk }}" data-thread-title="{{ thread.title }}" data-thread-post-count="{{ thread.posts.all|length }}" hidden>{% include 'events/partials/thread_detail_content.html' with thread=thread %}</section>{% endfor %}
+      {% for thread in threads %}{% include 'events/partials/thread_detail.html' with thread=thread thread_detail_hidden=True %}{% endfor %}
     </aside>
     <dialog id="thread-rule-dialog" class="thread-rule-dialog"><form method="dialog"><div class="thread-rule-dialog-header"><h2>条件を追加</h2><button class="icon-button" value="cancel" aria-label="閉じる">×</button></div><div class="thread-rule-candidates"><button type="button" data-audience="guest">Guest</button><button type="button" data-audience="account">NiixyAccount</button></div></form></dialog>
     <template id="thread-interface-selector-template"><section id="thread-interface-selector" class="ui-list-pane thread-interface-list-pane" aria-label="ThreadIF一覧">
@@ -97,4 +97,4 @@
 {{ available_account_condition_catalog|json_script:'available-account-condition-catalog-data' }}
 {{ niimap_search_state|json_script:'niimap-search-state-data' }}
 {% endblock %}
-{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'rooms/forms.js' %}?v=20261004-1"></script><script src="{% static 'events/map.js' %}?v=20261004-17"></script>{% endblock %}
+{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'rooms/forms.js' %}?v=20261004-1"></script><script src="{% static 'events/map.js' %}?v=20261004-18"></script>{% endblock %}

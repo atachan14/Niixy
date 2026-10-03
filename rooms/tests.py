@@ -273,6 +273,32 @@ class RoomViewTests(TestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(thread.posts.count(), 2)
 
+    def test_board_thread_uses_shared_detail_and_membership_from_account_page(self):
+        thread = Thread.objects.create(creator=self.owner, title='Shared Detail')
+        ThreadPost.objects.create(thread=thread, number=1, creator=self.owner, body='本文')
+        ThreadPlacement.objects.create(thread=thread, kind=ThreadPlacement.BOARD, board=self.board)
+        ThreadAccessRule.objects.create(thread=thread, capability='view', audience='account')
+        ThreadAccessRule.objects.create(thread=thread, capability='write', audience='account')
+        account_url = reverse('accounts:thread-detail', args=[self.owner.username, thread.pk])
+        room_url = reverse('rooms:thread-detail', args=[self.room.pk, thread.pk])
+
+        self.client.force_login(self.outsider)
+        outsider_response = self.client.get(account_url)
+
+        self.assertContains(outsider_response, 'class="thread-detail"')
+        self.assertContains(outsider_response, f'{self.room.name} / {self.board.name}')
+        self.assertNotContains(outsider_response, 'class="thread-reply-form"')
+
+        RoomMembership.objects.create(room=self.room, account=self.member)
+        self.client.force_login(self.member)
+        account_response = self.client.get(account_url)
+        room_response = self.client.get(room_url)
+
+        self.assertContains(account_response, 'class="thread-reply-form"')
+        self.assertContains(room_response, 'class="thread-reply-form"')
+        self.assertContains(account_response, 'data-thread-id=', count=1)
+        self.assertContains(room_response, 'data-thread-id=', count=1)
+
     def test_niimap_lists_room_but_not_room_internal_thread(self):
         thread = Thread.objects.create(creator=self.owner, title='Room Only Thread')
         ThreadPost.objects.create(thread=thread, number=1, creator=self.owner, body='本文')

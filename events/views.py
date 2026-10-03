@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-from django.db.models import Max, Prefetch
+from django.db.models import Max
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -27,31 +27,10 @@ from rooms.models import Room
 from .forms import ThreadCreateForm, ThreadPostForm
 from .idempotency import run_once, submission_id_from
 from .models import Locality, NiiMapFilterPreference, Station, Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
-from .services import prepare_thread_modules
+from .services import prepare_thread_for_view, prepare_thread_modules, thread_queryset
 
 
 CAPABILITIES = (ThreadAccessRule.VIEW, ThreadAccessRule.WRITE)
-
-
-def thread_queryset():
-    return (
-        Thread.objects.select_related('creator__niixy_profile')
-        .prefetch_related(
-            'access_rules',
-            Prefetch(
-                'placements',
-                queryset=ThreadPlacement.objects.select_related(
-                    'board__placement__collection__room',
-                ),
-            ),
-            Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
-            'interface_implementations__version__interface__creator',
-            'interface_implementations__values__field',
-            'direct_fields__version__definition__creator',
-            'direct_fields__binding__value',
-            'field_bindings__value',
-        )
-    )
 
 
 def map_view(request):
@@ -69,8 +48,7 @@ def map_view(request):
     )
     rooms = list(Room.objects.select_related('owner__niixy_profile', 'placement'))
     for thread in threads:
-        thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
-        thread.can_write = thread.allows(request.user, ThreadAccessRule.WRITE)
+        prepare_thread_for_view(thread, request.user)
 
     markers = []
     for thread in threads:

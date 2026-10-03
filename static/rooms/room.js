@@ -171,26 +171,11 @@ document.addEventListener('submit', (event) => {
 });
 
 roomDetailContent.addEventListener('submit', async (event) => {
-  const form = event.target.closest('.room-thread-reply-form');
+  const form = event.target.closest('.thread-reply-form');
   if (!form) return;
   event.preventDefault();
-  form.dataset.submissionId ||= crypto.randomUUID();
-  const data = new FormData(form);
-  data.append('submission_id', form.dataset.submissionId);
-  const pending = NiixyUI.beginPendingAction(form.querySelector('[type="submit"]'));
-  if (!pending) return;
-  const error = form.querySelector('.reply-form-error');
-  error.hidden = true;
-  try {
-    const response = await fetch(form.action, {method: 'POST', body: data});
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '送信に失敗しました。');
-    await openThread(roomDetailContent.querySelector('[data-thread-id]').dataset.threadId, false);
-  } catch (exception) {
-    error.textContent = exception.message;
-    error.hidden = false;
-    pending.restore();
-  }
+  const result = await NiixyUI.submitThreadReply(form, event.submitter);
+  if (result) await openThread(roomDetailContent.querySelector('[data-thread-id]').dataset.threadId, false);
 });
 
 window.addEventListener('popstate', () => location.reload());

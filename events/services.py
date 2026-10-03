@@ -1,6 +1,41 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
 
 from interfaces.services import prepare_thread_fields
+
+from .models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
+
+
+def thread_queryset():
+    return (
+        Thread.objects.select_related('creator__niixy_profile')
+        .prefetch_related(
+            'access_rules',
+            Prefetch(
+                'placements',
+                queryset=ThreadPlacement.objects.select_related(
+                    'board__placement__collection__room',
+                ),
+            ),
+            Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
+            'interface_implementations__version__interface__creator',
+            'interface_implementations__values__field',
+            'direct_fields__version__definition__creator',
+            'direct_fields__binding__value',
+            'field_bindings__value',
+        )
+    )
+
+
+def prepare_thread_for_view(thread, viewer):
+    from rooms.services import room_for_thread
+
+    thread.can_view = thread.allows(viewer, ThreadAccessRule.VIEW)
+    room = room_for_thread(thread)
+    thread.can_write = thread.allows(viewer, ThreadAccessRule.WRITE) and (
+        room is None or room.has_member(viewer)
+    )
+    return thread
 
 
 def prepare_thread_modules(data):

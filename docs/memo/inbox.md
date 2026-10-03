@@ -26,8 +26,6 @@
 
 
 
-
-
 ## Idea
 
 "Follow"は"watch"にしようかな？

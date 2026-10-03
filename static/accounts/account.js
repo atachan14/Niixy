@@ -23,10 +23,10 @@ const accountIdentity = document.getElementById('account-page-identity');
 const accountListTitle = document.getElementById('account-list-title');
 const profileStack = NiixyUI.createWorkspace(accountWorkspace, {
   overview: {root: true},
-  list: {target: '.account-thread-pane'},
-  detail: {target: '.account-thread-detail-pane'},
-  'module-list': {target: '.profile-module-list-pane'},
-  'module-detail': {target: '.profile-module-management .ui-detail-pane'},
+  list: {target: '.account-thread-pane', width: 'fixed'},
+  detail: {target: '.account-thread-detail-pane', width: 'remaining'},
+  'module-list': {target: '.profile-module-list-pane', width: 'fixed'},
+  'module-detail': {target: '.profile-module-management .ui-detail-pane', width: 'remaining'},
 }, {track: document.querySelector('.account-track')});
 const profileFeatures = NiixyUI.createFeatureWorkspaceController(document.querySelector('.account-track'));
 let activeModuleState = {type: 'element', subtype: 'field', collection: 'self'};
@@ -314,33 +314,11 @@ paneContainer.addEventListener('click', (event) => {
 });
 
 threadDetailContainer.addEventListener('submit', async (event) => {
-  const form = event.target.closest('.account-thread-reply-form');
+  const form = event.target.closest('.thread-reply-form');
   if (!form) return;
   event.preventDefault();
-  const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
-  const error = form.querySelector('.reply-form-error');
-  if (!pending) return;
-  error.hidden = true;
-  const data = new FormData(form);
-  form.dataset.submissionId ||= crypto.randomUUID();
-  data.append('submission_id', form.dataset.submissionId);
-  let sent = false;
-  try {
-    const response = await fetch(form.action, {method: 'POST', body: data});
-    const result = await response.json();
-    if (response.ok) {
-      sent = true;
-      location.reload();
-      return;
-    }
-    error.textContent = result.error || Object.values(result.errors || {}).flat().join(' ') || '送信に失敗しました。';
-    error.hidden = false;
-  } catch {
-    error.textContent = '通信に失敗しました。もう一度お試しください。';
-    error.hidden = false;
-  } finally {
-    if (!sent) pending.restore();
-  }
+  const result = await NiixyUI.submitThreadReply(form, event.submitter);
+  if (result) location.reload();
 });
 
 function applyStateFromUrl() {

@@ -1,1 +1,1 @@
-<section class="account-thread-detail" data-thread-detail-pane="{{ thread.pk }}" data-thread-title="{{ thread.title }}" data-thread-post-count="{{ thread.posts.all|length }}">{% include 'events/partials/thread_detail_content.html' with thread=thread reply_form_class='account-thread-reply-form thread-reply-form' %}</section>
+{% include 'events/partials/thread_detail.html' with thread=thread %}

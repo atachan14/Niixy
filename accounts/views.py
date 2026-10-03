@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
+from events.services import prepare_thread_for_view, thread_queryset
 
 from .forms import DisplayNameForm, LoginForm, SignUpForm
 from .models import AccountCondition, AccountProfile
@@ -216,20 +217,10 @@ def account_module_interface_detail(request, username, interface_id):
 def account_thread_detail(request, username, thread_id):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     thread = get_object_or_404(
-        Thread.objects.select_related('creator')
-        .prefetch_related(
-            'access_rules',
-            Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
-            Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
-            'interface_implementations__version__interface__creator',
-            'interface_implementations__values__field',
-        )
-        .filter(Q(creator=account) | Q(posts__creator=account, posts__number__gt=1))
-        .distinct(),
+        thread_queryset().filter(Q(creator=account) | Q(posts__creator=account, posts__number__gt=1)).distinct(),
         pk=thread_id,
     )
-    thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
-    thread.can_write = thread.allows(request.user, ThreadAccessRule.WRITE)
+    prepare_thread_for_view(thread, request.user)
     return render(request, 'accounts/partials/thread_detail.html', {
         'thread': thread,
     })

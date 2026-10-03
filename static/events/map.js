@@ -1626,17 +1626,20 @@ workspace.addEventListener('click', (event) => {
 workspace.addEventListener('submit', async (event) => {
   const roomAction = event.target.closest('[data-room-fragment] [data-room-action]');
   const boardCreate = event.target.closest('.niimap-room-thread-list-pane [data-board-thread-create]');
-  const roomReply = event.target.closest('.niimap-room-thread-detail-pane .room-thread-reply-form');
+  const roomReply = event.target.closest('.niimap-room-thread-detail-pane .thread-reply-form');
+  if (roomReply) {
+    event.preventDefault();
+    const result = await NiixyUI.submitThreadReply(roomReply, event.submitter);
+    const threadId = roomReply.closest('[data-thread-id]')?.dataset.threadId;
+    if (result && threadId) await openEmbeddedRoomThread(threadId, false);
+    return;
+  }
   const form = roomAction || boardCreate || roomReply;
   if (!form) return;
   event.preventDefault();
   const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
   if (!pending) return;
   const data = new FormData(form);
-  if (roomReply) {
-    form.dataset.submissionId ||= crypto.randomUUID();
-    data.append('submission_id', form.dataset.submissionId);
-  }
   const error = form.querySelector('.room-form-error, .reply-form-error');
   if (error) error.hidden = true;
   try {
@@ -1652,9 +1655,6 @@ workspace.addEventListener('submit', async (event) => {
       const board = {...activeRoomBoard};
       await openEmbeddedBoard(board.id, board.title, board.url, false);
       await openEmbeddedRoomThread(result.thread_id);
-    } else {
-      const threadId = roomReply.closest('[data-thread-id]')?.dataset.threadId;
-      if (threadId) await openEmbeddedRoomThread(threadId, false);
     }
   } catch (exception) {
     if (error) {
@@ -1707,25 +1707,11 @@ roomCreateForm.addEventListener('submit', async (event) => {
 });
 document.querySelectorAll('.thread-reply-form').forEach((form) => form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
-  if (!pending) return;
-  let sent = false;
-  const data = csrf(form);
-  form.dataset.submissionId ||= crypto.randomUUID();
-  data.append('submission_id', form.dataset.submissionId);
-  try {
-    const response = await fetch(form.action, {method: 'POST', body: data});
-    const result = await response.json();
-    if (response.ok) {
-      sent = true;
-      const threadId = form.closest('[data-thread-detail-pane]')?.dataset.threadDetailPane;
-      if (threadId) saveResumeState(threadId);
-      location.assign(result.redirect_url);
-      return;
-    }
-  } finally {
-    if (!sent) pending.restore();
-  }
+  const result = await NiixyUI.submitThreadReply(form, event.submitter);
+  if (!result) return;
+  const threadId = form.closest('[data-thread-detail-pane]')?.dataset.threadDetailPane;
+  if (threadId) saveResumeState(threadId);
+  location.assign(result.redirect_url);
 }));
 document.getElementById('current-location-trigger').addEventListener('click', () => {
   navigator.geolocation?.getCurrentPosition(

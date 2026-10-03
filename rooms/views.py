@@ -9,8 +9,7 @@ from django.views.decorators.http import require_POST
 
 from events.idempotency import run_once, submission_id_from
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
-from events.services import prepare_thread_modules
-from events.views import thread_queryset
+from events.services import prepare_thread_modules, thread_queryset
 from interfaces.services import save_thread_fields, thread_field_catalog, thread_interface_catalog
 
 from .forms import BoardThreadCreateForm, RoomCreateForm, RoomEditForm
