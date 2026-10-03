@@ -239,3 +239,13 @@ Collection は、自身を主配置先とする Board に加えて、別の Boar
 Collection 間の循環参照は禁止する。複数経路から同じ Board に到達した場合の重複排除、参照 Collection の見出し表示、並び順などは Collection 実装時に確定する。DB では Collection が対象 ID の配列を直接持つ形ではなく、掲載順や関係種別を保持できる中間モデルで表現する。
 
 Board の Owner は Account または Room とし、主配置先や参照先とは分離する。別の Collection から参照されても Owner は変わらない。Board を作成した実 Account は監査用情報として内部に保持する方向とし、管理権限の追加は BoardPolicy で表現する。Owner の移譲と複数管理者の詳細は実装時に確定する。
+
+## 2026-10-03 - Profile を Account と Room の共通表現領域とする
+
+状態: 採用・詳細保留
+
+Profile は Account の公開ページ全体を指す名称ではなく、Account と Room が自身の情報やコンテンツを表現する共通領域とする。この領域を ProfileArea と呼び、ProfileLayout によって内容と配置を定義する。
+
+Account と Room は、Niixy の独立した Field ではない基本情報として自由記述の Description を持つ。ProfileLayout は Description の表示を任意とし、ほかの Field、Timeline、Thread、Board なども縦横に配置できるようにする。ProfileArea は Layout によってページの主要コンテンツにも補助的な領域にもなり得るため、About や Overview とは呼ばない。
+
+画面全体の内部名称は、対象 Account を閲覧する画面を AccountPage、対象 Room を閲覧する画面を RoomPage とする。MyPage はログイン中 Account が情報や機能を管理する本人用画面として区別する。利用者向けの導線では、AccountPage を従来どおり `Profile` と表示してもよい。
