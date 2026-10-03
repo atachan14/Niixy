@@ -76,6 +76,8 @@ Status: Complete
 
 ## v0.5 - Interface Foundation
 
+Status: Complete
+
 最初の ThreadInterface 作成・適用基盤を追加する。独立した Field と FieldVersion、InterfaceVersion と編集途中の Draft を分離し、複数 Interface を一つの Thread に適用できる状態を目指す。
 
 主な対象:
