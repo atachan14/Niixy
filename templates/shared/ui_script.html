@@ -132,6 +132,9 @@ window.NiixyUI = (() => {
     let resizeFrame = null;
 
     const align = () => {
+      // Workspace positioning is controlled only by the track transform.
+      // Native horizontal scrolling can be introduced by scrollIntoView().
+      viewport.scrollLeft = 0;
       const definition = stages[currentStage];
       if (!definition || definition.root) {
         viewport.dataset.uiWorkspaceWidth = 'full';

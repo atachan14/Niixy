@@ -281,7 +281,13 @@ async function openDetail(threadId, postNumber = null, shouldUpdateUrl = true) {
   const target = postNumber ? detail.querySelector(`[data-thread-post-number="${postNumber}"]`) : null;
   if (target) {
     target.classList.add('is-response-target');
-    target.scrollIntoView({behavior: 'smooth', block: 'center'});
+    const detailPane = document.querySelector('.account-thread-detail-pane');
+    const paneRect = detailPane.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const centeredTop = detailPane.scrollTop
+      + targetRect.top - paneRect.top
+      - ((detailPane.clientHeight - targetRect.height) / 2);
+    detailPane.scrollTo({top: Math.max(0, centeredTop), behavior: 'smooth'});
     highlightTimer = window.setTimeout(() => target.classList.remove('is-response-target'), 2200);
   } else {
     document.querySelector('.account-thread-detail-pane').scrollTo({top: 0});
