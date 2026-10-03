@@ -31,7 +31,7 @@
       <input id="signup-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required>
     </div>
     <p class="auth-note">Email Addressを登録しないため、Passwordを忘れた場合は復旧できません。</p>
-    <button class="button primary" type="submit">Accountを作成</button>
+    <button class="button primary" type="submit" data-pending-label="作成中...">Accountを作成</button>
   </form>
 
   <form id="login-form" class="auth-form" method="post" action="{% url 'accounts:login' %}" novalidate hidden>
@@ -45,6 +45,6 @@
       <label for="login-password">Password</label>
       <input id="login-password" name="password" type="password" autocomplete="current-password" required>
     </div>
-    <button class="button primary" type="submit">ログイン</button>
+    <button class="button primary" type="submit" data-pending-label="ログイン中...">ログイン</button>
   </form>
 </dialog>

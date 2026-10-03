@@ -1276,6 +1276,8 @@ searchForm.querySelectorAll('[data-search-select]').forEach((button) => button.a
 document.getElementById('niimap-search-reset').addEventListener('click', () => restoreSearchState(emptySearchState()));
 searchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const pending = NiixyUI.beginPendingAction(event.submitter || searchForm.querySelector('[type="submit"]'));
+  if (!pending) return;
   const error = document.getElementById('niimap-search-error'); error.hidden = true; error.textContent = '';
   const data = new FormData(searchForm); const conditions = searchConditions();
   data.append('creator_include_groups', JSON.stringify(conditions.creator_include_groups));
@@ -1293,6 +1295,8 @@ searchForm.addEventListener('submit', async (event) => {
     if (searchControls.open) searchControls.open = false;
   } catch {
     error.textContent = '検索に失敗しました。'; error.hidden = false;
+  } finally {
+    pending.restore();
   }
 });
 restoreSearchState(initialSearchState());
@@ -1306,9 +1310,8 @@ list.addEventListener('click', (event) => {
 });
 createForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const button = createForm.querySelector('button[type="submit"]');
-  if (button.disabled) return;
-  button.disabled = true; button.textContent = '投稿中...';
+  const pending = NiixyUI.beginPendingAction(event.submitter || createForm.querySelector('[type="submit"]'));
+  if (!pending) return;
   let created = false;
   try {
     const response = await fetch(createForm.action, {method: 'POST', body: createFormData(), headers: {'X-Requested-With': 'XMLHttpRequest'}});
@@ -1323,14 +1326,13 @@ createForm.addEventListener('submit', async (event) => {
     error.textContent = Object.values(data.errors || {}).flat().join(' ');
     error.hidden = false;
   } finally {
-    if (!created) { button.disabled = false; button.textContent = '作成する'; }
+    if (!created) pending.restore();
   }
 });
 document.querySelectorAll('.thread-reply-form').forEach((form) => form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const button = form.querySelector('button[type="submit"]');
-  if (button.disabled) return;
-  button.disabled = true; button.textContent = '送信中...';
+  const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
+  if (!pending) return;
   let sent = false;
   const data = csrf(form);
   form.dataset.submissionId ||= crypto.randomUUID();
@@ -1346,7 +1348,7 @@ document.querySelectorAll('.thread-reply-form').forEach((form) => form.addEventL
       return;
     }
   } finally {
-    if (!sent) { button.disabled = false; button.textContent = '送信'; }
+    if (!sent) pending.restore();
   }
 }));
 document.getElementById('current-location-trigger').addEventListener('click', () => {

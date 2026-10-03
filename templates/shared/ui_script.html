@@ -1,5 +1,35 @@
 <script>
 window.NiixyUI = (() => {
+  function beginPendingAction(button, label = button?.dataset.pendingLabel) {
+    if (!button || button.dataset.uiPending === 'true') return null;
+    const form = button.form;
+    const state = {
+      buttonDisabled: button.disabled,
+      buttonHtml: button.innerHTML,
+      buttonAriaBusy: button.getAttribute('aria-busy'),
+      formAriaBusy: form?.getAttribute('aria-busy') ?? null,
+    };
+    button.dataset.uiPending = 'true';
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    if (form) form.setAttribute('aria-busy', 'true');
+    if (label) button.textContent = label;
+
+    return {
+      restore() {
+        button.disabled = state.buttonDisabled;
+        button.innerHTML = state.buttonHtml;
+        if (state.buttonAriaBusy === null) button.removeAttribute('aria-busy');
+        else button.setAttribute('aria-busy', state.buttonAriaBusy);
+        delete button.dataset.uiPending;
+        if (form) {
+          if (state.formAriaBusy === null) form.removeAttribute('aria-busy');
+          else form.setAttribute('aria-busy', state.formAriaBusy);
+        }
+      },
+    };
+  }
+
   async function fetchFragment(url, selector = null) {
     const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error('UI fragment request failed');
@@ -267,6 +297,6 @@ window.NiixyUI = (() => {
     if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
   }))).observe(document.body, {childList: true, subtree: true});
 
-  return {bindAccordions, bindModuleFilters, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, showPaneError};
+  return {beginPendingAction, bindAccordions, bindModuleFilters, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, showPaneError};
 })();
 </script>

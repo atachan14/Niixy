@@ -59,21 +59,30 @@ authDialog.addEventListener('click', (event) => {
 authForms.forEach((form) => {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
+    if (!pending) return;
     clearAuthErrors(form);
+    let authenticated = false;
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const data = await response.json();
 
-    const response = await fetch(form.action, {
-      method: 'POST',
-      body: new FormData(form),
-      credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    });
-    const data = await response.json();
+      if (response.ok) {
+        authenticated = true;
+        window.location.reload();
+        return;
+      }
 
-    if (response.ok) {
-      window.location.reload();
-      return;
+      showAuthErrors(form, data.errors || {});
+    } catch {
+      showAuthErrors(form, {__all__: ['通信に失敗しました。もう一度お試しください。']});
+    } finally {
+      if (!authenticated) pending.restore();
     }
-
-    showAuthErrors(form, data.errors || {});
   });
 });

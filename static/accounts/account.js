@@ -317,11 +317,9 @@ threadDetailContainer.addEventListener('submit', async (event) => {
   const form = event.target.closest('.account-thread-reply-form');
   if (!form) return;
   event.preventDefault();
-  const button = form.querySelector('button[type="submit"]');
+  const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
   const error = form.querySelector('.reply-form-error');
-  if (button.disabled) return;
-  button.disabled = true;
-  button.textContent = '送信中...';
+  if (!pending) return;
   error.hidden = true;
   const data = new FormData(form);
   form.dataset.submissionId ||= crypto.randomUUID();
@@ -341,10 +339,7 @@ threadDetailContainer.addEventListener('submit', async (event) => {
     error.textContent = '通信に失敗しました。もう一度お試しください。';
     error.hidden = false;
   } finally {
-    if (!sent) {
-      button.disabled = false;
-      button.textContent = '送信';
-    }
+    if (!sent) pending.restore();
   }
 });
 

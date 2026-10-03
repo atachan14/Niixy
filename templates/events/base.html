@@ -60,7 +60,7 @@
   {% include 'shared/ui_script.html' %}
   {% block scripts %}{% endblock %}
   {% if not user.is_authenticated %}
-    <script src="{% static 'accounts/auth.js' %}"></script>
+    <script src="{% static 'accounts/auth.js' %}?v=20261003-1"></script>
   {% endif %}
 </body>
 </html>
