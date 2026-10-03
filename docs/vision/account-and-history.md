@@ -2,7 +2,7 @@
 
 ## Account ページ
 
-将来の Account ページは、単なるログイン設定画面ではなく、公開プロフィールと活動履歴を扱う。アカウントのサムネイル、表示名、Niixy ID、選択した AccountInterface の情報、作成した Interface、活動数、Thread、ThreadPost、Book、将来的には Event 参加、Tweet、Room の履歴を表示できるようにする。
+将来の AccountPage は、単なるログイン設定画面ではなく、公開プロフィールと活動履歴を扱う。アカウントのサムネイル、表示名、Niixy ID、選択した AccountInterface の情報、作成した Interface、活動数、Thread、ThreadPost、Board、Collection、将来的には Event 参加、Tweet、Room の履歴を表示できるようにする。
 
 表示名は Niixy ID とは別の、重複を許可する呼び名である。空欄を許可し、絵文字は使わない。表示幅は全角 12 文字・半角 24 文字相当までとする。多くの画面では `表示名 @NiixyID` を基本の表示順とするが、DisplayLayout を含むすべての画面に強制する共通レイアウトにはしない。
 
@@ -14,9 +14,11 @@ MyPage は、本人だけが使う Account の管理ハブとする。公開 Acc
 
 MyPage は将来、Album とサムネイルの管理、AccountInterface の実装・作成・更新、ProfileLayout の選択・作成・更新を担当する。Profile 側のサムネイルは Album を閲覧する導線とし、本人であっても画像の変更などの管理操作は MyPage 側から行う。フォロー管理、参加中 Room、通知などの本人用機能も後続で MyPage に追加する。
 
-## Book と購読
+## Board と Collection
 
-Account は Book を作成でき、他者の公開 Book を購読できる。Account ページでは作成した Book と購読中の Book を扱う。Book は日記やブログを含む Thread のコレクションであり、独立した Note 投稿形式は作らない。
+AccountはCollectionを作成し、Boardを掲載できる。初期状態ではMain Collectionとブログ用Boardを用意する方向とする。日記やブログは独立したNote投稿形式を作らず、Board内のThreadとBoardの表示方法で表現する。
+
+他者のBoardを自分のCollectionへ追加する操作は参照として扱い、Board本体のOwnerや主配置先を変更しない。BoardのFollowは設けず、Collectionへの追加と将来の通知購読を別の機能として扱う。
 
 ## Album とサムネイル
 
@@ -24,4 +26,4 @@ Niixy では一般的なアバターを使わない。Account は自由に画像
 
 ## 保留する機能
 
-Account ページ、Book、Album、画像モデレーション、アカウント評価、紹介文、フォロー、Tweet、Event 参加は v0.3 の対象外である。
+ProfileArea、BoardとCollectionのAccount向け管理、Album、画像モデレーション、アカウント評価、フォロー、Tweet、Event参加はv0.6の対象外である。

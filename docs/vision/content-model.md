@@ -2,7 +2,7 @@
 
 ## Thread
 
-Thread は Niixy 上の会話の単位である。NiiMap に直接、または Room や Book の中で作成できる。Thread は Event や Pin ではない。
+Thread は Niixy 上の会話の単位である。NiiMap に直接、または Board の中で作成できる。Thread は Event や Pin ではない。
 
 Thread はタイトル、作成者、作成日時、更新日時、`last_activity_at`、必須の開始 ThreadPost（`#1`）を持つ。作成時にはタイトルと開始本文を同時に入力する。Thread Title は作成後に編集しない。
 
@@ -24,23 +24,29 @@ Version 更新では、旧 Version の削除と新 Version の追加を利用者
 
 Interface の追加、削除、実装値編集、Version 更新は構造化された履歴として保持する。Thread の時系列上で変更時点を示すシステム Response として表示し、`#1` の ThreadInterface 領域から更新履歴を一覧できるようにする案を有力とする。具体的な表示と、システム Response の投稿番号・Response 数への扱いは実装時に決める。
 
-## Book
+## Collection
 
-Book は Thread をテーマや用途ごとにまとめ、公開・購読できるコレクションである。日記、ブログ、料理レシピ、ゲームレビューなどは、独立した Note モデルではなく、Book に配置した Thread として表す。`#1` が記事本文、Response がコメントとして機能する。
+Collection は Board を掲載する一覧であり、一つの Account または Room に配置する。Collection 自体は NiiMap へ配置しない。Account と Room には初期 Collection として `Main` を用意するが、通常の Board 作成時には配置先 Collection を利用者が選ぶ。
 
-Book は作成者、タイトル、説明、公開条件、購読者、Book 内の Thread に適用する ThreadInterface と DisplayLayout を持つ。Book 内の Thread は同じ表示ルールを使う。初期方針では Book 作成者だけが Thread を追加できるものとし、共同投稿や投稿権限の拡張は後続で検討する。
+Collection は Board と別の Collection を参照できる。参照先を複製せず、参照解除によって対象本体を削除しない。Collection 間の循環参照は禁止し、複数経路から同じ Board に到達した場合の表示規則は Collection 管理機能の実装時に確定する。
 
-新規 Account には「日記」という空の Book を初期作成する。不要な場合は削除できる。Account の Book 一覧では、作成した Book と購読中の Book を区別して表示する。
+## Board
+
+Board は Thread をテーマや用途ごとにまとめるコンテナである。会話、告知、日記、ブログ、料理レシピ、ゲームレビューなどを、独立した投稿モデルではなく Board 内の Thread として表す。用途ごとの差は BoardPolicy、ThreadPostLayout、Board の表示方法で表現する。
+
+Board は一つの Owner と、一つの主配置先を持つ。Owner は Account または Room とし、主配置先は Collection または NiiMap の座標とする。Owner、主配置先、追加の参照先は分離し、別の Collection から参照されても Owner を変更しない。
+
+Room 作成時には、Room の Main Collection 内に `最初のBoard`を自動作成する。Board を使用しない Room も認め、Board 管理機能の実装後は最後の Board も削除できるようにする。Account の初期 Main Collectionにはブログ用 Board を用意する方向とするが、Account側の導入時期と詳細は実装時に決める。
 
 ## ThreadPlacement
 
-ThreadPlacement は Thread の掲載先または共有先を表す。主掲載先、Room や Book への共有、掲載先の移動、掲載履歴を扱うため、Thread から独立したモデルにする。
+ThreadPlacement は Thread の掲載先または共有先を表す。主掲載先、Board への参照、掲載先の移動、掲載履歴を扱うため、Thread から独立したモデルにする。
 
-NiiMap への配置は地図表示に必要な地点情報を持つ。Room や Book への配置は、それぞれのコンテナと Thread を結ぶ。v0.3 は NiiMap への配置のみを実装し、Room と Book に対応するためのモデル境界は維持する。
+NiiMap への配置は地図表示に必要な地点情報を持つ。Board への配置は Board と Thread を結ぶ。同じ Thread を別の Board から参照する場合も Thread を複製せず、主配置と参照を区別できる関係として保持する。
 
 ## 活動日時
 
-`last_activity_at` は Thread または Room に対する最後の意味のある操作日時である。活動中のコンテンツの並び順に使い、Thread 作成、ThreadPost 作成、関連する Interface の更新、掲載先変更、再掲載などで更新する。
+`last_activity_at` は Thread、Board、Collection、Room に対する最後の意味のある操作日時である。活動中のコンテンツの並び順に使い、Thread 作成、ThreadPost 作成、関連する Interface の更新、掲載先変更、再掲載などで更新する。上位対象へどこまで活動を伝播するかは、各対象の実装時に確定する。
 
 ## 投稿時点のスナップショット
 

@@ -85,13 +85,13 @@ Layout は Thumbnail、表示名、Niixy ID、投稿番号、投稿日時、Acco
 
 ### ProfileLayout
 
-ProfileLayout は、Account ページのプロフィール領域を表示する Layout である。必要な Field を宣言し、Account の共通 Item と合わせて配置する。Account が必要な Field を持たない場合は、その Field を含む AccountInterface の実装を案内する。
+ProfileLayout は、AccountPageとRoomPageのProfileAreaを表示するLayoutである。AccountまたはRoomが基本情報として持つDescriptionのほか、必要なField、Timeline、Thread、Boardなどを配置できる。対象が必要なFieldを持たない場合は、そのFieldを含むInterfaceの実装を案内する。
 
-ProfileLayout は Interface のフィールド定義や入力値を持たない。Interface の定義と Account ごとの実装値は Layout から独立して存在するため、Layout を変えても入力済みの情報を使い回せる。他者が作成した ProfileLayout をコピー、編集、保存、再利用できるようにする。
+ProfileLayout は Interface のフィールド定義や入力値を持たない。Interface の定義と対象ごとの実装値は Layout から独立して存在するため、Layout を変えても入力済みの情報を使い回せる。他者が作成した ProfileLayout をコピー、編集、保存、再利用できるようにする。
 
 用意した Slot と Item を並べる宣言的な Layout は有力な案だが、自由度、実装コスト、仕様の分かりやすさを踏まえて実装時に再検討する。DisplayLayout は、誰でも簡単に編集するための機能ではなく、詳しい利用者が高い自由度でカスタマイズするための機能として想定する。
 
-他者が作成した Layout をソースとしてコピーし、編集して別の対象で再利用したり、保存して使い回したりできるようにする。Book は Book 内の Thread に同じ ThreadInterface と ThreadPostLayout を要求できる。ProfileLayout の Snapshot、公開範囲、Version 管理の詳細は後続で決める。
+他者が作成した Layout をソースとしてコピーし、編集して別の対象で再利用したり、保存して使い回したりできるようにする。BoardはBoard内のThreadに同じThreadInterfaceとThreadPostLayoutを要求できる方向で設計する。ProfileLayoutのSnapshot、公開範囲、Version管理の詳細は後続で決める。
 
 ## 実装時に決めること
 

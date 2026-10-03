@@ -2,11 +2,11 @@
 
 ## SummaryList と SummaryItem
 
-SummaryList は、詳細表示の前に対象を要約して並べる一覧の表示パターンである。Thread、Room、Response、Tweet、Book など、異なる種類の対象に使える。SummaryItem は SummaryList 内の一件の要約表示である。
+SummaryList は、詳細表示の前に対象を要約して並べる一覧の表示パターンである。Thread、Room、Response、Tweet、Board、Collection など、異なる種類の対象に使える。SummaryItem は SummaryList 内の一件の要約表示である。
 
 各 SummaryItem は、対象ごとに異なる Header と概要情報を持つ。Item を選択すると、対応する DetailPane を直接開く。SummaryList 内で概要を展開するアコーディオンや、追加の「詳細を見る」操作は設けない。
 
-SummaryList はコンテンツの上位ドメイン概念ではない。Thread、Room、Response、Tweet、Book を同じデータモデルへ統合することを意味せず、一覧・選択・詳細表示という体験を共通化するための名称である。
+SummaryList はコンテンツの上位ドメイン概念ではない。Thread、Room、Response、Tweet、Board、Collection を同じデータモデルへ統合することを意味せず、一覧・選択・詳細表示という体験を共通化するための名称である。
 
 ## DetailPane
 

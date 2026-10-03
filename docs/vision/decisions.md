@@ -216,11 +216,13 @@ Board は安定 ID と変更可能な名称を持つ。BoardPolicy と Board 内
 
 状態: 採用・詳細保留
 
-Collection は Board を掲載する一覧であり、必ず一つの Account または Room に配置する。Collection 自体を NiiMap の座標へ直接配置しない。Account と Room には初期 Collection として `Main` を作成するが、新しく作成した Board を Main へ自動掲載しない。
+Collection は Board を掲載する一覧であり、必ず一つの Account または Room に配置する。Collection 自体を NiiMap の座標へ直接配置しない。Account と Room には初期 Collection として `Main` を作成する。通常の Board 新規作成時には配置先 Collection を利用者が選択し、Main へ自動掲載しない。
 
 Board は一つの主配置先を持ち、主配置先には Collection または NiiMap の座標を指定する。Account や Room を Board の直接の配置先にはせず、Collection を介して掲載する。これにより、Board から Collection、その配置先である Account または Room へ掲載経路を辿れるようにする。
 
 Account の初期状態では、Main Collection 内にブログ用 Board を用意する方向とする。初期 Collection と初期 Board の削除、再作成、名称変更などの詳細は Account と Board の実装時に確定する。
+
+Room の初期状態では、Main Collection 内に `最初のBoard`を自動作成する。Board を使わない Room も認め、Board 管理機能の実装後は最後の Board も削除できるようにする。
 
 ## 2026-10-03 - RoomPane に表示する Collection を選択する
 
@@ -249,3 +251,23 @@ Profile は Account の公開ページ全体を指す名称ではなく、Accoun
 Account と Room は、Niixy の独立した Field ではない基本情報として自由記述の Description を持つ。ProfileLayout は Description の表示を任意とし、ほかの Field、Timeline、Thread、Board なども縦横に配置できるようにする。ProfileArea は Layout によってページの主要コンテンツにも補助的な領域にもなり得るため、About や Overview とは呼ばない。
 
 画面全体の内部名称は、対象 Account を閲覧する画面を AccountPage、対象 Room を閲覧する画面を RoomPage とする。MyPage はログイン中 Account が情報や機能を管理する本人用画面として区別する。利用者向けの導線では、AccountPage を従来どおり `Profile` と表示してもよい。
+
+## 2026-10-03 - Room は一人の Owner と Account の参加者を持つ
+
+状態: 採用・詳細保留
+
+Room 作成時には、作成した Account を参加者かつ RoomOwner とする。存在する Room は常に一人の RoomOwner を持ち、RoomOwner は Owner である間は退出できない。将来は RoomOwner を別の参加者へ譲渡できるようにし、譲渡後の旧 Owner は通常の参加者として退出可能にする。
+
+Guest は継続的な関係を保存する Account を持たないため、RoomPolicy の設定にかかわらず Room へ参加できず、RoomOwner にもなれない。これは画面上で参加操作を隠すだけでなく、サーバー側でも常に保証する。Guest の閲覧や Guest 投稿など、Account への紐付けを必要としない操作は別の Policy として扱う。
+
+Room は参加条件を RoomPolicy として持てる方向で設計する。v0.6 では参加申請と参加条件を実装せず、ログイン済み Account が即時参加できる固定ルールから開始する。Room 内 Tag、複数管理者、Owner 譲渡は後続 Version で扱う。
+
+## 2026-10-03 - v0.6 は Room の基本的な共同利用を成立させる
+
+状態: 採用
+
+v0.6 は、Room の作成と NiiMap 配置、RoomPage、Main Collection と `最初のBoard`の自動作成、Room 参加、参加者による Board 内 Thread 作成と Response 投稿を対象にする。Room は NiiMap の Spot として検索・表示するが、Room 内部の Thread は NiiMap 検索対象に含めない。
+
+BoardPolicy と編集可能な RoomPolicy は後続 Version へ回す。v0.6 の Room 内書込は参加者だけに許可する固定ルールとし、Guest と非参加 Account は既存 ThreadPolicy が許す範囲で閲覧だけできる。ProfileArea と ProfileLayout の実装も v0.6 には含めない。
+
+RoomOwner の譲渡操作は後続 Version へ回すが、Room は最初から変更可能な Owner を一人保持するモデルにする。v0.6 では RoomOwner は退出できない。

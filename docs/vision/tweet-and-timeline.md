@@ -38,8 +38,9 @@ Account は Self、Follow、Fav、Bad の標準 Timeline を持つ。標準 Time
 
 - Thread は ThreadPost をまとめる会話単位である。
 - Timeline は Tweet を収集し、必要に応じて投稿先になる。
-- Room は Thread と Timeline を置く所属・活動の場である。
-- Book は `#1` を主コンテンツとする Thread のコレクションである。
-- NiiMap は Room、Thread、Timeline、Tweet を座標から発見する入口である。
+- Room は Collection と Timeline を置く所属・活動の場である。
+- Board は会話用、告知用、ブログ用などの Thread をまとめるコンテナである。
+- Collection は Board や別の Collection を掲載する一覧である。
+- NiiMap は Room、Board、Thread、Timeline、Tweet を座標から発見する入口である。
 
 Tweet と Timeline の詳細は、ThreadInterface 基盤より後の実装時に要件を確定する。

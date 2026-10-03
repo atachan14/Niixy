@@ -18,7 +18,13 @@ Thread の発見制限は持たない。Thread がどこに現れるかは Threa
 
 閲覧制限は Thread 本文と投稿一覧に、書込制限は返信作成に適用する。すべてサーバー側で再判定するため、URL を直接開いた場合や画面を改変した場合にも制限を回避できない。
 
-Room の共有と汎用 Policy を実装する前に、データ表現・継承・監査履歴を設計する。
+編集可能なRoomPolicyとBoardPolicyを実装する前に、条件、継承、監査履歴を設計する。
+
+## Room と Board
+
+Roomは閲覧条件と参加条件をRoomPolicyとして持てる方向で設計する。Guestは参加状態を保持できないため、RoomPolicyにかかわらずRoomへ参加できない。Room参加を必要としない閲覧やGuest投稿の可否は別のPolicyとして扱う。
+
+BoardPolicyとBoard内の個別ThreadPolicyはANDで評価する。v0.6ではRoomPolicyとBoardPolicyの編集を実装せず、ログイン済みAccountはRoomへ即時参加でき、Room参加者だけがBoard内でThread作成とResponse投稿を行える固定ルールを使用する。非参加者とGuestの閲覧可否は個別ThreadPolicyに従う。
 
 ## Account条件
 

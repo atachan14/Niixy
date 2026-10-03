@@ -92,6 +92,23 @@ Status: Complete
 
 ---
 
+## v0.6 - Room Foundation
+
+Status: Planned
+
+NiiMapへRoomを配置し、AccountがRoomへ参加して、Room内のBoardでThreadとResponseをやり取りできる最小の共同利用を完成させる。
+
+主な対象:
+
+* Roomの作成、基本情報編集、NiiMap配置
+* RoomPageとNiiMapでのRoom表示・検索
+* Main Collectionと「最初のBoard」の自動作成
+* ログイン済みAccountの即時参加・退出
+* RoomOwnerと参加者の区別
+* 参加者によるBoard内Thread作成・Response投稿
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。
@@ -121,19 +138,20 @@ v0.1以降のVersion番号や実装順序は固定しない。
 * Interface作成
 * Interface編集
 * EventとInterfaceの連携
-* CommunityとInterfaceの連携
+* RoomとInterfaceの連携
 
-### Community
+### Room / Board / Collection
 
-* Community作成
-* Community参加
-* Member管理
-* Community内Communication
+* RoomPolicyと参加申請
+* Room内Tagと複数管理者
+* BoardPolicy
+* BoardとCollectionの管理・参照
+* Room内部コンテンツを対象にしたNiiMap検索
 
 ### Service Integration
 
-* NiiMapとCommunityの連携
-* EventからCommunityへの接続
+* NiiMapとRoomの連携
+* ThreadからRoomへの接続
 * Niixy Accountによる各Serviceの共通利用
 
 実装順序は、各Versionの開発経験と必要性を基に決定する。
