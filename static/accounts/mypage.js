@@ -1,13 +1,11 @@
 const myPage = document.querySelector('.mypage');
 const workspace = document.querySelector('.mypage-workspace');
 const identity = document.getElementById('mypage-identity');
-const contextLabel = document.getElementById('mypage-context');
 const pageStack = NiixyUI.createWorkspace(document.querySelector('.mypage-viewport'), {
   overview: {root: true},
   basic: {target: '.basic-info-pane'},
-  interface: {target: '.interface-list-pane'},
+  module: {target: '.module-list-pane'},
   'interface-detail': {target: '.interface-detail-pane'},
-  field: {target: '.field-list-pane'},
   'field-detail': {target: '.field-detail-pane'},
   'synonym-list': {target: '[data-mypage-pane="add-synonym-list"]'},
   'synonym-detail': {target: '[data-mypage-pane="add-synonym-detail"]'},
@@ -15,16 +13,13 @@ const pageStack = NiixyUI.createWorkspace(document.querySelector('.mypage-viewpo
   'add-detail': {target: '.add-field-detail-pane'},
 }, {track: workspace});
 
-function updateContext(feature = null) {
+function updateHeaderNavigation(feature = null) {
   identity.disabled = !feature;
-  contextLabel.hidden = !feature;
-  const labels = {interface: '定義 > Interface', field: '定義 > Field', basic: '基本情報'};
-  contextLabel.textContent = ` > ${labels[feature]}`;
 }
 
 function showOverview() {
   pageStack.set('overview');
-  updateContext();
+  updateHeaderNavigation();
   history.pushState({}, '', myPage.dataset.paneUrl);
 }
 
@@ -36,25 +31,36 @@ function loadingPane(className, paneName) {
   });
 }
 
-const interfaceTrack = () => workspace.querySelector('.interface-track');
+const moduleTrack = () => workspace.querySelector('.module-track');
 
 function setInterfaceStage(stage) {
-  const pageStage = {list: 'interface', detail: 'interface-detail', 'add-list': 'add-list', 'add-detail': 'add-detail'}[stage];
+  const pageStage = {list: 'module', detail: 'interface-detail', 'add-list': 'add-list', 'add-detail': 'add-detail'}[stage];
   if (pageStage) pageStack.set(pageStage);
 }
 
 function removePanes(...names) {
-  names.forEach((name) => interfaceTrack()?.querySelector(`[data-mypage-pane="${name}"]`)?.remove());
+  names.forEach((name) => moduleTrack()?.querySelector(`[data-mypage-pane="${name}"]`)?.remove());
+}
+
+function removeModuleDetailPanes() {
+  removePanes(
+    'field-detail',
+    'add-synonym-list',
+    'add-synonym-detail',
+    'interface-detail',
+    'add-field-list',
+    'add-field-detail',
+  );
 }
 
 async function openBasic(updateHistory = true) {
   const url = new URL(myPage.dataset.paneUrl, location.origin);
   url.searchParams.set('_panes', '1');
-  workspace.querySelector('.basic-info-pane, .interface-management')?.remove();
+  workspace.querySelector('.basic-info-pane, .module-management, .interface-management')?.remove();
   const loading = loadingPane('basic-info-pane', 'basic-info');
   workspace.append(loading);
   pageStack.set('basic');
-  updateContext('basic');
+  updateHeaderNavigation('basic');
   if (updateHistory) history.pushState({}, '', myPage.dataset.paneUrl);
   let pane;
   try { pane = await NiixyUI.fetchFragment(url, '.basic-info-pane'); } catch { NiixyUI.showPaneError(loading); return; }
@@ -63,55 +69,115 @@ async function openBasic(updateHistory = true) {
   setTimeout(() => pane.querySelector('#id_display_name')?.focus(), 260);
 }
 
-async function openInterfaceList(updateHistory = true) {
-  workspace.querySelector('.basic-info-pane, .interface-management')?.remove();
+function currentModuleState(defaultType = 'element') {
+  const params = new URLSearchParams(location.search);
+  const requestedType = params.get('type') || defaultType;
+  const type = requestedType === 'field' ? 'element' : requestedType;
+  return {
+    type,
+    subtype: requestedType === 'field'
+      ? 'field'
+      : params.get('subtype') || ({element: 'field', interface: 'thread', layout: 'thread_post'}[type]),
+    collection: params.get('collection') || (params.has('draft') ? 'editing' : 'self'),
+  };
+}
+
+function moduleLocation(state) {
+  const params = new URLSearchParams({section: 'module', type: state.type});
+  params.set('subtype', state.subtype);
+  if (state.collection !== 'self') params.set('collection', state.collection);
+  return `${myPage.dataset.paneUrl}?${params}`;
+}
+
+async function openModuleList(initialState = currentModuleState(), updateHistory = true) {
+  workspace.querySelector('.basic-info-pane, .module-management, .interface-management')?.remove();
   const management = document.createElement('section');
-  management.className = 'interface-management';
+  management.className = 'module-management';
   const track = document.createElement('div');
-  track.className = 'interface-track';
-  const loading = loadingPane('interface-list-pane', 'interface-list');
+  track.className = 'module-track';
+  const loading = loadingPane('module-list-pane', 'module-list');
   track.append(loading);
   management.append(track);
   workspace.append(management);
-  pageStack.set('interface');
-  updateContext('interface');
-  if (updateHistory) history.pushState({}, '', `${myPage.dataset.paneUrl}?section=interface`);
+  pageStack.set('module');
+  updateHeaderNavigation('module');
+  if (updateHistory) history.pushState({}, '', moduleLocation(initialState));
   let list;
-  try { list = await NiixyUI.fetchFragment(myPage.dataset.interfaceListUrl); } catch { NiixyUI.showPaneError(loading); return; }
+  try { list = await NiixyUI.fetchFragment(myPage.dataset.moduleListUrl); } catch { NiixyUI.showPaneError(loading); return; }
   loading.replaceWith(list);
-  bindInterfaceList(list);
+  bindModuleList(list, initialState);
 }
 
-async function openFieldList(updateHistory = true) {
-  workspace.querySelector('.basic-info-pane, .interface-management')?.remove();
-  const management = document.createElement('section');
-  management.className = 'interface-management';
-  const track = document.createElement('div');
-  track.className = 'interface-track';
-  const loading = loadingPane('field-list-pane', 'field-list');
-  track.append(loading);
-  management.append(track);
-  workspace.append(management);
-  pageStack.set('field');
-  updateContext('field');
-  if (updateHistory) history.pushState({}, '', `${myPage.dataset.paneUrl}?section=definition&kind=field`);
-  let list;
-  try { list = await NiixyUI.fetchFragment(myPage.dataset.fieldListUrl); } catch { NiixyUI.showPaneError(loading); return; }
-  loading.replaceWith(list);
-  bindFieldList(list);
+function openInterfaceList(updateHistory = true) {
+  const state = currentModuleState('interface');
+  state.type = 'interface';
+  if (!['account', 'thread', 'thread_post'].includes(state.subtype)) state.subtype = 'thread';
+  return openModuleList(state, updateHistory);
 }
 
-function bindFieldList(list) {
-  NiixyUI.bindTabs(list);
-  list.querySelector('[data-close-field-list]')?.addEventListener('click', showOverview);
+function openFieldList(updateHistory = true) {
+  const state = currentModuleState('element');
+  state.type = 'element';
+  state.subtype = 'field';
+  return openModuleList(state, updateHistory);
+}
+
+function bindModuleList(list, initialState) {
+  NiixyUI.bindModuleFilters(list, initialState, {
+    onChange: (state) => history.replaceState({}, '', moduleLocation(state)),
+  });
+  list.querySelector('[data-close-module-list]')?.addEventListener('click', showOverview);
   list.querySelector('[data-field-create-url]')?.addEventListener('click', (event) => openFieldDetail(event.currentTarget.dataset.fieldCreateUrl));
-  list.querySelectorAll('[data-detail-url]').forEach((item) => item.addEventListener('click', () => openFieldDetail(item.dataset.detailUrl)));
+  bindFieldSearch(list);
+  list.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-detail-url]');
+    if (!item) return;
+    event.preventDefault();
+    const [type, subtype] = item.closest('[data-module-panel]').dataset.modulePanel.split(':');
+    if (type === 'element' && subtype === 'field') openFieldDetail(item.dataset.detailUrl);
+    else if (type === 'interface') openInterfaceDetail(item.dataset.detailUrl, item.getAttribute('href'));
+  });
+  bindAjaxForms(list);
+}
+
+function bindFieldSearch(list) {
+  const form = list.querySelector('[data-field-search-form]');
+  if (!form) return;
+
+  const loadResults = async (url) => {
+    const current = list.querySelector('[data-field-search-results]');
+    current.setAttribute('aria-busy', 'true');
+    try {
+      const results = await NiixyUI.fetchFragment(url, '[data-field-search-results]');
+      current.replaceWith(results);
+    } catch {
+      current.removeAttribute('aria-busy');
+    }
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const url = new URL(form.action, location.origin);
+    new FormData(form).forEach((value, key) => {
+      if (String(value).trim()) url.searchParams.set(key, value);
+    });
+    const details = form.closest('details');
+    if (details?.open) details.querySelector(':scope > summary')?.click();
+    loadResults(url);
+  });
+
+  list.addEventListener('click', (event) => {
+    const link = event.target.closest('[data-field-search-page]');
+    if (!link) return;
+    event.preventDefault();
+    loadResults(new URL(link.href, location.origin));
+  });
 }
 
 async function openFieldDetail(url) {
-  interfaceTrack()?.querySelector('[data-mypage-pane="field-detail"]')?.remove();
+  removeModuleDetailPanes();
   const loading = loadingPane('field-detail-pane', 'field-detail');
-  interfaceTrack().append(loading);
+  moduleTrack().append(loading);
   pageStack.set('field-detail');
   let detail;
   try { detail = await NiixyUI.fetchFragment(url); } catch { NiixyUI.showPaneError(loading); return; }
@@ -120,16 +186,20 @@ async function openFieldDetail(url) {
 }
 
 function bindFieldDetail(detail) {
-  detail.querySelector('[data-close-field-detail]')?.addEventListener('click', () => pageStack.set('field'));
+  detail.querySelector('[data-close-field-detail]')?.addEventListener('click', () => {
+    pageStack.set('module');
+    removePanes('field-detail', 'add-synonym-list', 'add-synonym-detail');
+    history.pushState({}, '', moduleLocation(currentModuleState('field')));
+  });
   detail.querySelector('[data-field-edit-url]')?.addEventListener('click', (event) => {
     event.preventDefault();
     openFieldDetail(event.currentTarget.href);
   });
   bindRemoveSynonymButtons(detail);
   detail.querySelector('[data-open-add-synonym]')?.addEventListener('click', async (event) => {
-    interfaceTrack().querySelectorAll('[data-mypage-pane="add-synonym-list"], [data-mypage-pane="add-synonym-detail"]').forEach((pane) => pane.remove());
+    moduleTrack().querySelectorAll('[data-mypage-pane="add-synonym-list"], [data-mypage-pane="add-synonym-detail"]').forEach((pane) => pane.remove());
     const loading = loadingPane('add-field-list-pane', 'add-synonym-list');
-    interfaceTrack().append(loading);
+    moduleTrack().append(loading);
     pageStack.set('synonym-list');
     let pane;
     try { pane = await NiixyUI.fetchFragment(event.currentTarget.dataset.url); } catch { NiixyUI.showPaneError(loading); return; }
@@ -157,9 +227,9 @@ function bindSynonymList(pane) {
   NiixyUI.bindTabs(pane);
   pane.querySelector('[data-close-add-synonym]')?.addEventListener('click', () => pageStack.set('field-detail'));
   pane.querySelectorAll('[data-detail-url]').forEach((item) => item.addEventListener('click', async () => {
-    interfaceTrack().querySelector('[data-mypage-pane="add-synonym-detail"]')?.remove();
+    moduleTrack().querySelector('[data-mypage-pane="add-synonym-detail"]')?.remove();
     const loading = loadingPane('add-field-detail-pane', 'add-synonym-detail');
-    interfaceTrack().append(loading);
+    moduleTrack().append(loading);
     pageStack.set('synonym-detail');
     let detail;
     try { detail = await NiixyUI.fetchFragment(item.dataset.detailUrl); } catch { NiixyUI.showPaneError(loading); return; }
@@ -206,22 +276,10 @@ function bindRemoveSynonymButtons(root) {
   });
 }
 
-function bindInterfaceList(list) {
-  NiixyUI.bindTabs(list);
-  list.querySelector('[data-close-interface-list]')?.addEventListener('click', showOverview);
-  list.addEventListener('click', async (event) => {
-    const item = event.target.closest('[data-detail-url]');
-    if (!item) return;
-    event.preventDefault();
-    await openInterfaceDetail(item.dataset.detailUrl, item.getAttribute('href'));
-  });
-  bindAjaxForms(list);
-}
-
 async function openInterfaceDetail(url, historyUrl = null) {
-  removePanes('interface-detail', 'add-field-list', 'add-field-detail');
+  removeModuleDetailPanes();
   const loading = loadingPane('interface-detail-pane', 'interface-detail');
-  interfaceTrack().append(loading);
+  moduleTrack().append(loading);
   setInterfaceStage('detail');
   if (historyUrl) history.pushState({}, '', historyUrl);
   let detail;
@@ -231,7 +289,7 @@ async function openInterfaceDetail(url, historyUrl = null) {
 }
 
 function bindAjaxForms(root) {
-  root.querySelectorAll('form').forEach((form) => form.addEventListener('submit', async (event) => {
+  root.querySelectorAll('form:not([data-field-search-form])').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const refreshInterfaceList = form.hasAttribute('data-refresh-interface-list');
     const data = new FormData(form);
@@ -247,7 +305,14 @@ function bindAjaxForms(root) {
       const target = new URL(response.url);
       const draftId = target.searchParams.get('draft');
       const interfaceId = target.searchParams.get('interface');
-      if (draftId) await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${draftId}/`, `${target.pathname}${target.search}`);
+      if (draftId) {
+        await openModuleList({
+          type: 'interface',
+          subtype: target.searchParams.get('subtype') || 'thread',
+          collection: 'editing',
+        }, false);
+        await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${draftId}/`, `${target.pathname}${target.search}`);
+      }
       else if (interfaceId) await openInterfaceDetail(`/mypage/interfaces/manage/${interfaceId}/`, `${target.pathname}${target.search}`);
       else await openInterfaceList(true);
     } catch {
@@ -260,12 +325,12 @@ function bindInterfaceDetail(detail) {
   detail.querySelector('[data-close-interface-detail]')?.addEventListener('click', () => {
     setInterfaceStage('list');
     removePanes('interface-detail', 'add-field-list', 'add-field-detail');
-    history.pushState({}, '', `${myPage.dataset.paneUrl}?section=interface`);
+    history.pushState({}, '', moduleLocation(currentModuleState('interface')));
   });
   detail.querySelector('[data-open-add-field]')?.addEventListener('click', async (event) => {
     removePanes('add-field-list', 'add-field-detail');
     const loading = loadingPane('add-field-list-pane', 'add-field-list');
-    interfaceTrack().append(loading);
+    moduleTrack().append(loading);
     setInterfaceStage('add-list');
     let pane;
     try { pane = await NiixyUI.fetchFragment(event.currentTarget.dataset.url); } catch { NiixyUI.showPaneError(loading); return; }
@@ -282,7 +347,7 @@ function bindAddFieldList(pane) {
   pane.querySelectorAll('[data-detail-url]').forEach((item) => item.addEventListener('click', async () => {
     removePanes('add-field-detail');
     const loading = loadingPane('add-field-detail-pane', 'add-field-detail');
-    interfaceTrack().append(loading);
+    moduleTrack().append(loading);
     setInterfaceStage('add-detail');
     let detail;
     try { detail = await NiixyUI.fetchFragment(item.dataset.detailUrl); } catch { NiixyUI.showPaneError(loading); return; }
@@ -334,19 +399,33 @@ function appendFieldFromPicker(pane) {
 }
 
 document.getElementById('open-basic-info').addEventListener('click', () => openBasic());
-document.getElementById('open-field').addEventListener('click', () => openFieldList());
-document.getElementById('open-interface').addEventListener('click', () => openInterfaceList());
+document.getElementById('open-module').addEventListener('click', () => openModuleList({
+  type: 'element',
+  subtype: 'field',
+  collection: 'self',
+}));
 identity.addEventListener('click', showOverview);
 
 const initialParams = new URLSearchParams(location.search);
-if (initialParams.get('section') === 'definition' && initialParams.get('kind') === 'field') {
+if (initialParams.get('section') === 'module') {
+  const type = initialParams.get('type') || 'field';
+  openModuleList(currentModuleState(type), false).then(async () => {
+    if (initialParams.get('field_edit')) await openFieldDetail(`/mypage/interfaces/manage/fields/${initialParams.get('field_edit')}/edit/`);
+    else if (initialParams.get('field')) await openFieldDetail(`/mypage/interfaces/manage/fields/${initialParams.get('field')}/`);
+    if (initialParams.get('draft')) await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${initialParams.get('draft')}/`);
+    else if (initialParams.get('interface')) await openInterfaceDetail(`/mypage/interfaces/manage/${initialParams.get('interface')}/`);
+  });
+} else if (initialParams.get('section') === 'definition' && initialParams.get('kind') === 'field') {
+  history.replaceState({}, '', `${myPage.dataset.paneUrl}?section=module&type=element&subtype=field${initialParams.get('field') ? `&field=${initialParams.get('field')}` : ''}`);
   openFieldList(false).then(async () => {
     if (initialParams.get('field')) await openFieldDetail(`/mypage/interfaces/manage/fields/${initialParams.get('field')}/`);
   });
 } else if (initialParams.get('section') === 'interface') {
+  const legacyTarget = `${myPage.dataset.paneUrl}?section=module&type=interface&subtype=thread${initialParams.get('draft') ? `&collection=editing&draft=${initialParams.get('draft')}` : ''}${initialParams.get('interface') ? `&interface=${initialParams.get('interface')}` : ''}`;
+  history.replaceState({}, '', legacyTarget);
   openInterfaceList(false).then(async () => {
     if (initialParams.get('draft')) await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${initialParams.get('draft')}/`);
     else if (initialParams.get('interface')) await openInterfaceDetail(`/mypage/interfaces/manage/${initialParams.get('interface')}/`);
   });
 } else if (myPage.dataset.initialSection === 'basic') openBasic(false);
-else updateContext();
+else updateHeaderNavigation();

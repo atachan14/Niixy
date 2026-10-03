@@ -18,7 +18,7 @@ ThreadPost の本文と ThreadPostInterface の実装値は、投稿後に編集
 
 ## ThreadInterface の更新
 
-Thread には複数の ThreadInterface を適用できる。作成後も新規 Interface の追加、既存 Interface の削除、実装値の編集、最新版への更新を許可する。各Interfaceは用途ごとのまとまりとして表示するが、同じFieldまたは片同義で接続されたFieldはThread内の一つのValueを共有する。
+Threadには複数のDirectFieldとThreadInterfaceを適用できる。DirectFieldはFieldを個別に追加する経路、ThreadInterfaceは複数Fieldや機能を用途ごとにまとめる経路とする。作成後も新規Field・Interfaceの追加、既存実装の削除、値の編集、最新版への更新を許可する。同じFieldまたは片同義で接続されたFieldは、実装経路にかかわらずThread内の一つのValueを共有する。
 
 Version 更新では、旧 Version の削除と新 Version の追加を利用者に個別操作させず、一つの更新操作として扱う。両 Version で継続する同一 Field の値は引き継ぎ、追加 Field は入力を求め、使用されなくなる Field は差分確認に表示する。片同義によって複数の既存Valueが統合される場合は、最初に実装されたFieldのValueを維持し、保存前に影響を示す。
 

@@ -1,8 +1,11 @@
+import json
+
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Value
+from django.db.models.functions import Concat
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
@@ -11,11 +14,60 @@ from django.views.decorators.http import require_POST
 from events.models import Thread, ThreadAccessRule, ThreadPost
 
 from .forms import DisplayNameForm, LoginForm, SignUpForm
-from .models import AccountProfile
-from interfaces.views import interface_management_context
+from .models import AccountCondition, AccountProfile
+from .services import condition_payload, save_account_condition
+from interfaces.models import FieldDefinition, Interface
+from interfaces.views import mark_interface_update_status, module_list_context, profile_module_list_context
 
 
 User = get_user_model()
+
+
+def account_condition_search(request):
+    query = request.GET.get('q', '').strip()
+    accounts = User.objects.select_related('niixy_profile').annotate(
+        search_identity=Concat('niixy_profile__display_name', Value('@'), 'username'),
+    )
+    if query:
+        accounts = accounts.filter(
+            Q(search_identity__icontains=query) | Q(username__icontains=query)
+        )
+    accounts = accounts.order_by('username')[:10]
+    return JsonResponse({'accounts': [
+        {
+            'id': account.pk,
+            'username': account.username,
+            'label': account.niixy_profile.display_label,
+        }
+        for account in accounts
+    ]})
+
+
+@require_POST
+def account_condition_save(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Account条件の保存にはログインが必要です。'}, status=401)
+    try:
+        definition = json.loads(request.POST.get('definition', '{}'))
+        condition = save_account_condition(
+            request.user,
+            kind=request.POST.get('kind', ''),
+            definition=definition,
+            condition_id=request.POST.get('condition_id') or None,
+        )
+    except (json.JSONDecodeError, ValueError) as error:
+        return JsonResponse({'error': str(error)}, status=400)
+    return JsonResponse({'condition': condition_payload(condition)})
+
+
+@require_POST
+def account_condition_delete(request, condition_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'ログインが必要です。'}, status=401)
+    condition = get_object_or_404(AccountCondition, pk=condition_id, owner=request.user)
+    condition.active = False
+    condition.save(update_fields=['active'])
+    return JsonResponse({'ok': True})
 
 
 def form_errors(form):
@@ -67,14 +119,10 @@ def prepare_threads(queryset, viewer):
             'interface_implementations__values__field',
         )
     )
-    discoverable = []
     for thread in threads:
-        if not thread.allows(viewer, ThreadAccessRule.DISCOVER):
-            continue
         thread.can_view = thread.allows(viewer, ThreadAccessRule.VIEW)
         thread.can_write = thread.allows(viewer, ThreadAccessRule.WRITE)
-        discoverable.append(thread)
-    return discoverable
+    return threads
 
 
 def account_page(request, username):
@@ -105,16 +153,62 @@ def account_response_pane(request, username):
         )
         .order_by('-created_at')
     )
-    responses = []
     for post in posts:
-        if not post.thread.allows(request.user, ThreadAccessRule.DISCOVER):
-            continue
         post.thread.can_view = post.thread.allows(request.user, ThreadAccessRule.VIEW)
-        responses.append(post)
-    response_page = Paginator(responses, 10).get_page(request.GET.get('response_page'))
+    response_page = Paginator(posts, 10).get_page(request.GET.get('response_page'))
     return render(request, 'accounts/partials/response_pane.html', {
         'account': account,
         'response_page': response_page,
+    })
+
+
+def account_module_pane(request, username):
+    account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    return render(
+        request,
+        'interfaces/module_management_list_pane.html',
+        profile_module_list_context(account),
+    )
+
+
+def account_module_field_detail(request, username, field_id):
+    account = get_object_or_404(User, username__iexact=username)
+    field = get_object_or_404(
+        FieldDefinition.objects.filter(
+            creator=account,
+            status=FieldDefinition.ACTIVE,
+            current_version__isnull=False,
+        ).select_related('creator', 'current_version').prefetch_related(
+            'current_version__synonyms__target__creator',
+        ),
+        pk=field_id,
+    )
+    return render(request, 'interfaces/field_detail_pane.html', {
+        'field_item': field,
+        'profile_mode': True,
+    })
+
+
+def account_module_interface_detail(request, username, interface_id):
+    account = get_object_or_404(User, username__iexact=username)
+    interface = get_object_or_404(
+        Interface.objects.filter(
+            creator=account,
+            status=Interface.ACTIVE,
+            current_version__isnull=False,
+        ).select_related('creator', 'current_version').prefetch_related(
+            'current_version__fields__definition__creator',
+            'current_version__fields__definition__current_version',
+            'current_version__fields__field_version',
+            'current_version__fields__field_version__synonyms__target__creator',
+        ),
+        pk=interface_id,
+    )
+    mark_interface_update_status([interface])
+    return render(request, 'interfaces/published_detail_pane.html', {
+        'selected_interface': interface,
+        'selected_interface_dependents': 0,
+        'profile_mode': True,
     })
 
 
@@ -132,8 +226,6 @@ def account_thread_detail(request, username, thread_id):
         .distinct(),
         pk=thread_id,
     )
-    if not thread.allows(request.user, ThreadAccessRule.DISCOVER):
-        return render(request, 'accounts/partials/thread_not_found.html', status=404)
     thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
     thread.can_write = thread.allows(request.user, ThreadAccessRule.WRITE)
     return render(request, 'accounts/partials/thread_detail.html', {
@@ -155,23 +247,15 @@ def my_page(request):
         return redirect('mypage')
 
     render_panes = request.GET.get('_panes') == '1' or request.method == 'POST'
+    section = request.GET.get('section')
+    show_module = section in {'module', 'interface', 'definition'}
     context = {
         'account': request.user,
         'form': form,
         'show_basic_info': show_basic_info,
-        'show_interface': request.GET.get('section') == 'interface',
+        'show_module': show_module,
         'render_mypage_panes': render_panes,
     }
-    selected_draft_id = request.GET.get('draft')
-    if selected_draft_id and selected_draft_id.isdigit():
-        selected_draft_id = int(selected_draft_id)
-    else:
-        selected_draft_id = None
-    selected_interface_id = request.GET.get('interface')
-    if selected_interface_id and selected_interface_id.isdigit():
-        selected_interface_id = int(selected_interface_id)
-    else:
-        selected_interface_id = None
-    if render_panes and request.GET.get('section') == 'interface':
-        context.update(interface_management_context(request.user, selected_draft_id, selected_interface_id))
+    if render_panes and show_module:
+        context.update(module_list_context(request.user))
     return render(request, 'accounts/my_page.html', context)

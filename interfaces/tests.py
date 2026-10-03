@@ -1,21 +1,28 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import (
+    FieldDefinition,
     FieldType,
     Interface,
     InterfaceDraft,
     InterfaceDraftField,
     ThreadInterfaceImplementation,
+    ThreadDirectField,
 )
 from .services import (
     expand_field_definition_ids,
     prepare_thread_interfaces,
+    prepare_thread_fields,
     publish_draft,
     publish_field_definition,
     save_thread_interfaces,
+    save_thread_fields,
     thread_interface_catalog,
 )
 from events.models import Thread
@@ -128,17 +135,63 @@ class InterfaceManagementViewTests(TestCase):
         payload.update(overrides)
         return payload
 
-    def test_my_page_shows_interface_management(self):
-        response = self.client.get(reverse('mypage'), {'section': 'interface', '_panes': '1'})
+    def test_my_page_shows_unified_module_management(self):
+        response = self.client.get(reverse('mypage'), {'section': 'module', '_panes': '1'})
 
-        self.assertContains(response, 'data-ui-tab="draft"')
+        self.assertContains(response, 'data-mypage-pane="module-list"')
+        self.assertContains(response, 'data-module-type="element"')
+        self.assertContains(response, 'data-module-type="interface"')
+        self.assertContains(response, 'data-module-type="layout"')
+        self.assertContains(response, 'data-module-subtypes="element"')
+        self.assertContains(response, 'data-module-subtype="field"')
+        self.assertContains(response, 'data-module-subtype="computed_field"')
+        self.assertContains(response, 'data-module-subtype="action"')
+        self.assertContains(response, 'data-module-collection="search"')
+        self.assertContains(response, 'data-module-collection="self"')
+        self.assertContains(response, 'data-module-collection="editing"')
         self.assertContains(response, reverse('interfaces:draft-create'))
 
-    def test_management_list_is_served_as_its_own_pane(self):
-        response = self.client.get(reverse('interfaces:management-list'))
+    def test_module_list_combines_field_and_interface_sources(self):
+        draft = InterfaceDraft.objects.create(
+            creator=self.user,
+            kind=Interface.ACCOUNT,
+            name='Account module',
+        )
+
+        response = self.client.get(reverse('interfaces:module-management-list'))
+
+        self.assertContains(response, 'data-mypage-pane="module-list"')
+        self.assertContains(response, self.definition.name)
+        self.assertContains(response, draft.name)
+        self.assertContains(response, 'data-module-subtype="account"')
+        html = response.content.decode()
+        self_panel = html.split('data-module-panel="interface:self"', 1)[1].split(
+            'data-module-panel="interface:editing"', 1
+        )[0]
+        editing_panel = html.split('data-module-panel="interface:editing"', 1)[1].split(
+            'data-module-panel="interface:saved"', 1
+        )[0]
+        self.assertNotIn(draft.name, self_panel)
+        self.assertIn(draft.name, editing_panel)
+
+    def test_new_interface_uses_selected_module_subtype(self):
+        response = self.client.post(
+            reverse('interfaces:draft-create'),
+            {'kind': Interface.ACCOUNT},
+        )
+
+        draft = InterfaceDraft.objects.get(creator=self.user)
+        self.assertEqual(draft.kind, Interface.ACCOUNT)
+        self.assertRedirects(
+            response,
+            f'/mypage/?section=module&type=interface&subtype=account&collection=editing&draft={draft.pk}',
+        )
+
+    def test_module_list_is_served_without_a_detail_pane(self):
+        response = self.client.get(reverse('interfaces:module-management-list'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'data-mypage-pane="interface-list"')
+        self.assertContains(response, 'data-mypage-pane="module-list"')
         self.assertNotContains(response, 'data-mypage-pane="interface-detail"')
 
     def test_published_detail_is_served_without_interface_list(self):
@@ -214,13 +267,13 @@ class InterfaceManagementViewTests(TestCase):
         create_response = self.client.post(reverse('interfaces:draft-create'))
         draft = InterfaceDraft.objects.get(creator=self.user)
 
-        self.assertRedirects(create_response, f'/mypage/?section=interface&draft={draft.pk}')
+        self.assertRedirects(create_response, f'/mypage/?section=module&type=interface&subtype=thread&collection=editing&draft={draft.pk}')
         save_response = self.client.post(
             reverse('interfaces:draft-update', args=[draft.pk]),
             self.field_payload(),
         )
         draft.refresh_from_db()
-        self.assertRedirects(save_response, f'/mypage/?section=interface&draft={draft.pk}')
+        self.assertRedirects(save_response, f'/mypage/?section=module&type=interface&subtype=thread&collection=editing&draft={draft.pk}')
         self.assertEqual(draft.name, 'Event')
         self.assertEqual(draft.fields.get().definition, self.definition)
 
@@ -245,7 +298,7 @@ class InterfaceManagementViewTests(TestCase):
         )
 
         interface = Interface.objects.get(creator=self.user)
-        self.assertRedirects(response, '/mypage/?section=interface')
+        self.assertRedirects(response, '/mypage/?section=module&type=interface&subtype=thread')
         self.assertEqual(interface.name, 'Event')
         self.assertEqual(interface.current_version.version_number, 1)
         self.assertEqual(interface.current_version.fields.get().definition, self.definition)
@@ -264,7 +317,7 @@ class InterfaceManagementViewTests(TestCase):
         response = self.client.post(reverse('interfaces:draft-edit', args=[interface.pk]))
 
         edit_draft = InterfaceDraft.objects.get(interface=interface)
-        self.assertRedirects(response, f'/mypage/?section=interface&draft={edit_draft.pk}')
+        self.assertRedirects(response, f'/mypage/?section=module&type=interface&subtype=thread&collection=editing&draft={edit_draft.pk}')
         self.assertEqual(edit_draft.name, 'Event')
         self.assertEqual(edit_draft.publication_version_number, 2)
         self.assertEqual(edit_draft.fields.get().field_key, source_field.field_key)
@@ -281,7 +334,7 @@ class InterfaceManagementViewTests(TestCase):
         )
 
         interface.refresh_from_db()
-        self.assertRedirects(response, '/mypage/?section=interface')
+        self.assertRedirects(response, '/mypage/?section=module&type=interface&subtype=thread')
         self.assertEqual(interface.pk, first_version.interface_id)
         self.assertEqual(interface.name, 'Renamed Event')
         self.assertEqual(interface.current_version.version_number, 2)
@@ -295,7 +348,7 @@ class InterfaceManagementViewTests(TestCase):
         first_draft = InterfaceDraft.objects.get(interface=interface)
         response = self.client.post(reverse('interfaces:draft-edit', args=[interface.pk]))
 
-        self.assertRedirects(response, f'/mypage/?section=interface&draft={first_draft.pk}')
+        self.assertRedirects(response, f'/mypage/?section=module&type=interface&subtype=thread&collection=editing&draft={first_draft.pk}')
         self.assertEqual(InterfaceDraft.objects.filter(interface=interface).count(), 1)
 
     def test_user_cannot_edit_another_users_draft(self):
@@ -325,7 +378,7 @@ class InterfaceManagementViewTests(TestCase):
             payload,
         )
 
-        self.assertRedirects(response, '/mypage/?section=interface')
+        self.assertRedirects(response, '/mypage/?section=module&type=interface&subtype=thread')
         child = Interface.objects.get(name='Child')
         self.assertEqual(child.current_version.fields.count(), 2)
 
@@ -354,7 +407,7 @@ class InterfaceManagementViewTests(TestCase):
 
         response = self.client.post(reverse('interfaces:draft-update', args=[draft.pk]), payload)
 
-        self.assertRedirects(response, f'/mypage/?section=interface&draft={draft.pk}')
+        self.assertRedirects(response, f'/mypage/?section=module&type=interface&subtype=thread&collection=editing&draft={draft.pk}')
         remaining = draft.fields.get()
         self.assertEqual(remaining.definition, second)
         self.assertEqual(remaining.position, 0)
@@ -365,12 +418,12 @@ class InterfaceManagementViewTests(TestCase):
 
         delete_response = self.client.post(reverse('interfaces:delete', args=[interface.pk]))
         interface.refresh_from_db()
-        self.assertRedirects(delete_response, '/mypage/?section=interface')
+        self.assertRedirects(delete_response, '/mypage/?section=module&type=interface&subtype=thread')
         self.assertEqual(interface.status, Interface.DELETED)
 
         restore_response = self.client.post(reverse('interfaces:restore', args=[interface.pk]))
         interface.refresh_from_db()
-        self.assertRedirects(restore_response, f'/mypage/?section=interface&interface={interface.pk}')
+        self.assertRedirects(restore_response, f'/mypage/?section=module&type=interface&subtype=thread&interface={interface.pk}')
         self.assertEqual(interface.status, Interface.ACTIVE)
         self.assertEqual(interface.current_version.version_number, 1)
 
@@ -434,6 +487,58 @@ class ThreadInterfaceServiceTests(TestCase):
 
         with self.assertRaises(ValidationError):
             prepare_thread_interfaces([interface.pk], {})
+
+    def test_direct_field_and_interface_share_one_value(self):
+        definition = create_field(self.user, 'Shared')
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Shared IF')
+        draft_field = InterfaceDraftField.objects.create(
+            draft=draft,
+            definition=definition,
+            required=True,
+            position=0,
+        )
+        interface, _ = publish_draft(draft.pk)
+        prepared_direct, prepared_interfaces = prepare_thread_fields(
+            [definition.pk],
+            {str(definition.key): ['Directの値']},
+            [interface.pk],
+            {(interface.pk, str(draft_field.field_key)): ['Interfaceの値']},
+        )
+        thread = Thread.objects.create(title='共有Thread')
+
+        save_thread_fields(thread, prepared_direct, prepared_interfaces)
+
+        direct = ThreadDirectField.objects.select_related('binding__value').get(thread=thread)
+        interface_value = ThreadInterfaceImplementation.objects.get(thread=thread).values.get()
+        self.assertEqual(thread.field_values.count(), 1)
+        self.assertEqual(direct.binding.value_id, interface_value.binding.value_id)
+        self.assertEqual(direct.value, 'Directの値')
+
+    def test_direct_synonym_fields_share_first_direct_value(self):
+        target = create_field(self.user, 'Target')
+        source, _ = publish_field_definition(
+            creator=self.user,
+            name='Source',
+            field_type=FieldType.SHORT_TEXT,
+            synonym_target_ids=[target.pk],
+        )
+        prepared_direct, prepared_interfaces = prepare_thread_fields(
+            [target.pk, source.pk],
+            {
+                str(target.key): ['先の値'],
+                str(source.key): ['後の値'],
+            },
+            [],
+            {},
+        )
+        thread = Thread.objects.create(title='片同義DirectField')
+
+        save_thread_fields(thread, prepared_direct, prepared_interfaces)
+
+        direct_fields = list(ThreadDirectField.objects.select_related('binding__value'))
+        self.assertEqual(thread.field_values.count(), 1)
+        self.assertEqual({item.binding.value_id for item in direct_fields}, {thread.field_values.get().pk})
+        self.assertEqual({item.value for item in direct_fields}, {'先の値'})
 
     def test_shared_field_is_resolved_for_each_interface_without_extra_interface(self):
         definition = create_field(self.user, 'Shared')
@@ -597,20 +702,81 @@ class FieldManagementViewTests(TestCase):
         definition = self.user.field_definitions.get()
         self.assertRedirects(
             response,
-            f'/mypage/?section=definition&kind=field&field={definition.pk}',
+            f'/mypage/?section=module&type=element&subtype=field&field={definition.pk}',
         )
         self.assertEqual(definition.current_version.version_number, 1)
 
     def test_field_list_and_detail_are_separate_panes(self):
-        definition = create_field(self.user, '一覧Field')
+        definition, _ = publish_field_definition(
+            creator=self.user,
+            name='一覧Field',
+            field_type=FieldType.DATETIME,
+            description='一覧Fieldの詳細',
+        )
 
-        list_response = self.client.get(reverse('interfaces:field-management-list'))
+        list_response = self.client.get(reverse('interfaces:module-management-list'))
         detail_response = self.client.get(reverse('interfaces:field-detail', args=[definition.pk]))
 
-        self.assertContains(list_response, 'data-mypage-pane="field-list"')
+        self.assertContains(list_response, 'data-mypage-pane="module-list"')
         self.assertNotContains(list_response, 'data-mypage-pane="field-detail"')
         self.assertContains(detail_response, 'data-mypage-pane="field-detail"')
         self.assertContains(detail_response, '一覧Field@field_editor v1/Field', count=1)
+        self.assertContains(detail_response, '<dt>詳細：</dt><dd>一覧Fieldの詳細</dd>')
+        self.assertContains(detail_response, '<dt>型：</dt><dd>日時</dd>')
+        self.assertContains(detail_response, 'class="interface-action-buttons"')
+        self.assertContains(detail_response, 'class="button event-delete-button"')
+
+    def test_field_search_uses_and_partial_matches_and_excludes_deleted_fields(self):
+        other = get_user_model().objects.create_user('AccountA', password='eightchars')
+        match = create_field(other, '開始日時', FieldType.DATETIME)
+        publish_field_definition(
+            creator=other,
+            definition=match,
+            name='開始日時',
+            field_type=FieldType.DATETIME,
+            description='地域イベントの開始時刻',
+        )
+        wrong_description = create_field(other, '終了日時', FieldType.DATETIME)
+        deleted = create_field(other, '削除日時', FieldType.DATETIME)
+        deleted.status = deleted.DELETED
+        deleted.save(update_fields=['status', 'updated_at'])
+
+        response = self.client.get(reverse('interfaces:field-search'), {
+            'name': '@accounta',
+            'description': 'イベント',
+            'field_type': FieldType.DATETIME,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '開始日時@AccountA v2/Field')
+        self.assertNotContains(response, wrong_description.name)
+        self.assertNotContains(response, deleted.name)
+
+    def test_field_search_is_newest_first_and_paginated_by_ten(self):
+        fields = [create_field(self.user, f'検索Field{i:02}') for i in range(11)]
+        now = timezone.now()
+        for index, field in enumerate(fields):
+            FieldDefinition.objects.filter(pk=field.pk).update(
+                updated_at=now - timedelta(minutes=index),
+            )
+
+        first_page = self.client.get(reverse('interfaces:field-search'))
+        second_page = self.client.get(reverse('interfaces:field-search'), {'page': 2})
+        first_html = first_page.content.decode()
+
+        self.assertEqual(first_html.count('data-detail-url='), 10)
+        self.assertLess(first_html.index('検索Field00'), first_html.index('検索Field01'))
+        self.assertNotContains(first_page, '検索Field10')
+        self.assertContains(second_page, '検索Field10')
+
+    def test_module_field_search_panel_is_open_and_has_expected_filters(self):
+        response = self.client.get(reverse('interfaces:module-management-list'))
+
+        self.assertContains(response, 'class="field-search-controls" open')
+        self.assertContains(response, 'name="name"')
+        self.assertContains(response, 'name="description"')
+        self.assertContains(response, 'name="field_type"')
+        self.assertNotContains(response, 'name="sort"')
 
     def test_field_update_marks_referencing_interface_as_stale(self):
         definition = create_field(self.user, '更新Field')
@@ -626,7 +792,7 @@ class FieldManagementViewTests(TestCase):
             description='v2',
         )
 
-        response = self.client.get(reverse('interfaces:management-list'))
+        response = self.client.get(reverse('interfaces:module-management-list'))
         self.assertContains(response, '更新が必要')
         with self.assertRaises(ValidationError):
             prepare_thread_interfaces([interface.pk], {})
@@ -643,6 +809,6 @@ class FieldManagementViewTests(TestCase):
 
         self.assertRedirects(
             response,
-            f'/mypage/?section=definition&kind=field&field={source.pk}',
+            f'/mypage/?section=module&type=element&subtype=field&field={source.pk}',
         )
         self.assertEqual(source.current_version.synonyms.get().target, target)

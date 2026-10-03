@@ -1,5 +1,24 @@
 <aside class="ui-pane ui-detail-pane field-detail-pane" data-mypage-pane="field-detail">
   <header class="ui-pane-header ui-detail-pane-header interface-pane-header"><h2>{{ field_item.name }}@{{ field_item.creator.username }} v{{ field_item.current_version.version_number }}/Field</h2><button class="icon-button" type="button" data-close-field-detail aria-label="Field一覧に戻る">×</button></header>
-  <article class="interface-definition-detail">{% if field_item.status == 'deleted' %}<p class="interface-definition-status"><span class="interface-status">削除済み</span></p>{% endif %}{% if field_item.current_version.description %}<p class="interface-description">{{ field_item.current_version.description|linebreaksbr }}</p>{% endif %}<section class="interface-form-section"><h3>型</h3><p>{{ field_item.current_version.get_field_type_display }}</p>{% if field_item.current_version.settings.options %}<p>{{ field_item.current_version.settings.options|join:' / ' }}</p>{% endif %}</section><section class="interface-form-section"><h3>片同義</h3>{% for synonym in field_item.current_version.synonyms.all %}<p>{{ synonym.target.name }}@{{ synonym.target.creator.username }}</p>{% empty %}<p class="empty">片同義はありません。</p>{% endfor %}</section></article>
-  {% if user == field_item.creator %}<div class="ui-detail-actions" aria-label="Action">{% if field_item.status == 'active' %}<a class="button secondary" href="{% url 'interfaces:field-edit' field_item.pk %}" data-field-edit-url>定義を編集</a><form method="post" action="{% url 'interfaces:field-delete' field_item.pk %}">{% csrf_token %}<button class="button danger" type="submit">Fieldを削除</button></form>{% else %}<form method="post" action="{% url 'interfaces:field-restore' field_item.pk %}">{% csrf_token %}<button class="button" type="submit">Fieldを復元</button></form>{% endif %}</div>{% endif %}
+  <article class="interface-definition-detail field-definition-detail">
+    {% if field_item.status == 'deleted' %}<p class="interface-definition-status"><span class="interface-status">削除済み</span></p>{% endif %}
+    <dl class="field-definition-summary">
+      <div><dt>詳細：</dt><dd>{% if field_item.current_version.description %}{{ field_item.current_version.description|linebreaksbr }}{% else %}<span class="empty">未設定</span>{% endif %}</dd></div>
+      <div><dt>型：</dt><dd>{{ field_item.current_version.get_field_type_display }}</dd></div>
+      {% if field_item.current_version.settings.options %}<div><dt>選択肢：</dt><dd>{{ field_item.current_version.settings.options|join:' / ' }}</dd></div>{% endif %}
+      <div><dt>片同義：</dt><dd>{% for synonym in field_item.current_version.synonyms.all %}{{ synonym.target.name }}@{{ synonym.target.creator.username }}{% if not forloop.last %} / {% endif %}{% empty %}<span class="empty">なし</span>{% endfor %}</dd></div>
+    </dl>
+  </article>
+  {% if user == field_item.creator %}
+    <div class="ui-detail-actions" aria-label="Action">
+      <div class="interface-action-buttons">
+        {% if field_item.status == 'active' %}
+          <a class="button" href="{% if profile_mode %}{% url 'mypage' %}?section=module&amp;type=element&amp;subtype=field&amp;field_edit={{ field_item.pk }}{% else %}{% url 'interfaces:field-edit' field_item.pk %}{% endif %}" data-field-edit-url>定義を編集</a>
+          <form method="post" action="{% url 'interfaces:field-delete' field_item.pk %}">{% csrf_token %}<button class="button event-delete-button" type="submit">Fieldを削除</button></form>
+        {% else %}
+          <form method="post" action="{% url 'interfaces:field-restore' field_item.pk %}">{% csrf_token %}<button class="button" type="submit">Fieldを復元</button></form>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
 </aside>

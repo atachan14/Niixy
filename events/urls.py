@@ -10,5 +10,6 @@ urlpatterns = [
     path('threads/new/', views.thread_create, name='thread-create'),
     path('threads/<int:thread_id>/posts/', views.thread_post_create, name='thread-post-create'),
     path('api/filter-preferences/', views.filter_preferences_update, name='filter-preferences'),
+    path('api/threads/search/', views.thread_search, name='thread-search'),
     path('api/locations/', views.location_search, name='location-search'),
 ]

@@ -1,11 +1,11 @@
 {% if draft %}
-<a class="ui-summary-item interface-summary-item{% if selected_id == draft.pk %} is-selected{% endif %}" href="{% url 'mypage' %}?section=interface&amp;draft={{ draft.pk }}" data-detail-url="{% url 'interfaces:draft-detail' draft.pk %}">
+<a class="ui-summary-item interface-summary-item module-summary-entry{% if selected_id == draft.pk %} is-selected{% endif %}" href="{% url 'mypage' %}?section=module&amp;type=interface&amp;subtype={{ draft.kind }}&amp;collection=editing&amp;draft={{ draft.pk }}" data-module-subtype="{{ draft.kind }}" data-detail-url="{% url 'interfaces:draft-detail' draft.pk %}">
   <span class="ui-summary-item-context" aria-hidden="true"></span>
   <strong class="ui-summary-item-title">{{ draft.name }}@{{ draft.creator.username }} v{{ draft.publication_version_number }}/{{ draft.get_kind_display }}</strong>
   <small class="ui-summary-item-updated">最終更新 {{ draft.updated_at|date:'Y/m/d H:i' }}</small>
 </a>
 {% else %}
-<a class="ui-summary-item interface-summary-item{% if selected_id == interface.pk %} is-selected{% endif %}" href="{% url 'mypage' %}?section=interface&amp;interface={{ interface.pk }}" data-detail-url="{% url 'interfaces:published-detail' interface.pk %}">
+<a class="ui-summary-item interface-summary-item module-summary-entry{% if selected_id == interface.pk %} is-selected{% endif %}" href="{% if profile_mode %}{% url 'accounts:detail' profile_account.username %}?pane=module&amp;type=interface&amp;subtype={{ interface.kind }}&amp;interface={{ interface.pk }}{% else %}{% url 'mypage' %}?section=module&amp;type=interface&amp;subtype={{ interface.kind }}&amp;interface={{ interface.pk }}{% endif %}" data-module-subtype="{{ interface.kind }}" data-detail-url="{% if profile_mode %}{% url 'accounts:module-interface-detail' profile_account.username interface.pk %}{% else %}{% url 'interfaces:published-detail' interface.pk %}{% endif %}">
   <span class="ui-summary-item-context" aria-hidden="true"></span>
   <strong class="ui-summary-item-title">{{ interface.name }}@{{ interface.creator.username }} v{{ interface.current_version.version_number }}/{{ interface.get_kind_display }}</strong>
   <small class="ui-summary-item-updated">{% if interface.requires_update %}<span class="interface-update-required">更新が必要</span> / {% endif %}最終更新 {{ interface.updated_at|date:'Y/m/d H:i' }}</small>

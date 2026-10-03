@@ -1,0 +1,79 @@
+<section class="ui-pane ui-list-pane module-list-pane{% if profile_mode %} profile-module-list-pane{% endif %}" data-mypage-pane="module-list">
+  <header class="ui-pane-header ui-list-pane-header interface-pane-header">
+    <h2>Module一覧</h2>
+    <button class="icon-button" type="button" data-close-module-list aria-label="{% if profile_mode %}Profile{% else %}MyPage{% endif %}に戻る">×</button>
+  </header>
+
+  <div class="ui-tabs module-filter" role="tablist" aria-label="Moduleの種類" data-module-type-filter>
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-module-type="element">Element</button>
+    <button type="button" role="tab" aria-selected="false" data-module-type="interface">Interface</button>
+    <button type="button" role="tab" aria-selected="false" data-module-type="layout">Layout</button>
+  </div>
+
+  <div class="ui-tabs module-filter module-subtype-filter" role="tablist" aria-label="Elementの種類" data-module-subtypes="element">
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-module-subtype="field">Field</button>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="computed_field">ComputedField</button>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="action">Action</button>
+  </div>
+  <div class="ui-tabs module-filter module-subtype-filter" role="tablist" aria-label="Interfaceの種類" data-module-subtypes="interface" hidden>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="account">AccountIF</button>
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-module-subtype="thread">ThreadIF</button>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="thread_post">ResponseIF</button>
+  </div>
+  <div class="ui-tabs module-filter module-subtype-filter" role="tablist" aria-label="Layoutの種類" data-module-subtypes="layout" hidden>
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-module-subtype="thread_post">ThreadPost</button>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="profile">Profile</button>
+  </div>
+
+  <div class="ui-tabs module-filter" role="tablist" aria-label="Module一覧の分類" data-module-collection-filter>
+    {% if not profile_mode %}<button type="button" role="tab" aria-selected="false" data-module-collection="search">検索</button>{% endif %}
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-module-collection="self">自作</button>
+    {% if not profile_mode %}<button type="button" role="tab" aria-selected="false" data-module-collection="editing" data-module-collection-types="interface layout" hidden>編集中</button>{% endif %}
+    <button type="button" role="tab" aria-selected="false" data-module-collection="saved">保存済み</button>
+    {% if not profile_mode %}<button type="button" role="tab" aria-selected="false" data-module-collection="deleted">削除済み</button>{% endif %}
+  </div>
+
+  <div class="module-list-content">
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="element:field:search">{% include 'interfaces/field_search_panel.html' %}</section>{% endif %}
+    <section class="module-list-panel" data-module-panel="element:field:self">
+      {% if not profile_mode %}<div class="module-create-action"><button class="button" type="button" data-field-create-url="{% url 'interfaces:field-create' %}">新規作成</button></div>{% endif %}
+      {% for field in active_fields %}{% if profile_mode %}<a class="ui-summary-item interface-summary-item module-summary-entry" href="{% url 'accounts:detail' profile_account.username %}?pane=module&amp;type=element&amp;subtype=field&amp;field={{ field.pk }}" data-detail-url="{% url 'accounts:module-field-detail' profile_account.username field.pk %}">{% else %}<button class="ui-summary-item interface-summary-item module-summary-entry" type="button" data-detail-url="{% url 'interfaces:field-detail' field.pk %}">{% endif %}<span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ field.name }}@{{ field.creator.username }} v{{ field.current_version.version_number }}/Field</strong><small class="ui-summary-item-updated">最終更新 {{ field.updated_at|date:'Y/m/d H:i' }}</small>{% if profile_mode %}</a>{% else %}</button>{% endif %}{% empty %}<p class="empty">自作のFieldはありません。</p>{% endfor %}
+    </section>
+    <section class="module-list-panel" data-module-panel="element:field:saved"><p class="empty">保存したFieldはありません。</p></section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="element:field:deleted">
+      {% for field in deleted_fields %}<button class="ui-summary-item interface-summary-item module-summary-entry" type="button" data-detail-url="{% url 'interfaces:field-detail' field.pk %}"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ field.name }}@{{ field.creator.username }} v{{ field.current_version.version_number }}/Field</strong><small class="ui-summary-item-updated">最終更新 {{ field.updated_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">削除済みFieldはありません。</p>{% endfor %}
+    </section>{% endif %}
+
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="element:computed_field:search"><p class="empty">ComputedField検索は今後実装予定です。</p></section>{% endif %}
+    <section class="module-list-panel" data-module-panel="element:computed_field:self"><p class="empty">{% if profile_mode %}自作のComputedFieldはありません。{% else %}ComputedFieldの作成は今後実装予定です。{% endif %}</p></section>
+    <section class="module-list-panel" data-module-panel="element:computed_field:saved"><p class="empty">保存したComputedFieldはありません。</p></section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="element:computed_field:deleted"><p class="empty">削除済みComputedFieldはありません。</p></section>{% endif %}
+
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="element:action:search"><p class="empty">Action検索は今後実装予定です。</p></section>{% endif %}
+    <section class="module-list-panel" data-module-panel="element:action:self"><p class="empty">{% if profile_mode %}自作のActionはありません。{% else %}Actionの作成は今後実装予定です。{% endif %}</p></section>
+    <section class="module-list-panel" data-module-panel="element:action:saved"><p class="empty">保存したActionはありません。</p></section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="element:action:deleted"><p class="empty">削除済みActionはありません。</p></section>{% endif %}
+
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="interface:search"><p class="empty">選択したInterfaceの検索は今後実装予定です。</p></section>{% endif %}
+    <section class="module-list-panel" data-module-panel="interface:self">
+      {% if not profile_mode %}<form class="module-create-action" method="post" action="{% url 'interfaces:draft-create' %}">{% csrf_token %}<input type="hidden" name="kind" value="thread" data-module-create-kind><button class="button" type="submit">新規作成</button></form>{% endif %}
+      {% for item in active_interfaces %}{% include 'interfaces/summary_item.html' with interface=item detail_url_name='interfaces:published-detail' %}{% endfor %}
+      <p class="empty" data-module-empty>自作のInterfaceはありません。</p>
+    </section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="interface:editing">
+      {% for draft in interface_drafts %}{% include 'interfaces/summary_item.html' with draft=draft detail_url_name='interfaces:draft-detail' %}{% endfor %}
+      <p class="empty" data-module-empty>編集中のInterfaceはありません。</p>
+    </section>{% endif %}
+    <section class="module-list-panel" data-module-panel="interface:saved"><p class="empty">保存したInterfaceはありません。</p></section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="interface:deleted">
+      {% for item in deleted_interfaces %}{% include 'interfaces/summary_item.html' with interface=item deleted=True detail_url_name='interfaces:published-detail' %}{% endfor %}
+      <p class="empty" data-module-empty>削除済みInterfaceはありません。</p>
+    </section>{% endif %}
+
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:search"><p class="empty">選択したLayoutの検索は今後実装予定です。</p></section>{% endif %}
+    <section class="module-list-panel" data-module-panel="layout:self"><p class="empty">{% if profile_mode %}自作のLayoutはありません。{% else %}Layoutの作成は今後実装予定です。{% endif %}</p></section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:editing"><p class="empty">編集中のLayoutはありません。</p></section>{% endif %}
+    <section class="module-list-panel" data-module-panel="layout:saved"><p class="empty">保存したLayoutはありません。</p></section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:deleted"><p class="empty">削除済みLayoutはありません。</p></section>{% endif %}
+  </div>
+</section>

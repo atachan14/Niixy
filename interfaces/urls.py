@@ -5,13 +5,13 @@ from . import views
 app_name = 'interfaces'
 
 urlpatterns = [
-    path('manage/', views.management_list, name='management-list'),
+    path('manage/modules/', views.module_management_list, name='module-management-list'),
+    path('manage/modules/fields/search/', views.field_search, name='field-search'),
     path('manage/drafts/<int:draft_id>/', views.draft_detail, name='draft-detail'),
     path('manage/<int:interface_id>/', views.published_detail, name='published-detail'),
     path('<int:interface_id>/detail/', views.definition_detail, name='definition-detail'),
     path('manage/drafts/<int:draft_id>/add-fields/', views.add_field_list, name='add-field-list'),
     path('manage/drafts/<int:draft_id>/add-fields/<int:field_id>/', views.add_field_detail, name='add-field-detail'),
-    path('manage/fields/', views.field_management_list, name='field-management-list'),
     path('manage/fields/new/', views.field_create, name='field-create'),
     path('manage/fields/new/publish/', views.field_publish, name='field-publish-new'),
     path('manage/fields/<int:field_id>/', views.field_detail, name='field-detail'),

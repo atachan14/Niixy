@@ -107,6 +107,120 @@ window.NiixyUI = (() => {
     };
   }
 
+  function createFeatureWorkspaceController(track) {
+    const selector = '[data-ui-feature-workspace]';
+    const workspaces = () => Array.from(track.querySelectorAll(`:scope > ${selector}`));
+    const activate = (name) => {
+      workspaces().forEach((workspace) => {
+        workspace.hidden = workspace.dataset.uiFeatureWorkspace !== name;
+      });
+    };
+
+    return {
+      activate,
+      clear() {
+        workspaces().forEach((workspace) => { workspace.hidden = true; });
+      },
+      register(name, workspace) {
+        workspace.dataset.uiFeatureWorkspace = name;
+        workspace.classList.add('ui-feature-workspace');
+        if (workspace.parentElement !== track) track.append(workspace);
+        activate(name);
+        return workspace;
+      },
+      remove(name) {
+        workspaces()
+          .filter((workspace) => workspace.dataset.uiFeatureWorkspace === name)
+          .forEach((workspace) => workspace.remove());
+      },
+    };
+  }
+
+  function bindModuleFilters(list, initialState, {onChange = null} = {}) {
+    const subtypeByType = {
+      element: new Set(['field', 'computed_field', 'action']),
+      interface: new Set(['account', 'thread', 'thread_post']),
+      layout: new Set(['thread_post', 'profile']),
+    };
+    const allowedCollections = new Set(['search', 'self', 'editing', 'saved', 'deleted']);
+    const state = {
+      type: subtypeByType[initialState.type] ? initialState.type : 'element',
+      collection: allowedCollections.has(initialState.collection) ? initialState.collection : 'self',
+      subtypes: {
+        element: subtypeByType.element.has(initialState.subtype) ? initialState.subtype : 'field',
+        interface: subtypeByType.interface.has(initialState.subtype) ? initialState.subtype : 'thread',
+        layout: subtypeByType.layout.has(initialState.subtype) ? initialState.subtype : 'thread_post',
+      },
+    };
+
+    const supportsType = (button) => {
+      const types = button?.dataset.moduleCollectionTypes?.split(' ');
+      return !types || types.includes(state.type);
+    };
+
+    const apply = (notify = false) => {
+      const collectionButton = list.querySelector(`[data-module-collection="${state.collection}"]`);
+      if (!collectionButton || !supportsType(collectionButton)) state.collection = 'self';
+      list.querySelectorAll('[data-module-type]').forEach((button) => {
+        const active = button.dataset.moduleType === state.type;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', String(active));
+      });
+      list.querySelectorAll('[data-module-subtypes]').forEach((group) => {
+        const activeGroup = group.dataset.moduleSubtypes === state.type;
+        group.hidden = !activeGroup;
+        group.querySelectorAll('[data-module-subtype]').forEach((button) => {
+          const active = activeGroup && button.dataset.moduleSubtype === state.subtypes[state.type];
+          button.classList.toggle('is-active', active);
+          button.setAttribute('aria-selected', String(active));
+        });
+      });
+      list.querySelectorAll('[data-module-collection]').forEach((button) => {
+        button.hidden = !supportsType(button);
+        const active = button.dataset.moduleCollection === state.collection;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', String(active));
+      });
+      const activePanel = state.type === 'element'
+        ? `${state.type}:${state.subtypes.element}:${state.collection}`
+        : `${state.type}:${state.collection}`;
+      list.querySelectorAll('[data-module-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.modulePanel === activePanel);
+      });
+      list.querySelectorAll('[data-module-panel^="interface:"] .module-summary-entry').forEach((item) => {
+        item.hidden = item.dataset.moduleSubtype !== state.subtypes.interface;
+      });
+      list.querySelectorAll('[data-module-empty]').forEach((empty) => {
+        const panel = empty.closest('[data-module-panel]');
+        const hasVisibleItem = Array.from(panel.querySelectorAll('.module-summary-entry')).some((item) => !item.hidden);
+        empty.hidden = hasVisibleItem;
+      });
+      const kindInput = list.querySelector('[data-module-create-kind]');
+      if (kindInput) kindInput.value = state.subtypes.interface;
+      if (notify && onChange) onChange({
+        type: state.type,
+        subtype: state.subtypes[state.type],
+        collection: state.collection,
+      });
+    };
+
+    list.querySelectorAll('[data-module-type]').forEach((button) => button.addEventListener('click', () => {
+      state.type = button.dataset.moduleType;
+      apply(true);
+    }));
+    list.querySelectorAll('[data-module-subtypes] [data-module-subtype]').forEach((button) => button.addEventListener('click', () => {
+      const type = button.closest('[data-module-subtypes]').dataset.moduleSubtypes;
+      state.subtypes[type] = button.dataset.moduleSubtype;
+      apply(true);
+    }));
+    list.querySelectorAll('[data-module-collection]').forEach((button) => button.addEventListener('click', () => {
+      state.collection = button.dataset.moduleCollection;
+      apply(true);
+    }));
+    apply();
+    return {state, apply};
+  }
+
   function bindAccordion(details) {
     if (details.dataset.uiAccordionBound || details.matches('.account-menu, .map-filter, [data-ui-accordion="off"]')) return;
     const summary = details.querySelector(':scope > summary');
@@ -153,6 +267,6 @@ window.NiixyUI = (() => {
     if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
   }))).observe(document.body, {childList: true, subtree: true});
 
-  return {bindAccordions, bindTabs, createPaneStack, createStatusPane, createWorkspace, fetchFragment, showPaneError};
+  return {bindAccordions, bindModuleFilters, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, showPaneError};
 })();
 </script>

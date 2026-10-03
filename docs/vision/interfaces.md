@@ -31,6 +31,8 @@ Field は Interface の内部ではなく、作成者、安定 ID、現在 Versi
 
 対象は Field を直接値として保持せず、対象に属する Value と、Field から Value への接続を保持する。同じ Field を複数 Interface が使用する場合は同じ Value を参照する。Account と Thread のように対象が異なる場合は、同じ Field を使用してもそれぞれ別の Value を持つ。
 
+Threadには、FieldをInterface経由だけでなくDirectFieldとして個別に実装できる。DirectFieldとInterface内のFieldは同じValue解決処理を使用し、同一Fieldまたは片同義Fieldであれば実装経路にかかわらず一つのValueを共有する。DirectFieldは軽量な個別追加、Interfaceは複数Fieldや機能を用途ごとにまとめる単位として使い分ける。
+
 FieldVersion は、同じ意味と値型を持つ別の Field を「片同義（One-way synonym）」として参照できる。検索時は参照元から参照先だけへ候補を展開する。同じ対象へ片同義で接続された Field が実装された場合は、方向にかかわらず一つの Value を共有する。
 
 片同義によって既存の異なる Value が接続される場合は、その対象へ最初に実装された Field の Value を維持する。変更される値は Interface の実装前に表示し、利用者の確認を得る。片同義Targetは同じ型の Field に限定する。

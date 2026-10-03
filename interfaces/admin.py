@@ -8,6 +8,7 @@ from .models import (
     InterfaceDraft,
     InterfaceField,
     InterfaceVersion,
+    ThreadDirectField,
     ThreadFieldBinding,
     ThreadFieldValue,
 )
@@ -32,3 +33,4 @@ admin.site.register(FieldVersion, ImmutablePublishedAdmin)
 admin.site.register(FieldSynonym, ImmutablePublishedAdmin)
 admin.site.register(ThreadFieldBinding)
 admin.site.register(ThreadFieldValue)
+admin.site.register(ThreadDirectField)

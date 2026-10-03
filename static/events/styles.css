@@ -863,6 +863,7 @@ a {
 .ui-summary-item-updated { color: var(--muted); font-size: 12px; line-height: 1.25; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark); }
 .ui-pane-status { color: var(--muted); margin: 0; }
+.ui-feature-workspace[hidden] { display: none !important; }
 .ui-pane.is-loading, .ui-pane.has-load-error { display: grid; place-items: center; }
 .ui-workspace-track { transform: translateX(calc(-1 * var(--ui-workspace-offset, 0px))); transition: transform 260ms ease; }
 .ui-accordion-content { display: grid; grid-template-rows: 0fr; opacity: 0; overflow: hidden; transition: grid-template-rows 240ms ease, opacity 180ms ease; }
@@ -875,9 +876,18 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .thread-workspace { height: calc(100dvh - var(--header-height) - var(--footer-height)); overflow: hidden; }
 .thread-track { --list-width: 360px; --main-width: calc(100vw - var(--list-width)); --ui-workspace-fixed-width: var(--list-width); display: grid; grid-template-columns: minmax(0, var(--main-width)) var(--list-width) minmax(0, var(--main-width)); height: 100%; width: calc(200vw - var(--list-width)); }
 .thread-workspace.is-interface-list-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width) minmax(0, var(--main-width)); width: 200vw; }
-.thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane { display: none; }
+.thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane, .thread-workspace.is-field-list-open .thread-detail-pane, .thread-workspace.is-field-detail-open .thread-detail-pane { display: none; }
 .thread-workspace.is-interface-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width) minmax(0, var(--main-width)); width: 200vw; }
-.thread-workspace.is-interface-list-open .thread-interface-list-pane, .thread-workspace.is-interface-list-open .thread-interface-detail-pane, .thread-workspace.is-interface-detail-open .thread-interface-list-pane, .thread-workspace.is-interface-detail-open .thread-interface-detail-pane { display: block; }
+.thread-workspace.is-field-list-open .thread-track, .thread-workspace.is-field-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width) minmax(0, var(--main-width)); width: 200vw; }
+.thread-workspace.is-account-conditions-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width); width: calc(100vw + var(--list-width)); }
+.thread-workspace.is-account-selector-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(3, var(--list-width)); width: calc(100vw + (2 * var(--list-width))); }
+.thread-workspace.is-account-condition-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(3, var(--list-width)) minmax(0, var(--main-width)); width: calc(200vw + var(--list-width)); }
+.thread-workspace.is-account-condition-history-edit-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(2, var(--list-width)) minmax(0, var(--main-width)); width: 200vw; }
+.thread-workspace.is-account-conditions-open .thread-detail-pane, .thread-workspace.is-account-selector-open .thread-detail-pane, .thread-workspace.is-account-condition-detail-open .thread-detail-pane, .thread-workspace.is-account-condition-history-edit-open .thread-detail-pane { display: none; }
+.thread-workspace.is-interface-list-open .thread-interface-list-pane:not(.thread-field-list-pane), .thread-workspace.is-interface-list-open .thread-interface-detail-pane:not(.thread-field-detail-pane), .thread-workspace.is-interface-detail-open .thread-interface-list-pane:not(.thread-field-list-pane), .thread-workspace.is-interface-detail-open .thread-interface-detail-pane:not(.thread-field-detail-pane) { display: block; }
+.thread-workspace.is-field-list-open .thread-field-list-pane, .thread-workspace.is-field-list-open .thread-field-detail-pane, .thread-workspace.is-field-detail-open .thread-field-list-pane, .thread-workspace.is-field-detail-open .thread-field-detail-pane { display: block; }
+.thread-workspace.is-account-conditions-open .account-condition-pane, .thread-workspace.is-account-selector-open .account-condition-pane, .thread-workspace.is-account-selector-open .account-selector-pane, .thread-workspace.is-account-condition-detail-open .account-condition-pane, .thread-workspace.is-account-condition-detail-open .account-selector-pane, .thread-workspace.is-account-condition-detail-open .account-condition-detail-pane { display: block; }
+.thread-workspace.is-account-condition-history-edit-open .account-condition-pane, .thread-workspace.is-account-condition-history-edit-open .account-condition-detail-pane { display: block; }
 html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100vw + var(--list-width))); transition: none; }
 .thread-workspace.is-restoring-detail .thread-track { transition: none; }
 .thread-map-list-pane { display: contents; }
@@ -887,14 +897,79 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-detail-pane { border-left: 1px solid var(--line); position: relative; }
 .thread-pane-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 40px; }
 .thread-pane-header h2, .thread-detail-header h2 { font-size: 18px; margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.niimap-search-controls { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-top: 12px; }
+.niimap-search-controls > summary { cursor: pointer; font-weight: 700; padding: 12px; }
+.niimap-search-controls > summary { list-style: none; }
+.niimap-search-controls > summary::-webkit-details-marker { display: none; }
+.niimap-search-controls form { display: grid; padding: 0 12px 12px; }
+.niimap-search-section { border-top: 1px solid var(--line); }
+.niimap-search-section > summary { cursor: pointer; font-size: 14px; font-weight: 700; padding: 11px 0; }
+.niimap-search-section-body { display: grid; gap: 10px; padding: 2px 0 14px; }
+.niimap-search-controls label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.niimap-search-controls input, .niimap-search-controls select, .niimap-picker-search { border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; min-height: 38px; min-width: 0; padding: 7px 8px; width: 100%; }
+.niimap-search-row { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.niimap-search-row:has(.niimap-module-select:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, .8fr); }
+.niimap-module-select { background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--accent-dark); cursor: pointer; font: inherit; min-width: 0; overflow: hidden; padding: 7px 8px; text-overflow: ellipsis; white-space: nowrap; }
+.niimap-condition-list { display: grid; gap: 7px; }
+.niimap-condition-row { align-items: center; display: grid; gap: 6px; grid-template-columns: minmax(0, .8fr) minmax(0, .8fr) minmax(120px, 1.5fr) auto auto; }
+.niimap-module-condition { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
+.niimap-module-condition > span { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.niimap-condition-remove { background: transparent; border: 0; cursor: pointer; font: inherit; padding: 6px; }
+.niimap-search-actions { border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; }
+.niimap-search-actions .button { flex: 0 0 auto; white-space: nowrap; width: auto; }
+.niimap-account-condition-field { display: grid; gap: 7px; }
+.niimap-account-condition-field > strong { font-size: 13px; }
+.niimap-account-condition-field > .button { justify-self: start; }
+.niimap-policy-conditions { gap: 0; }
+.niimap-policy-condition { border-top: 1px solid var(--line); display: grid; gap: 7px; padding: 11px 0; }
+.niimap-policy-condition:first-child { border-top: 0; }
+.niimap-policy-condition > strong { font-size: 13px; }
+.niimap-policy-condition > .button { justify-self: start; }
+.niimap-selected-account-conditions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.niimap-selected-account-condition { align-items: center; background: #eef6f4; border: 1px solid #b8ddd6; border-radius: 4px; display: flex; font-size: 13px; gap: 5px; max-width: 100%; padding: 5px 7px; }
+.niimap-selected-account-condition > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.niimap-selected-account-condition button { background: transparent; border: 0; cursor: pointer; flex: 0 0 auto; font: inherit; padding: 0 2px; }
+.account-condition-pane, .account-selector-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; min-height: 0; min-width: 0; overflow-y: auto; width: var(--list-width); }
+.account-condition-detail-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; min-height: 0; min-width: 0; overflow-y: auto; width: var(--main-width); }
+.account-condition-controls { display: grid; gap: 12px; padding: 16px 20px 20px; }
+#browse-account-conditions { justify-content: center; margin: 0; width: 100%; }
+.account-condition-group-actions { align-items: stretch; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(92px, auto); }
+.account-condition-group-actions .button { justify-content: center; margin: 0; min-width: 92px; white-space: nowrap; width: 100%; }
+.account-condition-list { padding: 0 20px 20px; }
+.account-condition-summary { align-items: stretch; border-bottom: 1px solid var(--line); display: flex; }
+.account-condition-summary .ui-summary-item { border: 0; }
+.account-condition-summary .ui-summary-item { flex: 1 1 auto; min-width: 0; }
+.account-condition-edit, .account-condition-delete { background: transparent; border: 0; cursor: pointer; flex: 0 0 auto; font: inherit; padding: 8px; }
+.account-condition-edit { color: var(--accent-dark); }
+.account-selector-content .module-list-panel { display: none; padding: 16px 20px 28px; }
+.account-selector-content .module-list-panel.is-active { display: block; }
+.account-selector-tabs[hidden] { display: none; }
+.account-selector-content .field-search-controls { border-bottom: 1px solid var(--line); }
+.account-selector-content .field-search-controls > summary { cursor: pointer; font-weight: 700; padding: 2px 0 14px; }
+.account-selector-content .field-search-form { display: grid; gap: 12px; padding-bottom: 16px; }
+.account-selector-content .field-search-row { align-items: center; display: grid; gap: 10px; grid-template-columns: 44px minmax(0, 1fr); }
+.account-selector-content .field-search-row label { font-weight: 700; }
+.account-selector-content .field-search-row input, .account-selector-content .field-search-row select, .account-selector-search input { border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; min-height: 40px; min-width: 0; padding: 8px 9px; width: 100%; }
+.account-selector-content .field-search-actions { display: flex; justify-content: flex-end; }
+.account-selector-search { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; margin-bottom: 12px; }
+.account-condition-detail-body { margin: 0 auto; max-width: 760px; padding: 24px; }
+.account-field-condition-form { display: grid; gap: 18px; }
+.account-field-condition-form h3 { font-size: 17px; margin: 0; }
+.account-field-condition-controls { display: grid; gap: 10px; grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr); }
+.account-field-condition-controls input, .account-field-condition-controls select { border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; min-height: 40px; min-width: 0; padding: 8px 9px; width: 100%; }
+.niimap-create-controls-body { display: grid; gap: 10px; padding: 0 12px 12px; }
+.niimap-create-controls-body > div { display: grid; gap: 7px; grid-template-columns: 1fr 1fr; }
+.niimap-create-controls .event-location-status { grid-column: 1 / -1; }
+.thread-detail-pane > .map-event-form { padding-top: 18px; }
 .thread-list { margin-top: 12px; }
 .thread-item { border-bottom: 1px solid var(--line); }
 .thread-summary { padding-left: 0; padding-right: 0; }
 .thread-detail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; min-height: 60px; position: sticky; top: 0; z-index: 2; }
 .thread-detail { display: grid; gap: 16px; min-width: 0; }
 .thread-detail[hidden] { display: none !important; }
-.thread-post { border-bottom: 1px solid var(--line); display: grid; gap: 12px; grid-template-columns: clamp(56px, 12%, 96px) minmax(0, 1fr); min-width: 0; padding: 14px 0; }
-.thread-post > div, .thread-post-info { min-width: 0; }
+.thread-post { border-bottom: 1px solid var(--line); min-width: 0; padding: 14px 0; }
+.thread-post-layout-area { display: grid; gap: 12px; grid-template-columns: clamp(56px, 12%, 96px) minmax(0, 1fr); min-width: 0; }
+.thread-post-layout-area > div, .thread-post-info { min-width: 0; }
 .thread-thumbnail { aspect-ratio: 1; background: #e7e4df; border: 1px solid var(--line); border-radius: 6px; }
 .thread-post-info { align-items: center; display: flex; gap: 8px; font-size: 14px; font-weight: 700; }
 .thread-post-info time { color: var(--muted); font-weight: 400; margin-left: auto; }
@@ -912,8 +987,8 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-interface-input { border-top: 1px solid var(--line); padding-top: 10px; }
 .thread-interface-input > summary { cursor: pointer; font-size: 16px; font-weight: 700; padding: 4px 0 10px; }
 .thread-interface-input-content { display: grid; gap: 10px; min-width: 0; width: 100%; }
-#selected-thread-interfaces { min-width: 0; width: 100%; }
-#open-thread-interface-selector { background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--accent-dark); cursor: pointer; font: inherit; justify-self: start; padding: 7px 10px; }
+#selected-direct-fields, #selected-thread-interfaces { min-width: 0; width: 100%; }
+#open-direct-field-selector, #open-thread-interface-selector { background: #fff; border: 1px solid var(--line); border-radius: 6px; color: var(--accent-dark); cursor: pointer; font: inherit; justify-self: start; padding: 7px 10px; }
 .selected-interface-root { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
 .selected-interface-root button { background: transparent; border: 0; color: var(--text); cursor: pointer; font: inherit; padding: 10px 4px; }
 .selected-interface-root button:first-child { flex: 1; font-weight: 700; text-align: left; }
@@ -923,6 +998,10 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-interface-implementation > summary .remove-thread-interface { cursor: pointer; flex: 0 0 auto; font-weight: 400; margin-left: auto; padding: 4px; }
 .thread-interface-implementation-fields { display: grid; gap: 10px; padding: 2px 0 14px; }
 .thread-interface-field input:not([type='checkbox']), .thread-interface-field select, .thread-interface-field textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; min-height: 40px; padding: 8px 9px; width: 100%; }
+.thread-field-control { border: 1px solid transparent; padding: 5px; transition: border-color 140ms ease, background-color 140ms ease; }
+.thread-field-control.is-linked-value { background: #eef6f4; border-color: var(--accent); }
+.thread-interface-implementation.has-linked-thread-value > summary, .thread-information-entry.has-linked-thread-value > summary { color: var(--accent-dark); outline: 1px solid var(--accent); outline-offset: -1px; }
+.thread-information-entry [data-thread-value].is-linked-value { background: #eef6f4; outline: 1px solid var(--accent); }
 .thread-interface-choices { display: grid; gap: 7px; }
 .thread-interface-choices label { align-items: center; display: flex; gap: 7px; }
 .thread-interface-list-pane, .thread-interface-detail-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; min-height: 0; min-width: 0; overflow-y: auto; }
@@ -930,8 +1009,18 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-interface-detail-pane { width: var(--main-width); }
 .thread-interface-catalog { padding: 0 20px 20px; }
 .thread-interface-catalog-list small, .thread-interface-creator, .thread-interface-requires { color: var(--muted); }
+.thread-field-search { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.thread-field-search > summary { cursor: pointer; font-weight: 700; }
+.thread-field-search form { display: grid; gap: 10px; padding-top: 12px; }
+.thread-field-search label { align-items: center; display: grid; gap: 8px; grid-template-columns: 44px minmax(0, 1fr); font-weight: 700; }
+.thread-field-search input, .thread-field-search select { border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; min-height: 40px; min-width: 0; padding: 8px 9px; width: 100%; }
+.thread-field-search .button { justify-self: end; }
 .thread-interface-selector-detail { overflow-y: auto; padding: 24px; }
 .interface-definition-detail { display: grid; gap: 28px; margin: 0 auto; max-width: 760px; }
+.field-definition-summary { display: grid; gap: 12px; margin: 0; }
+.field-definition-summary > div { display: grid; gap: 8px; grid-template-columns: max-content minmax(0, 1fr); }
+.field-definition-summary dt { font-weight: 700; }
+.field-definition-summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .interface-description,
 .published-field p { margin: 0; }
 .published-requirement small,
@@ -947,15 +1036,13 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .interface-implementation-editor { border-top: 1px solid var(--line); display: grid; gap: 10px; margin: 28px auto 0; max-width: 760px; padding-top: 20px; }
 .interface-implementation-editor > h3 { font-size: 17px; margin: 0; }
 .interface-detail-actions { display: grid; gap: 14px; justify-items: end; margin: 20px auto 0; max-width: 760px; }
-.thread-interface-accordion { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 10px; }
-.thread-interface-accordion > summary, .thread-interface-entry > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
-.thread-interface-accordion-content { display: grid; gap: 6px; padding: 4px 0 8px; }
-.thread-interface-entry { border-top: 1px solid var(--line); }
-.thread-interface-entry summary small { color: var(--muted); font-weight: 400; }
-.thread-interface-entry dl { margin: 0; }
-.thread-interface-entry dl div { display: grid; gap: 4px; grid-template-columns: minmax(100px, 35%) minmax(0, 1fr); padding: 7px 0; }
-.thread-interface-entry dt { color: var(--muted); }
-.thread-interface-entry dd { margin: 0; overflow-wrap: anywhere; }
+.thread-information { border-top: 1px solid var(--line); display: grid; margin-top: 16px; }
+.thread-information-entry { border-bottom: 1px solid var(--line); min-width: 0; }
+.thread-information-entry > summary { cursor: pointer; font-weight: 700; padding: 10px 0; }
+.thread-information-entry dl { margin: 0; padding-bottom: 8px; }
+.thread-information-entry dl div { display: grid; gap: 4px; grid-template-columns: minmax(100px, 35%) minmax(0, 1fr); padding: 7px 0; }
+.thread-information-entry dt { color: var(--muted); }
+.thread-information-entry dd { margin: 0; overflow-wrap: anywhere; }
 .thread-rule-dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 18px; width: min(360px, calc(100vw - 32px)); }
 .thread-rule-dialog::backdrop { background: rgba(36, 33, 29, 0.42); }
 .thread-rule-dialog form { display: grid; gap: 16px; }
@@ -971,10 +1058,14 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
   .thread-list-pane { box-sizing: border-box; min-height: 0; min-width: 0; overflow: visible; width: 100vw; }
   .thread-detail-pane { box-sizing: border-box; flex: 0 0 100vw; min-height: 0; min-width: 0; overflow-y: auto; padding-bottom: calc(24px + env(safe-area-inset-bottom)); position: relative; transform: none; width: 100vw; z-index: auto; }
   .thread-detail-header { top: 0; }
-  .thread-post { grid-template-columns: clamp(44px, 18%, 64px) minmax(0, 1fr); }
-  .thread-workspace.is-interface-list-open .thread-track, .thread-workspace.is-interface-detail-open .thread-track { width: 400vw; }
-  .thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane { display: block; }
+  .thread-post-layout-area { grid-template-columns: clamp(44px, 18%, 64px) minmax(0, 1fr); }
+  .thread-workspace.is-interface-list-open .thread-track, .thread-workspace.is-interface-detail-open .thread-track, .thread-workspace.is-field-list-open .thread-track, .thread-workspace.is-field-detail-open .thread-track, .thread-workspace.is-account-conditions-open .thread-track, .thread-workspace.is-account-selector-open .thread-track, .thread-workspace.is-account-condition-detail-open .thread-track, .thread-workspace.is-account-condition-history-edit-open .thread-track { width: 600vw; }
+  .thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane, .thread-workspace.is-field-list-open .thread-detail-pane, .thread-workspace.is-field-detail-open .thread-detail-pane { display: block; }
   .thread-interface-list-pane, .thread-interface-detail-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
+  .account-condition-pane, .account-selector-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
+  .account-condition-detail-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
+  .account-condition-detail-body { padding: 20px 16px 40px; }
+  .account-field-condition-controls { grid-template-columns: 1fr; }
   .thread-interface-catalog { padding: 0 16px 24px; }
   .thread-interface-selector-detail { padding: 20px 16px 40px; }
 }

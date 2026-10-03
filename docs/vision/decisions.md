@@ -158,4 +158,38 @@ Field の再利用を InterfaceRequirement で表現しない。InterfaceRequire
 
 Layout は複数 Interface の Field、ComputedField、Action を横断して配置するため、InterfaceVersion の内部には置かず独立した定義とする。対象は用途に対応する Layout を一つ使用し、通常利用者には Niixy の標準 Layout を自動適用する。ThreadPost 作成時の Layout Snapshot と、本文などの固定領域を Layout から削除できない方針は維持する。
 
-Field、ComputedField、Action、Interface、Layout のユーザー向け総称は「定義」、英語表記は Definition とする。これは UI 上の分類であり、共通の親データモデルを必須としない。
+当時はField、ComputedField、Action、Interface、Layoutのユーザー向け総称を「定義（Definition）」としていた。この名称判断は、2026-10-02の「Moduleをユーザー向け総称とする」により置き換えた。
+
+## 2026-10-02 - Moduleをユーザー向け総称とする
+
+状態: 採用
+
+Field、ComputedField、Action、Interface、Layoutのユーザー向け総称は「Module」とする。MyPageとProfileではModuleを一つの入口とし、Module種別、対象種別、検索・自作・保存済み・削除済みの順に一覧を絞り込む。Draftを持つInterfaceとLayoutでは、自作の隣に編集中を加えて公開済みModuleとDraftを分離する。
+
+Module一覧の最上位分類はElement、Interface、Layoutとする。ElementはInterfaceなどを構成する単位を表し、Field、ComputedField、Actionを分類する。
+
+ProfileでもMyPageと同じModule一覧・詳細Paneを使用する。Profileでは、Profile本人が公開した自作ModuleとProfile本人が保存したModuleだけを扱う。保存済みは閲覧者自身の保存先ではない。新規作成、検索、編集中、削除済みは表示しない。実装済みAccountIFはAccountInterface実装時に分類を追加する。
+
+画面、URL、画面制御など上位概念を扱う内部名称にも`module`を使用する。一方、`FieldDefinition`のように具体的な定義データを表す既存モデル名は維持する。ModuleはUIとドメイン上の分類であり、共通の親データモデルを必須としない。
+
+## 2026-10-02 - ThreadへのDirectField実装を認める
+
+状態: 採用
+
+Thread作成時には、FieldをThreadInterface経由だけでなくDirectFieldとして個別に追加できる。DirectFieldは作成時の入力を必須とし、追加時点の最新FieldVersionを固定する。DirectFieldとThreadInterface内のFieldは共通のValue解決処理を使い、同一Fieldまたは片同義Fieldであれば一つのThreadFieldValueを共有する。UIでは同じValueを参照するFieldへホバーまたはフォーカスした際、関連するFieldまたは収納中の親アコーディオンを強調する。
+
+## 2026-10-02 - Threadの発見制限を廃止する
+
+状態: 採用（2026-09-20の最小制限と、発見・閲覧を分離する方針を一部置換）
+
+Threadがどこに現れるかはThreadPlacementと掲載先が決める。Thread固有のPolicyは閲覧制限と書込制限を持ち、発見制限は持たない。
+
+閲覧できないThreadも掲載先の一覧、Map、検索、Profileには存在を表示する。本文とThreadPostはサーバー側で返さず、詳細では閲覧できないことを案内する。存在自体を隠す必要が生じた場合は、公開範囲を持つRoomなど掲載先側の仕様として実装時に再設計する。
+
+## 2026-10-02 - Account条件を再利用可能な一覧として扱う
+
+状態: 採用
+
+作成者検索とPolicyで使うAccount条件は、Default、Account、AccountIF、Field、Roomを同じ一覧から選択する。Accountごとに一覧と使用順を保持し、既存条件の再追加では重複させず先頭へ移動する。削除したDefault条件はDefault一覧から復元できる。
+
+呼び出し元に追加した条件Item同士はOR、ANDグループ内の条件同士はANDとして評価する。ANDグループは条件種別をまたいで作成でき、成立不能な組み合わせも当面は利用者の判断に委ねる。

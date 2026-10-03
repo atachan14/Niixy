@@ -166,6 +166,14 @@ class FieldVersion(ImmutablePublishedModel):
     def __str__(self):
         return f'{self.definition} v{self.version_number}'
 
+    @property
+    def field_key(self):
+        return self.definition.key
+
+    @property
+    def label(self):
+        return self.name
+
 
 class FieldSynonym(ImmutablePublishedModel):
     source_version = models.ForeignKey(FieldVersion, on_delete=models.CASCADE, related_name='synonyms')
@@ -302,6 +310,47 @@ class ThreadFieldBinding(models.Model):
             ),
         ]
         ordering = ['created_at', 'pk']
+
+
+class ThreadDirectField(models.Model):
+    thread = models.ForeignKey('events.Thread', on_delete=models.CASCADE, related_name='direct_fields')
+    definition = models.ForeignKey(
+        FieldDefinition,
+        on_delete=models.PROTECT,
+        related_name='direct_thread_implementations',
+    )
+    version = models.ForeignKey(
+        FieldVersion,
+        on_delete=models.PROTECT,
+        related_name='direct_thread_implementations',
+    )
+    binding = models.ForeignKey(
+        ThreadFieldBinding,
+        on_delete=models.PROTECT,
+        related_name='direct_implementations',
+    )
+    position = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['thread', 'definition'], name='unique_thread_direct_field'),
+            models.UniqueConstraint(fields=['thread', 'position'], name='unique_thread_direct_field_position'),
+        ]
+        ordering = ['position', 'pk']
+
+    @property
+    def value(self):
+        return self.binding.value.value
+
+    @property
+    def display_value(self):
+        value = self.value
+        if isinstance(value, bool):
+            return 'はい' if value else 'いいえ'
+        if isinstance(value, list):
+            return ' / '.join(str(item) for item in value)
+        return str(value)
 
 
 class ThreadInterfaceValue(models.Model):

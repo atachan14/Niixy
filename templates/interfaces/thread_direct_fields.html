@@ -1,0 +1,8 @@
+{% if thread.direct_fields.all %}
+  <details class="thread-information-entry thread-direct-field-entry" open>
+    <summary>DirectField</summary>
+    <dl>
+      {% for item in thread.direct_fields.all %}<div data-thread-value="{{ item.binding.value_id }}"><dt>{{ item.version.name }}@{{ item.version.definition.creator.username }} v{{ item.version.version_number }}/Field</dt><dd>{{ item.display_value }}</dd></div>{% endfor %}
+    </dl>
+  </details>
+{% endif %}

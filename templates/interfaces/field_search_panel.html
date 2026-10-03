@@ -1,0 +1,10 @@
+<details class="field-search-controls" open>
+  <summary>検索条件</summary>
+  <form class="field-search-form" action="{% url 'interfaces:field-search' %}" method="get" data-field-search-form>
+    <div class="field-search-row"><label for="field-search-name">名前</label><input id="field-search-name" type="search" name="name" value="{{ field_search_filters.name }}" placeholder="Field名@NiixyID"></div>
+    <div class="field-search-row"><label for="field-search-description">詳細</label><input id="field-search-description" type="search" name="description" value="{{ field_search_filters.description }}"></div>
+    <div class="field-search-row"><label for="field-search-type">型</label><select id="field-search-type" name="field_type"><option value="">すべて</option>{% for value, label in field_search_types %}<option value="{{ value }}"{% if field_search_filters.field_type == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="field-search-actions"><button class="button" type="submit">検索</button></div>
+  </form>
+</details>
+{% include 'interfaces/field_search_results.html' %}

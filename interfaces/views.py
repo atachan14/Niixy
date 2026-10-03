@@ -1,14 +1,17 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .forms import FieldDefinitionForm, InterfaceDraftFieldFormSet, InterfaceDraftForm
-from .models import FieldDefinition, Interface, InterfaceDraft, InterfaceDraftField
-from .services import publish_draft, publish_field_definition
+from .models import FieldDefinition, FieldType, Interface, InterfaceDraft, InterfaceDraftField
+from .services import publish_draft, publish_field_definition, search_field_definitions
 
 
 def field_initial(field):
@@ -106,6 +109,62 @@ def interface_list_context(user):
     }
 
 
+def module_list_context(user):
+    context = interface_list_context(user)
+    fields = list(
+        user.field_definitions.select_related('current_version').order_by('name')
+    )
+    context.update({
+        'active_fields': [item for item in fields if item.status == FieldDefinition.ACTIVE],
+        'deleted_fields': [item for item in fields if item.status == FieldDefinition.DELETED],
+    })
+    context.update(field_search_context({}))
+    return context
+
+
+def field_search_context(params):
+    filters = {
+        'name': params.get('name', ''),
+        'description': params.get('description', ''),
+        'field_type': params.get('field_type', ''),
+    }
+    valid_field_types = {value for value, _ in FieldType.choices}
+    if filters['field_type'] not in valid_field_types:
+        filters['field_type'] = ''
+    page = Paginator(search_field_definitions(**filters), 10).get_page(params.get('page'))
+    return {
+        'field_search_filters': filters,
+        'field_search_types': FieldType.choices,
+        'field_search_page': page,
+        'field_search_query': urlencode({key: value for key, value in filters.items() if value}),
+    }
+
+
+def profile_module_list_context(user):
+    fields = list(
+        user.field_definitions.filter(
+            status=FieldDefinition.ACTIVE,
+            current_version__isnull=False,
+        ).select_related('creator', 'current_version').order_by('name')
+    )
+    interfaces = mark_interface_update_status(list(
+        user.interfaces.filter(
+            status=Interface.ACTIVE,
+            current_version__isnull=False,
+        ).select_related('creator', 'current_version').prefetch_related(
+            'current_version__fields__definition__creator',
+            'current_version__fields__definition__current_version',
+            'current_version__fields__field_version',
+        ).order_by('name')
+    ))
+    return {
+        'profile_mode': True,
+        'profile_account': user,
+        'active_fields': fields,
+        'active_interfaces': interfaces,
+    }
+
+
 def draft_detail_context(user, draft_id):
     draft = get_object_or_404(
         user.interface_drafts.select_related('interface__current_version').prefetch_related(
@@ -129,8 +188,13 @@ def draft_detail_context(user, draft_id):
 
 
 @login_required
-def management_list(request):
-    return render(request, 'interfaces/management_list_pane.html', interface_list_context(request.user))
+def module_management_list(request):
+    return render(request, 'interfaces/module_management_list_pane.html', module_list_context(request.user))
+
+
+@login_required
+def field_search(request):
+    return render(request, 'interfaces/field_search_results.html', field_search_context(request.GET))
 
 
 @login_required
@@ -204,12 +268,15 @@ def add_field_detail(request, draft_id, field_id):
 @login_required
 @require_POST
 def draft_create(request):
+    kind = request.POST.get('kind', Interface.THREAD)
+    if kind not in dict(Interface.KIND_CHOICES):
+        kind = Interface.THREAD
     draft = InterfaceDraft.objects.create(
         creator=request.user,
-        kind=Interface.THREAD,
+        kind=kind,
         name='新しいInterface',
     )
-    return redirect(f'/mypage/?section=interface&draft={draft.pk}')
+    return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
 
 
 @login_required
@@ -243,7 +310,7 @@ def draft_edit(request, interface_id):
             )
             for field in interface.current_version.fields.all()
         ])
-    return redirect(f'/mypage/?section=interface&draft={draft.pk}')
+    return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
 
 
 def save_draft_forms(draft, draft_form, field_formset):
@@ -316,29 +383,30 @@ def draft_update(request, draft_id):
                 errors.extend(str(error) for error in field_errors)
         errors.extend(str(error) for error in field_formset.non_form_errors())
         messages.error(request, ' '.join(errors) or '入力内容を確認してください。')
-        return redirect(f'/mypage/?section=interface&draft={draft.pk}')
+        return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
 
     try:
         save_draft_forms(draft, draft_form, field_formset)
         if request.POST.get('action') == 'publish':
             interface, version = publish_draft(draft.pk)
             messages.success(request, f'{interface.name} v{version.version_number}を公開しました。')
-            return redirect('/mypage/?section=interface')
+            return redirect(f'/mypage/?section=module&type=interface&subtype={interface.kind}')
     except ValidationError as error:
         messages.error(request, ' '.join(error.messages))
-        return redirect(f'/mypage/?section=interface&draft={draft.pk}')
+        return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
 
     messages.success(request, 'Draftを保存しました。')
-    return redirect(f'/mypage/?section=interface&draft={draft.pk}')
+    return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
 
 
 @login_required
 @require_POST
 def draft_discard(request, draft_id):
     draft = get_object_or_404(InterfaceDraft, pk=draft_id, creator=request.user)
+    kind = draft.kind
     draft.delete()
     messages.success(request, 'Draftを破棄しました。')
-    return redirect('/mypage/?section=interface')
+    return redirect(f'/mypage/?section=module&type=interface&subtype={kind}&collection=editing')
 
 
 @login_required
@@ -348,7 +416,7 @@ def interface_delete(request, interface_id):
     interface.status = Interface.DELETED
     interface.save(update_fields=['status', 'updated_at'])
     messages.success(request, f'{interface.name}を削除しました。既存の実装では引き続き利用されます。')
-    return redirect('/mypage/?section=interface')
+    return redirect(f'/mypage/?section=module&type=interface&subtype={interface.kind}')
 
 
 @login_required
@@ -358,7 +426,7 @@ def interface_restore(request, interface_id):
     interface.status = Interface.ACTIVE
     interface.save(update_fields=['status', 'updated_at'])
     messages.success(request, f'{interface.name}を復元しました。')
-    return redirect(f'/mypage/?section=interface&interface={interface.pk}')
+    return redirect(f'/mypage/?section=module&type=interface&subtype={interface.kind}&interface={interface.pk}')
 
 
 def field_form_initial(definition):
@@ -370,17 +438,6 @@ def field_form_initial(definition):
         'options': '\n'.join(version.settings.get('options', [])),
         'synonym_targets': list(version.synonyms.values_list('target_id', flat=True)),
     }
-
-
-@login_required
-def field_management_list(request):
-    fields = list(
-        request.user.field_definitions.select_related('current_version').order_by('name')
-    )
-    return render(request, 'interfaces/field_management_list_pane.html', {
-        'active_fields': [item for item in fields if item.status == FieldDefinition.ACTIVE],
-        'deleted_fields': [item for item in fields if item.status == FieldDefinition.DELETED],
-    })
 
 
 @login_required
@@ -402,7 +459,10 @@ def field_detail(request, field_id):
         .prefetch_related('current_version__synonyms__target__creator'),
         pk=field_id,
     )
-    return render(request, 'interfaces/field_detail_pane.html', {'field_item': definition})
+    return render(request, 'interfaces/field_detail_pane.html', {
+        'field_item': definition,
+        'profile_mode': request.GET.get('context') == 'profile',
+    })
 
 
 @login_required
@@ -476,9 +536,9 @@ def field_publish(request, field_id=None):
         )
     except ValidationError as error:
         messages.error(request, ' '.join(error.messages))
-        return redirect('/mypage/?section=definition&kind=field')
+        return redirect('/mypage/?section=module&type=element&subtype=field')
     messages.success(request, f'{definition.name} v{version.version_number}を公開しました。')
-    return redirect(f'/mypage/?section=definition&kind=field&field={definition.pk}')
+    return redirect(f'/mypage/?section=module&type=element&subtype=field&field={definition.pk}')
 
 
 @login_required
@@ -488,7 +548,7 @@ def field_delete(request, field_id):
     definition.status = FieldDefinition.DELETED
     definition.save(update_fields=['status', 'updated_at'])
     messages.success(request, f'{definition.name}を削除しました。既存の実装では引き続き利用されます。')
-    return redirect('/mypage/?section=definition&kind=field')
+    return redirect('/mypage/?section=module&type=element&subtype=field')
 
 
 @login_required
@@ -498,4 +558,4 @@ def field_restore(request, field_id):
     definition.status = FieldDefinition.ACTIVE
     definition.save(update_fields=['status', 'updated_at'])
     messages.success(request, f'{definition.name}を復元しました。')
-    return redirect(f'/mypage/?section=definition&kind=field&field={definition.pk}')
+    return redirect(f'/mypage/?section=module&type=element&subtype=field&field={definition.pk}')

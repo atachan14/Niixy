@@ -1,0 +1,11 @@
+<details class="thread-information-entry thread-policy-entry">
+  <summary>Policy</summary>
+  <dl class="thread-policy-list">
+    {% for row in thread.access_policy_rows %}
+      <div>
+        <dt>{{ row.label }}</dt>
+        <dd>{% for audience in row.audiences %}{{ audience }}{% if not forloop.last %} / {% endif %}{% empty %}許可なし{% endfor %}</dd>
+      </div>
+    {% endfor %}
+  </dl>
+</details>

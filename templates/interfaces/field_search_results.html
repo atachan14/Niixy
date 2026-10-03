@@ -1,0 +1,10 @@
+<div class="field-search-results" data-field-search-results aria-live="polite">
+  <div class="ui-summary-list">
+    {% for field in field_search_page %}<button class="ui-summary-item interface-summary-item module-summary-entry" type="button" data-detail-url="{% url 'interfaces:field-detail' field.pk %}"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ field.name }}@{{ field.creator.username }} v{{ field.current_version.version_number }}/Field</strong><small class="ui-summary-item-updated">最終更新 {{ field.updated_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">条件に一致するFieldはありません。</p>{% endfor %}
+  </div>
+  {% if field_search_page.has_other_pages %}<nav class="field-search-pagination" aria-label="Field検索結果のページ">
+    {% if field_search_page.has_previous %}<a class="button secondary" href="{% url 'interfaces:field-search' %}?{% if field_search_query %}{{ field_search_query }}&amp;{% endif %}page={{ field_search_page.previous_page_number }}" data-field-search-page>前へ</a>{% endif %}
+    <span>{{ field_search_page.number }} / {{ field_search_page.paginator.num_pages }}</span>
+    {% if field_search_page.has_next %}<a class="button secondary" href="{% url 'interfaces:field-search' %}?{% if field_search_query %}{{ field_search_query }}&amp;{% endif %}page={{ field_search_page.next_page_number }}" data-field-search-page>次へ</a>{% endif %}
+  </nav>{% endif %}
+</div>

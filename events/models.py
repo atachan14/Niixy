@@ -40,6 +40,25 @@ class Thread(IdempotentSubmission):
             return any(rule.capability == capability and rule.audience == audience for rule in prefetched_rules)
         return self.access_rules.filter(capability=capability, audience=audience).exists()
 
+    @property
+    def access_policy_rows(self):
+        rules = self._prefetched_objects_cache.get('access_rules')
+        if rules is None:
+            rules = list(self.access_rules.all())
+
+        enabled = {(rule.capability, rule.audience) for rule in rules}
+        return [
+            {
+                'label': capability_label,
+                'audiences': [
+                    audience_label
+                    for audience, audience_label in ThreadAccessRule.AUDIENCE_CHOICES
+                    if (capability, audience) in enabled
+                ],
+            }
+            for capability, capability_label in ThreadAccessRule.CAPABILITY_CHOICES
+        ]
+
 
 class ThreadPost(IdempotentSubmission):
     thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='posts')
@@ -69,12 +88,11 @@ class ThreadPlacement(models.Model):
 
 
 class ThreadAccessRule(models.Model):
-    DISCOVER = 'discover'
     VIEW = 'view'
     WRITE = 'write'
     GUEST = 'guest'
     ACCOUNT = 'account'
-    CAPABILITY_CHOICES = [(DISCOVER, '発見'), (VIEW, '閲覧'), (WRITE, '書込')]
+    CAPABILITY_CHOICES = [(VIEW, '閲覧'), (WRITE, '書込')]
     AUDIENCE_CHOICES = [(GUEST, 'Guest'), (ACCOUNT, 'NiixyAccount')]
 
     thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='access_rules')
@@ -90,6 +108,7 @@ class NiiMapFilterPreference(models.Model):
     show_guest_threads = models.BooleanField(default=True)
     account_ids_enabled = models.BooleanField(default=False)
     account_section_open = models.BooleanField(default=False)
+    search_state = models.JSONField(default=dict, blank=True)
 
 
 class Station(models.Model):

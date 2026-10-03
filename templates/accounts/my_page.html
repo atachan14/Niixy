@@ -3,36 +3,33 @@
 
 {% block title %}{{ account.niixy_profile.display_label }} のマイページ | Niixy{% endblock %}
 {% block main_class %}mypage-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20260929-6">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
 {% block content %}
-<section class="mypage" data-initial-section="{% if show_basic_info %}basic{% elif show_interface %}interface{% else %}overview{% endif %}" data-pane-url="{% url 'mypage' %}" data-interface-list-url="{% url 'interfaces:management-list' %}" data-field-list-url="{% url 'interfaces:field-management-list' %}">
-  <header class="mypage-header"><h1><button id="mypage-identity" type="button"{% if not show_basic_info and not show_interface %} disabled{% endif %}>{{ account.niixy_profile.display_label }} のマイページ</button><span id="mypage-context"{% if not show_basic_info and not show_interface %} hidden{% endif %}> &gt; {% if show_interface %}定義 &gt; Interface{% else %}基本情報{% endif %}</span></h1></header>
+<section class="mypage" data-initial-section="{% if show_basic_info %}basic{% elif show_module %}module{% else %}overview{% endif %}" data-pane-url="{% url 'mypage' %}" data-module-list-url="{% url 'interfaces:module-management-list' %}">
+  <header class="mypage-header"><h1><button id="mypage-identity" type="button"{% if not show_basic_info and not show_module %} disabled{% endif %}>{{ account.niixy_profile.display_label }} のマイページ</button></h1></header>
   <div class="mypage-viewport"><div class="mypage-workspace ui-workspace-track">
     <section class="mypage-overview" aria-label="マイページ概要"><div class="mypage-overview-content">
       <div class="mypage-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
       <div class="mypage-actions" aria-label="マイページ機能">
         <button id="open-basic-info" class="is-active" type="button">基本情報</button>
         <button type="button" disabled>Album</button>
-        <button id="open-field" class="is-active" type="button">定義: Field</button>
-        <button id="open-interface" class="is-active" type="button">定義: Interface</button>
-        <button type="button" disabled>定義: Layout</button>
+        <button id="open-module" class="is-active" type="button">Module</button>
       </div>
     </div></section>
 
-    {% if render_mypage_panes and not show_interface %}<section class="basic-info-pane" aria-label="基本情報">
+    {% if render_mypage_panes and not show_module %}<section class="basic-info-pane" aria-label="基本情報">
       <header class="basic-info-header"><h2>基本情報</h2><button id="close-basic-info" class="icon-button" type="button" aria-label="マイページ概要に戻る">×</button></header>
       <form class="basic-info-form" method="post" novalidate>{% csrf_token %}<div class="field"><label for="{{ form.display_name.id_for_label }}">表示名</label>{{ form.display_name }}<p class="field-help">空欄可。全角12文字、半角24文字相当まで。絵文字は使えません。</p>{% for error in form.display_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div><button class="button" type="submit">保存</button></form>
     </section>{% endif %}
 
-    {% if render_mypage_panes and show_interface %}<section class="interface-management" aria-label="Interface管理"><div class="interface-track">
-      {% include 'interfaces/management_list_pane.html' %}
-      {% if selected_interface_draft %}{% include 'interfaces/definition_detail_pane.html' %}{% elif selected_interface %}{% include 'interfaces/published_detail_pane.html' %}{% endif %}
+    {% if render_mypage_panes and show_module %}<section class="module-management" aria-label="Module管理"><div class="module-track">
+      {% include 'interfaces/module_management_list_pane.html' %}
     </div></section>{% endif %}
   </div></div>
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/mypage.js' %}?v=20260929-4"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/mypage.js' %}?v=20261002-7"></script>{% endblock %}

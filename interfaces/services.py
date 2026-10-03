@@ -3,7 +3,8 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import F, Max
+from django.db.models import F, Max, Value
+from django.db.models.functions import Concat
 from django.urls import reverse
 
 from .models import (
@@ -17,9 +18,29 @@ from .models import (
     InterfaceVersion,
     ThreadFieldBinding,
     ThreadFieldValue,
+    ThreadDirectField,
     ThreadInterfaceImplementation,
     ThreadInterfaceValue,
 )
+
+
+def search_field_definitions(*, name='', description='', field_type=''):
+    fields = FieldDefinition.objects.filter(
+        status=FieldDefinition.ACTIVE,
+        current_version__isnull=False,
+    ).select_related('creator', 'current_version')
+    name = name.strip()
+    description = description.strip()
+    field_type = field_type.strip()
+    if name:
+        fields = fields.annotate(
+            search_identity=Concat('name', Value('@'), 'creator__username'),
+        ).filter(search_identity__icontains=name)
+    if description:
+        fields = fields.filter(current_version__description__icontains=description)
+    if field_type:
+        fields = fields.filter(current_version__field_type=field_type)
+    return fields.order_by('-updated_at', '-pk')
 
 
 def validate_field_settings(field):
@@ -216,10 +237,33 @@ def resolve_interface_versions(interface_ids):
     return resolved
 
 
-def normalize_field_value(field, raw_values):
+def resolve_direct_field_versions(definition_ids):
+    if len(definition_ids) != len(set(definition_ids)):
+        raise ValidationError({'direct_fields': '同じFieldを重複して追加できません。'})
+    definitions = {
+        item.pk: item
+        for item in FieldDefinition.objects.filter(pk__in=definition_ids).select_related(
+            'creator', 'current_version'
+        ).prefetch_related('current_version__synonyms')
+    }
+    if len(definitions) != len(set(definition_ids)):
+        raise ValidationError({'direct_fields': '選択したFieldが見つかりません。'})
+
+    resolved = []
+    for definition_id in definition_ids:
+        definition = definitions[definition_id]
+        if definition.status != FieldDefinition.ACTIVE or definition.current_version_id is None:
+            raise ValidationError({'direct_fields': f'{definition.name}は現在利用できません。'})
+        resolved.append(definition.current_version)
+    return resolved
+
+
+def normalize_field_value(field, raw_values, *, required=None):
+    if required is None:
+        required = field.required
     values = [value for value in raw_values if value != '']
     if not values:
-        if field.required:
+        if required:
             raise ValidationError({str(field.field_key): f'{field.label}は必須です。'})
         return None
 
@@ -258,9 +302,8 @@ def _connected_field_components(fields):
     definitions = {field.definition_id for field in fields}
     graph = {definition_id: set() for definition_id in definitions}
     for field in fields:
-        if not field.field_version_id:
-            continue
-        for target_id in field.field_version.synonyms.values_list('target_id', flat=True):
+        version = getattr(field, 'field_version', field)
+        for target_id in version.synonyms.values_list('target_id', flat=True):
             if target_id in definitions:
                 graph[field.definition_id].add(target_id)
                 graph[target_id].add(field.definition_id)
@@ -283,27 +326,37 @@ def _connected_field_components(fields):
     return component_by_definition
 
 
-def prepare_thread_interfaces(interface_ids, value_lists):
+def prepare_thread_fields(direct_field_ids, direct_value_lists, interface_ids, interface_value_lists):
+    direct_versions = resolve_direct_field_versions(direct_field_ids)
     versions = resolve_interface_versions(interface_ids)
-    all_fields = [field for version in versions for field in version.fields.all()]
+    all_fields = direct_versions + [field for version in versions for field in version.fields.all()]
     component_by_definition = _connected_field_components(all_fields)
     supplied_values = {}
+    prepared_direct_fields = []
+    for version in direct_versions:
+        value = normalize_field_value(
+            version,
+            direct_value_lists.get(str(version.field_key), []),
+            required=True,
+        )
+        component = component_by_definition.get(version.definition_id, version.definition_id)
+        supplied_values.setdefault(component, value)
+        prepared_direct_fields.append((version, component))
+
     normalized = []
     for version in versions:
         field_values = []
         for field in version.fields.all():
-            raw_values = value_lists.get((version.interface_id, str(field.field_key)), [])
+            raw_values = interface_value_lists.get((version.interface_id, str(field.field_key)), [])
             required = field.required
-            field.required = False
-            value = normalize_field_value(field, raw_values)
-            field.required = required
+            value = normalize_field_value(field, raw_values, required=False)
             component = component_by_definition.get(field.definition_id, field.definition_id)
             if value is not None:
                 supplied_values.setdefault(component, value)
             field_values.append((field, component, required))
         normalized.append((version, field_values))
 
-    prepared = []
+    prepared_interfaces = []
     for version, field_values in normalized:
         resolved_values = []
         for field, component, required in field_values:
@@ -311,13 +364,39 @@ def prepare_thread_interfaces(interface_ids, value_lists):
             if required and value is None:
                 raise ValidationError({str(field.field_key): f'{field.label}は必須です。'})
             resolved_values.append((field, value, component))
-        prepared.append((version, resolved_values))
-    return prepared
+        prepared_interfaces.append((version, resolved_values))
+    prepared_direct_fields = [
+        (version, supplied_values[component], component)
+        for version, component in prepared_direct_fields
+    ]
+    return prepared_direct_fields, prepared_interfaces
 
 
-def save_thread_interfaces(thread, prepared):
+def prepare_thread_interfaces(interface_ids, value_lists):
+    return prepare_thread_fields([], {}, interface_ids, value_lists)[1]
+
+
+def save_thread_fields(thread, prepared_direct_fields, prepared_interfaces):
     values_by_component = {}
-    for position, (version, field_values) in enumerate(prepared):
+    for position, (version, value, component) in enumerate(prepared_direct_fields):
+        shared_value = values_by_component.get(component)
+        if shared_value is None:
+            shared_value = ThreadFieldValue.objects.create(thread=thread, value=value)
+            values_by_component[component] = shared_value
+        binding, _ = ThreadFieldBinding.objects.get_or_create(
+            thread=thread,
+            definition=version.definition,
+            defaults={'value': shared_value},
+        )
+        ThreadDirectField.objects.create(
+            thread=thread,
+            definition=version.definition,
+            version=version,
+            binding=binding,
+            position=position,
+        )
+
+    for position, (version, field_values) in enumerate(prepared_interfaces):
         implementation = ThreadInterfaceImplementation.objects.create(
             thread=thread,
             interface=version.interface,
@@ -346,6 +425,34 @@ def save_thread_interfaces(thread, prepared):
                 binding=binding,
             ))
         ThreadInterfaceValue.objects.bulk_create(interface_values)
+
+
+def save_thread_interfaces(thread, prepared):
+    save_thread_fields(thread, [], prepared)
+
+
+def thread_field_catalog():
+    fields = search_field_definitions().prefetch_related('current_version__synonyms')
+    return [
+        {
+            'id': definition.pk,
+            'detail_url': reverse('interfaces:field-detail', args=[definition.pk]),
+            'name': definition.name,
+            'creator': definition.creator.username,
+            'version': definition.current_version.version_number,
+            'updated_at': definition.updated_at,
+            'description': definition.current_version.description,
+            'key': str(definition.key),
+            'type': definition.current_version.field_type,
+            'type_label': definition.current_version.get_field_type_display(),
+            'settings': definition.current_version.settings,
+            'definition_id': definition.pk,
+            'synonym_target_ids': list(
+                definition.current_version.synonyms.values_list('target_id', flat=True)
+            ),
+        }
+        for definition in fields
+    ]
 
 
 def thread_interface_catalog():
