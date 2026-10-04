@@ -8,7 +8,6 @@ const roomListTitle = document.getElementById('room-list-title');
 const roomListContent = document.getElementById('room-list-content');
 const roomThreadListTitle = document.getElementById('room-thread-list-title');
 const roomThreadListContent = document.getElementById('room-thread-list-content');
-const roomBoardEdit = document.getElementById('edit-room-board');
 const roomDetailTitle = document.getElementById('room-thread-detail-title');
 const roomDetailContent = document.getElementById('room-thread-detail-content');
 const roomIdentity = document.getElementById('room-page-identity');
@@ -19,6 +18,10 @@ const roomStack = NiixyUI.createWorkspace(roomWorkspace, {
   list: {target: roomListPane},
   'thread-list': {target: roomThreadListPane},
   detail: {target: roomDetailPane},
+  'interface-list': {target: '.thread-create-module-list-pane:not(.thread-field-list-pane)'},
+  'interface-detail': {target: '.thread-create-module-detail-pane:not(.thread-field-detail-pane)'},
+  'field-list': {target: '.thread-create-module-list-pane.thread-field-list-pane'},
+  'field-detail': {target: '.thread-create-module-detail-pane.thread-field-detail-pane'},
 }, {track: roomTrack});
 let activeBoardId = null;
 const requests = {list: 0, threads: 0, detail: 0};
@@ -38,7 +41,6 @@ function clearThreadPanes() {
   requests.detail += 1;
   activeBoardId = null;
   roomThreadListTitle.textContent = '';
-  roomBoardEdit.hidden = true;
   roomThreadListContent.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
   roomDetailTitle.textContent = '';
   roomDetailContent.innerHTML = '<p class="empty">Threadを選択してください。</p>';
@@ -69,7 +71,6 @@ async function openBoard(boardId, title, url, updateHistory = true) {
   requests.detail += 1;
   activeBoardId = String(boardId);
   roomThreadListTitle.textContent = title;
-  roomBoardEdit.hidden = true;
   roomThreadListContent.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
   roomDetailTitle.textContent = '';
   roomDetailContent.innerHTML = '<p class="empty">Threadを選択してください。</p>';
@@ -81,9 +82,12 @@ async function openBoard(boardId, title, url, updateHistory = true) {
     const html = await response.text();
     if (current !== requests.threads) return;
     roomThreadListContent.innerHTML = html;
-    NiixyRoomForms.initialize(roomThreadListContent, roomFieldCatalog, roomInterfaceCatalog);
-    const boardPane = roomThreadListContent.querySelector('.room-board-thread-list');
-    roomBoardEdit.hidden = boardPane?.dataset.boardManageable !== 'true';
+    NiixyRoomForms.initialize(roomThreadListContent, roomFieldCatalog, roomInterfaceCatalog, {
+      selectorHost: roomTrack,
+      setStage: (stage) => roomStack.set(stage),
+      returnStage: 'thread-list',
+      currentAccount: roomPage.dataset.currentAccount,
+    });
   } catch {
     if (current === requests.threads) roomThreadListContent.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
   }
@@ -123,13 +127,8 @@ document.getElementById('close-room-thread-list').addEventListener('click', () =
   requests.threads += 1;
   requests.detail += 1;
   activeBoardId = null;
-  roomBoardEdit.hidden = true;
   roomStack.set('list');
   updateUrl({boards: 1});
-});
-roomBoardEdit.addEventListener('click', () => {
-  const actions = roomThreadListContent.querySelector('.room-board-actions');
-  if (actions) actions.hidden = !actions.hidden;
 });
 document.getElementById('close-room-thread-detail').addEventListener('click', () => {
   requests.detail += 1;
@@ -147,10 +146,10 @@ roomThreadListContent.addEventListener('click', (event) => {
   if (trigger) openThread(trigger.dataset.roomThread);
 });
 
-async function submitJsonForm(form, onSuccess) {
+async function submitJsonForm(form, onSuccess, submitter = null) {
   const error = form.querySelector('.room-form-error');
   if (error) error.hidden = true;
-  const pending = NiixyUI.beginPendingAction(form.querySelector('[type="submit"]'));
+  const pending = NiixyUI.beginPendingAction(submitter || form.querySelector('[type="submit"]'));
   if (!pending) return;
   try {
     const response = await fetch(form.action, {method: 'POST', body: new FormData(form)});
@@ -170,20 +169,20 @@ document.addEventListener('submit', (event) => {
   const roomAction = event.target.closest('[data-room-action]');
   if (roomAction) {
     event.preventDefault();
-    submitJsonForm(roomAction, () => location.reload());
+    submitJsonForm(roomAction, () => location.reload(), event.submitter);
     return;
   }
   const boardAction = event.target.closest('[data-board-action]');
   if (boardAction) {
     event.preventDefault();
     if (boardAction.dataset.confirmMessage && !window.confirm(boardAction.dataset.confirmMessage)) return;
-    submitJsonForm(boardAction, (result) => location.assign(result.redirect_url));
+    submitJsonForm(boardAction, (result) => location.assign(result.redirect_url), event.submitter);
     return;
   }
   const create = event.target.closest('[data-board-thread-create]');
   if (create) {
     event.preventDefault();
-    submitJsonForm(create, (result) => location.assign(result.redirect_url));
+    submitJsonForm(create, (result) => location.assign(result.redirect_url), event.submitter);
   }
 });
 

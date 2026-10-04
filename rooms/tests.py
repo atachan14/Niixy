@@ -204,10 +204,11 @@ class RoomViewTests(TestCase):
         board = Board.objects.get(name='お知らせ')
         edited = self.client.post(
             reverse('rooms:board-edit', args=[self.room.pk, board.pk]),
-            {'name': '更新済みBoard'},
+            {'name': '更新済みBoard', 'description': 'Boardの詳細'},
         )
         board.refresh_from_db()
         self.assertEqual(board.name, '更新済みBoard')
+        self.assertEqual(board.description, 'Boardの詳細')
         deleted = self.client.post(reverse('rooms:board-delete', args=[self.room.pk, board.pk]))
 
         self.assertEqual(denied.status_code, 403)
@@ -230,16 +231,32 @@ class RoomViewTests(TestCase):
         self.assertNotContains(owner_response, '削除済み')
         self.assertNotContains(member_response, reverse('rooms:board-create', args=[self.room.pk]))
 
-    def test_board_edit_action_is_exposed_from_owner_header(self):
+    def test_board_information_and_edit_actions_are_exposed_below_header(self):
         self.client.force_login(self.owner)
 
         room_response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
         board_response = self.client.get(reverse('rooms:board-threads', args=[self.room.pk, self.board.pk]))
+        self.client.force_login(self.member)
+        member_response = self.client.get(reverse('rooms:board-threads', args=[self.room.pk, self.board.pk]))
 
-        room_html = room_response.content.decode()
-        self.assertLess(room_html.index('id="edit-room-board"'), room_html.index('id="close-room-thread-list"'))
+        self.assertNotContains(room_response, 'id="edit-room-board"')
         self.assertContains(board_response, 'data-board-manageable="true"')
-        self.assertContains(board_response, 'class="room-board-actions" hidden')
+        self.assertContains(board_response, 'data-board-information-toggle')
+        self.assertContains(board_response, 'data-board-create-toggle')
+        self.assertContains(board_response, 'data-board-edit-toggle')
+        self.assertContains(board_response, 'data-board-information-window')
+        self.assertContains(board_response, 'data-board-create-window')
+        self.assertContains(board_response, 'class="ui-accordion-content room-board-window"', count=2)
+        self.assertContains(board_response, 'data-board-editor hidden')
+        self.assertContains(board_response, 'class="room-board-edit"')
+        self.assertContains(board_response, '>編集<', count=1)
+        self.assertContains(board_response, '>詳細情報<', count=1)
+        self.assertContains(board_response, '>Thread作成<', count=1)
+        self.assertNotContains(member_response, 'data-board-edit-toggle')
+        self.assertContains(member_response, 'data-board-information-toggle')
+        self.assertContains(member_response, 'data-board-create-toggle')
+        self.assertContains(member_response, 'disabled title="Roomへの参加が必要です"')
+        self.assertNotContains(member_response, 'data-board-create-window')
         self.assertContains(board_response, 'Boardの削除は取り消せません。')
 
     def test_deleting_board_keeps_thread_and_allows_policy_authorized_reply(self):
@@ -318,11 +335,14 @@ class RoomViewTests(TestCase):
 
         self.assertContains(page_response, 'room-thread-field-catalog')
         self.assertContains(page_response, 'room-thread-interface-catalog')
-        self.assertContains(pane_response, 'data-room-direct-fields')
-        self.assertContains(pane_response, 'data-room-thread-interfaces')
-        self.assertContains(pane_response, 'ui-control-accordion')
-        self.assertContains(pane_response, 'name="view_guest"')
-        self.assertContains(pane_response, 'name="write_account"')
+        self.assertContains(pane_response, 'data-thread-selected-direct-fields')
+        self.assertContains(pane_response, 'data-thread-selected-interfaces')
+        self.assertContains(pane_response, 'data-open-thread-field-selector')
+        self.assertContains(pane_response, 'data-open-thread-interface-selector')
+        self.assertContains(pane_response, 'class="thread-interface-input"', count=3)
+        self.assertContains(pane_response, '<summary>Policy</summary>')
+        self.assertContains(pane_response, 'data-capability="view" data-default-audiences="guest account"')
+        self.assertContains(pane_response, 'data-capability="write" data-default-audiences="account"')
 
     def test_room_overview_uses_compact_controls_without_description(self):
         response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))

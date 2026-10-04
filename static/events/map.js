@@ -60,7 +60,11 @@ const markerById = new Map();
 const resumeStorageKey = 'niixy:resume:niimap';
 let draftMarker;
 let creating = false;
-let activeRuleCapability;
+let spotControlWindows;
+const draftPlacementLinks = new Map(['thread', 'room'].map((kind) => {
+  const link = document.getElementById(`${kind}-create-placement-link`);
+  return [kind, {link, href: link.href}];
+}));
 const selectedInterfaceIds = new Set();
 const selectedDirectFieldIds = new Set();
 const interfaceValueStore = new Map();
@@ -84,6 +88,23 @@ let accountConditionDetailReturnStage = 'account-selector';
 let activeRoomId = null;
 let activeRoomBoard = null;
 let roomRequestId = 0;
+
+function resetDraftPlacement() {
+  draftMarker?.remove();
+  draftMarker = null;
+  ['thread', 'room'].forEach((kind) => {
+    document.getElementById(`${kind}-latitude`).value = '';
+    document.getElementById(`${kind}-longitude`).value = '';
+    const placement = draftPlacementLinks.get(kind);
+    placement.link.href = placement.href;
+    placement.link.textContent = '';
+    delete placement.link.dataset.latitude;
+    delete placement.link.dataset.longitude;
+  });
+  document.getElementById('niimap-create-location-status').textContent = '地点を選択してください。';
+  openThreadCreate.disabled = true;
+  openRoomCreate.disabled = true;
+}
 
 function stableConditionValue(value) {
   if (Array.isArray(value)) return value.map(stableConditionValue);
@@ -228,32 +249,21 @@ function focusMapFromUrl(animate = false) {
   else map.jumpTo(options);
   return true;
 }
-function addRule(capability, audience) {
-  const list = document.querySelector(`.thread-rule[data-capability="${capability}"] .thread-rule-list`);
-  if (list.querySelector(`[data-audience="${audience}"]`)) return;
-  const item = document.createElement('span');
-  item.className = 'thread-rule-item';
-  item.dataset.audience = audience;
-  item.textContent = audience === 'guest' ? 'Guest' : 'NiixyAccount';
-  const remove = document.createElement('button');
-  remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', `${item.textContent}を削除`);
-  remove.addEventListener('click', () => item.remove());
-  item.append(remove); list.append(item);
-}
-document.querySelectorAll('.thread-rule').forEach((rule) => {
-  const capability = rule.dataset.capability;
-  addRule(capability, 'guest'); addRule(capability, 'account');
-  rule.querySelector('.thread-rule-add').addEventListener('click', () => { activeRuleCapability = capability; ruleDialog.showModal(); });
+NiixyRoomForms.initialize(document, fieldCatalog, interfaceCatalog, {
+  selectorHost: document.querySelector('.thread-track'),
+  setStage: setThreadStage,
+  returnStage: 'detail',
+  currentAccount: workspace.dataset.currentActor,
+  policyDialog: ruleDialog,
+  beforeSelectorOpen: () => {
+    document.getElementById('thread-interface-selector')?.remove();
+    document.getElementById('thread-field-selector')?.remove();
+    document.querySelector('.thread-interface-detail-pane:not(.thread-create-module-detail-pane):not(.thread-field-detail-pane)')?.remove();
+    document.querySelector('.thread-field-detail-pane:not(.thread-create-module-detail-pane)')?.remove();
+  },
 });
-ruleDialog.querySelectorAll('[data-audience]').forEach((button) => button.addEventListener('click', () => {
-  addRule(activeRuleCapability, button.dataset.audience); ruleDialog.close();
-}));
 function createFormData() {
-  const data = csrf(createForm);
-  document.querySelectorAll('.thread-rule').forEach((rule) => {
-    rule.querySelectorAll('.thread-rule-item').forEach((item) => data.append(`${rule.dataset.capability}_${item.dataset.audience}`, 'true'));
-  });
-  return data;
+  return csrf(createForm);
 }
 
 function interfaceValueKey(interfaceId, fieldKey) { return `${interfaceId}:${fieldKey}`; }
@@ -559,8 +569,6 @@ function closeInterfaceSelector() {
   setThreadStage(selectorReturnStage);
   synchronizeThreadFieldControls();
 }
-document.getElementById('open-thread-interface-selector').addEventListener('click', () => openInterfaceSelector(null, 'create'));
-document.getElementById('open-direct-field-selector').addEventListener('click', () => openFieldSelector(null, 'create'));
 function applyFilters() {
   const bounds = map.getBounds();
   let visibleCount = 0;
@@ -1393,19 +1401,19 @@ async function openEmbeddedBoard(boardId, title, url, shouldUpdateUrl = true) {
     const html = await response.text();
     if (current !== roomRequestId) return;
     ui.content.innerHTML = html;
-    NiixyRoomForms.initialize(ui.content, fieldCatalog, interfaceCatalog);
-    const boardPane = ui.content.querySelector('.room-board-thread-list');
-    if (boardPane?.dataset.boardManageable === 'true') {
-      const edit = document.createElement('button');
-      edit.className = 'button secondary';
-      edit.type = 'button';
-      edit.textContent = '編集';
-      edit.addEventListener('click', () => {
-        const actions = ui.content.querySelector('.room-board-actions');
-        if (actions) actions.hidden = !actions.hidden;
-      });
-      ui.actions.prepend(edit);
-    }
+    NiixyRoomForms.initialize(ui.content, fieldCatalog, interfaceCatalog, {
+      selectorHost: document.querySelector('.thread-track'),
+      setStage: setThreadStage,
+      returnStage: 'room-board',
+      currentAccount: workspace.dataset.currentActor,
+      policyDialog: ruleDialog,
+      beforeSelectorOpen: () => {
+        document.getElementById('thread-interface-selector')?.remove();
+        document.getElementById('thread-field-selector')?.remove();
+        document.querySelector('.thread-interface-detail-pane:not(.thread-create-module-detail-pane):not(.thread-field-detail-pane)')?.remove();
+        document.querySelector('.thread-field-detail-pane:not(.thread-create-module-detail-pane)')?.remove();
+      },
+    });
     ui.content.addEventListener('click', (event) => {
       const thread = event.target.closest('[data-room-thread]');
       if (thread) openEmbeddedRoomThread(thread.dataset.roomThread);
@@ -1454,7 +1462,7 @@ function openDetail(id, shouldUpdateUrl = true) {
   const pane = document.querySelector(`[data-thread-detail-pane="${id}"]`);
   if (!pane) return false;
   removeEmbeddedRoomPanes();
-  if (createControls.open) NiixyUI.setAccordionExpanded(createControls, false);
+  spotControlWindows?.set('create', false);
   creating = false;
   createForm.hidden = true;
   roomCreateForm.hidden = true;
@@ -1524,14 +1532,22 @@ async function applyThreadStateFromUrl() {
   }
   selectThread(threadId, true);
 }
-searchControls.addEventListener('niixy:accordion-change', (event) => {
-  if (!event.detail.expanded) return;
-  if (createControls.open) NiixyUI.setAccordionExpanded(createControls, false);
-  creating = false;
-});
-createControls.addEventListener('niixy:accordion-change', (event) => {
-  creating = event.detail.expanded;
-  if (event.detail.expanded && searchControls.open) NiixyUI.setAccordionExpanded(searchControls, false);
+spotControlWindows = NiixyUI.createExclusivePanels(document.getElementById('niimap-control-windows'), {
+  create: {
+    toggle: '#niimap-create-toggle',
+    panel: createControls,
+    label: '新規作成',
+    onOpen: () => { creating = true; },
+    onClose: () => {
+      creating = false;
+      resetDraftPlacement();
+    },
+  },
+  search: {
+    toggle: '#niimap-search-toggle',
+    panel: searchControls,
+    label: '検索',
+  },
 });
 openThreadCreate.addEventListener('click', () => {
   if (openThreadCreate.disabled) return;
@@ -1601,7 +1617,7 @@ searchForm.addEventListener('submit', async (event) => {
     appliedRoomSearchIds = new Set((result.room_ids || []).map(String));
     appliedSpotOrder = (result.spot_order || []).map((spot) => ({kind: spot.kind, id: String(spot.id)}));
     applyFilters();
-    if (searchControls.open) NiixyUI.setAccordionExpanded(searchControls, false);
+    spotControlWindows.set('search', false);
   } catch {
     error.textContent = '検索に失敗しました。'; error.hidden = false;
   } finally {

@@ -927,10 +927,11 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-detail-pane { border-left: 1px solid var(--line); position: relative; }
 .thread-pane-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 40px; }
 .thread-pane-header h2, .thread-detail-header h2 { font-size: 18px; margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.niimap-search-controls { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-top: 12px; }
-.niimap-search-controls > summary { cursor: pointer; font-weight: 700; list-style: none; padding: 12px; }
-.niimap-search-controls > summary::-webkit-details-marker { display: none; }
-.niimap-search-controls form { display: grid; padding: 0 12px 12px; }
+.niimap-window-actions { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
+.niimap-window-actions .button { justify-content: center; width: 100%; }
+.niimap-control-window { margin-top: 12px; }
+.niimap-control-window-body { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.niimap-search-controls form { display: grid; }
 .niimap-search-section { border-top: 1px solid var(--line); }
 .niimap-search-section > summary { cursor: pointer; font-size: 14px; font-weight: 700; padding: 11px 0; }
 .niimap-search-section-body { display: grid; gap: 10px; padding: 2px 0 14px; }
@@ -989,7 +990,7 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .account-field-condition-form h3 { font-size: 17px; margin: 0; }
 .account-field-condition-controls { display: grid; gap: 10px; grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr); }
 .account-field-condition-controls input, .account-field-condition-controls select { border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; min-height: 40px; min-width: 0; padding: 8px 9px; width: 100%; }
-.niimap-create-controls-body { display: grid; gap: 10px; padding: 0 12px 12px; }
+.niimap-create-controls-body { display: grid; gap: 10px; }
 .niimap-create-controls-body > div { display: grid; gap: 7px; grid-template-columns: 1fr 1fr; }
 .niimap-create-controls .event-location-status { grid-column: 1 / -1; }
 .thread-detail-pane > .map-event-form { padding-top: 0; }

@@ -119,6 +119,7 @@ class Collection(models.Model):
 class Board(models.Model):
     submission_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField('Board名', max_length=120)
+    description = models.TextField('詳細', blank=True, max_length=10000)
     created_at = models.DateTimeField('作成日時', auto_now_add=True)
     updated_at = models.DateTimeField('更新日時', auto_now=True)
     last_activity_at = models.DateTimeField('最終活動日時', auto_now_add=True)

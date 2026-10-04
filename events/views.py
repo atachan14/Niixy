@@ -78,8 +78,8 @@ def map_view(request):
         'thread_submission_id': uuid.uuid4(),
         'room_submission_id': uuid.uuid4(),
         'rule_capabilities': [
-            (ThreadAccessRule.VIEW, '閲覧制限'),
-            (ThreadAccessRule.WRITE, '書込制限'),
+            (ThreadAccessRule.VIEW, '閲覧制限', 'guest account'),
+            (ThreadAccessRule.WRITE, '書込制限', 'guest account'),
         ],
         'thread_interface_catalog': interface_catalog,
         'created_thread_interface_catalog': [

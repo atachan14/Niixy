@@ -17,6 +17,7 @@ class RoomEditForm(forms.Form):
 
 class BoardForm(forms.Form):
     name = forms.CharField(max_length=120)
+    description = forms.CharField(required=False, max_length=10000, widget=forms.Textarea)
 
 
 class BoardThreadCreateForm(forms.Form):

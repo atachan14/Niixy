@@ -25,13 +25,14 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
     return run_once(Room, submission_id, operation)
 
 
-def create_board(*, submission_id, room, name):
+def create_board(*, submission_id, room, name, description=''):
     def operation():
         with transaction.atomic():
             main = room.collections.select_for_update().get(is_main=True)
             board = Board.objects.create(
                 submission_id=submission_id,
                 name=name,
+                description=description,
             )
             BoardPlacement.objects.create(
                 board=board,

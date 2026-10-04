@@ -151,6 +151,7 @@ def board_create(request, room_id):
         submission_id=submission_id_from(request.POST.get('submission_id')),
         room=room,
         name=form.cleaned_data['name'],
+        description=form.cleaned_data['description'],
     )
     return JsonResponse({
         'board_id': board.pk,
@@ -169,7 +170,8 @@ def board_edit(request, room_id, board_id):
     if not form.is_valid():
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
     board.name = form.cleaned_data['name']
-    board.save(update_fields=['name', 'updated_at'])
+    board.description = form.cleaned_data['description']
+    board.save(update_fields=['name', 'description', 'updated_at'])
     return JsonResponse({
         'board_id': board.pk,
         'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&board={board.pk}',
@@ -203,6 +205,10 @@ def board_threads(request, room_id, board_id):
         'board': board,
         'threads': threads,
         'thread_submission_id': uuid.uuid4(),
+        'rule_capabilities': [
+            (ThreadAccessRule.VIEW, '閲覧制限', 'guest account'),
+            (ThreadAccessRule.WRITE, '書込制限', 'account'),
+        ],
     })
 
 

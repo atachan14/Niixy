@@ -369,6 +369,35 @@ window.NiixyUI = (() => {
     root.querySelectorAll?.('details').forEach(bindAccordion);
   }
 
+  function createExclusivePanels(root, definitions) {
+    const panels = new Map(Object.entries(definitions).map(([name, definition]) => {
+      const toggle = typeof definition.toggle === 'string' ? root.querySelector(definition.toggle) : definition.toggle;
+      const panel = typeof definition.panel === 'string' ? root.querySelector(definition.panel) : definition.panel;
+      return [name, {...definition, toggle, panel}];
+    }));
+
+    const apply = (item, expanded) => {
+      if (!item.toggle || !item.panel) return;
+      const wasExpanded = item.panel.classList.contains('is-open');
+      item.panel.classList.toggle('is-open', expanded);
+      item.panel.setAttribute('aria-hidden', String(!expanded));
+      item.toggle.setAttribute('aria-expanded', String(expanded));
+      item.toggle.textContent = expanded ? (item.openLabel || 'キャンセル') : item.label;
+      if (wasExpanded !== expanded) item[expanded ? 'onOpen' : 'onClose']?.();
+    };
+    const set = (name, expanded = true) => {
+      panels.forEach((item, itemName) => apply(item, expanded && itemName === name));
+    };
+    const isExpanded = (name) => panels.get(name)?.panel?.classList.contains('is-open') || false;
+
+    panels.forEach((item, name) => {
+      if (!item.toggle || !item.panel) return;
+      apply(item, item.panel.classList.contains('is-open'));
+      item.toggle.addEventListener('click', () => set(name, !isExpanded(name)));
+    });
+    return {isExpanded, set};
+  }
+
   function setAccordionExpanded(details, expanded) {
     const controller = accordionControllers.get(details);
     if (controller) controller.setExpanded(expanded);
@@ -380,6 +409,6 @@ window.NiixyUI = (() => {
     if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
   }))).observe(document.body, {childList: true, subtree: true});
 
-  return {beginPendingAction, bindAccordions, bindModuleFilters, bindSummarySearch, bindTabs, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, setAccordionExpanded, showPaneError, submitThreadReply};
+  return {beginPendingAction, bindAccordions, bindModuleFilters, bindSummarySearch, bindTabs, createExclusivePanels, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, setAccordionExpanded, showPaneError, submitThreadReply};
 })();
 </script>
