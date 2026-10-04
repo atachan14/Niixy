@@ -336,4 +336,6 @@ RoomPageには特定CollectionのBoardを直接表示しない。機能ボタン
 
 `Main`はRoomまたはAccountの作成時に用意される初期Collection名にすぎず、特別な機能やシステム上の役割を持たない。通常Collectionと同様に名称変更と削除を認める。システム上の識別が必要なのは、Collection削除時のBoard退避先となる常設の`未分類`だけとする。
 
-Board一覧PaneのTabは、作成順の通常Collection群、固定の`未分類`、管理者だけに表示する`管理`の順に並べる。`管理`はCollection実体ではなく管理UIであり、Collection作成をここへ配置する。新規Collectionは通常Collection群の末尾へ追加する。編集、削除、並び替えの管理UIは後続の検討で拡張する。
+Board一覧PaneのTabは、作成順の通常Collection群、固定の`未分類`、管理者だけに表示する`管理`の順に並べる。`管理`はCollection実体ではなく管理UIであり、Collection作成をここへ配置する。新規Collectionは通常Collection群の末尾へ追加する。
+
+各Collection Tabでは`詳細確認`と、Room管理者向けの`Board作成`を排他的に展開する。詳細確認にはCollection名とBoard数を表示し、通常CollectionではRoom管理者だけに編集への導線を表示する。編集領域では名称変更と削除を行う。`未分類`では詳細確認とBoard作成を利用できるが、編集への導線は表示しない。Collectionの並び替えは後続Versionで扱う。

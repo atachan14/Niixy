@@ -28,9 +28,10 @@
         - 
 
 - BoardPolicy
-
-
-
+    - Thread作成制限
+    - 閲覧制限
+        - 不可の場合、SummaryItem:Boardが「閲覧不可」と表示。
+            - クリックでBoard詳細Paneへ遷移は可能。Board詳細PaneではThreadを全て非表示にし、
 ## now
 
 
