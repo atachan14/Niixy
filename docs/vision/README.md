@@ -29,7 +29,8 @@ Niixy は次の概念を中心にする。
 - [Account と履歴](account-and-history.md): AccountPage、Board、Collection、Album、将来の履歴
 - [表示パターン](presentation.md): SummaryList、SummaryItem、DetailPane の役割
 - [決定記録](decisions.md): 設計判断の時系列ログ
-- [v0.6 要件定義](../v0.6/requirements.md): 現在実装する Room 基盤の範囲
+- [v0.6 要件定義](../v0.6/requirements.md): Room 基盤として完成した範囲
+- [v0.7 要件定義](../v0.7/requirements.md): Board 管理として完成した範囲
 
 ## 旧文書
 

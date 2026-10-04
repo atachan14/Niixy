@@ -1,6 +1,6 @@
 # v0.7 Board Management 要件
 
-Status: In Progress
+Status: Complete
 
 ## 目的
 
@@ -11,7 +11,7 @@ v0.7ではRoom配下のBoard管理を対象とする。Collectionの追加・編
 ## 対象範囲
 
 - RoomOwnerによるBoardの新規作成
-- RoomOwnerによるBoard名の編集
+- RoomOwnerによるBoard名と詳細の編集
 - Boardの物理削除
 - 複数BoardでのThread作成、閲覧、Response投稿
 - Board削除後も存続するThreadとResponse
@@ -20,7 +20,7 @@ v0.7ではRoom配下のBoard管理を対象とする。Collectionの追加・編
 
 ## Board
 
-BoardはThreadをまとめるコンテナであり、安定したIDと変更可能なBoard名を持つ。
+BoardはThreadをまとめるコンテナであり、安定したIDと変更可能なBoard名および詳細を持つ。
 
 Boardは独立したOwnerや作成者を持たない。管理権限は配置先から解決する。v0.7でRoomから作成するBoardはRoomのMain Collectionへ配置し、そのRoomのRoomOwnerだけが管理する。Board名を変更してもBoard IDと配置先は変更しない。
 
@@ -34,9 +34,11 @@ RoomのBoard一覧に、RoomOwnerだけが利用できる`Board作成`を配置�
 
 ## Board編集
 
-RoomOwnerだけがBoard名を変更できる。編集操作はBoard内Thread一覧PaneのHeaderから開く。
+RoomOwnerだけがBoard名と詳細を変更できる。編集操作はBoard内Thread一覧Paneの`詳細情報`から開く。
 
-Board名の変更は既存Thread、ThreadPlacement、URLへ影響させない。空文字、文字数超過などの不正な入力は保存しない。
+Board名や詳細の変更は既存Thread、ThreadPlacement、URLへ影響させない。Board名の空文字や各項目の文字数超過など、不正な入力は保存しない。
+
+Board内Thread一覧Paneでは、`詳細情報`と`Thread作成`を排他的に展開する。`詳細情報`にはBoard名、詳細、将来のPolicy、Layout、ThreadTemplateの確認領域を配置し、RoomOwnerにだけ編集への導線を表示する。編集時には同じ領域を入力状態へ切り替え、保存と物理削除を行えるようにする。
 
 v0.7ではBoardの配置先変更、NiiMap配置、BoardPolicy、Layout、Templateを提供しない。
 
@@ -93,7 +95,7 @@ Board削除時にThreadまで削除されないことをDB関係とService Test�
 
 - RoomOwnerがMain Collectionへ複数のBoardを作成できる。
 - 作成した各BoardでRoom参加者がThreadとResponseをやり取りできる。
-- RoomOwnerがBoard名を変更できる。
+- RoomOwnerがBoard名と詳細を変更できる。
 - RoomOwnerがThreadの有無にかかわらずBoardを物理削除できる。
 - Board削除後もThread、ThreadPost、ThreadPolicy、Field、Interfaceが残る。
 - Board削除後のThreadへ、ThreadPolicyで許可された利用者がResponseを投稿できる。

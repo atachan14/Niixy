@@ -59,6 +59,9 @@
 - SummaryItemの色について、カード的な表現は保留としても、Spot以外のSummaryListにも色を反映させるとこまでは確定として共通化したい。
 
 - Threadの座標行をfixed化。かつ、NiiMap座標のときに初見で何の数字だかわかりづらいから表記も工夫したい。座標:X=xxxxxxx,Y=xxxxxxxとか？緯度や軽度ってXとかYとかって書き方はしないのかな？
+- Room>Collection>Boardに配置しているThreadの座標行の表記を[RoomA > CollectionA > BoardA]にしようかなぁ。それぞれ別のlinkで。（RoomAをクリックしたらRoomPageに遷移。）
+- 
+
 
 - RoomPageやAccountPageのスマホレイアウトについて
     - [Thumb左上配置について]Thumbを左上にするレイアウトで統一するって話だったけどRoomPageでしかその仕様になってない。AccountPageではThumbの下に機能ボタン群を配置する以前の仕様のままになってる。
