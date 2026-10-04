@@ -441,6 +441,7 @@ function renderSelectedDirectFields() {
 }
 function fieldCandidateButton(field) {
   const button = document.createElement('button'); button.className = 'ui-summary-item'; button.type = 'button';
+  button.dataset.summaryKind = 'field';
   const context = document.createElement('span'); context.className = 'ui-summary-item-context'; context.setAttribute('aria-hidden', 'true');
   const title = document.createElement('strong'); title.className = 'ui-summary-item-title'; title.textContent = `${field.name}@${field.creator} v${field.version}/Field`;
   const updated = document.createElement('small'); updated.className = 'ui-summary-item-updated'; updated.textContent = `最終更新 ${new Date(field.updated_at).toLocaleString('ja-JP', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}`;
@@ -733,6 +734,7 @@ function renderAccountConditionCatalog() {
     const choose = document.createElement('button');
     choose.className = 'ui-summary-item';
     choose.type = 'button';
+    choose.dataset.summaryKind = 'account-condition';
     choose.innerHTML = '<span class="ui-summary-item-context"></span><strong class="ui-summary-item-title"></strong><small class="ui-summary-item-updated"></small>';
     const field = condition.kind === 'field'
       ? fieldCatalog.find((item) => item.id === Number(condition.definition.field_id))
@@ -799,10 +801,11 @@ function ensureAccountSelectorPane() {
     });
   });
 }
-function accountSelectorSummary(label, meta, onClick = null) {
+function accountSelectorSummary(label, meta, onClick = null, summaryKind = '') {
   const button = document.createElement('button');
   button.className = 'ui-summary-item';
   button.type = 'button';
+  if (summaryKind) button.dataset.summaryKind = summaryKind;
   button.innerHTML = '<span class="ui-summary-item-context"></span><strong class="ui-summary-item-title"></strong><small class="ui-summary-item-updated"></small>';
   button.querySelector('strong').textContent = label;
   button.querySelector('small').textContent = meta;
@@ -835,6 +838,12 @@ function fieldConditionContext(condition, field) {
 function renderAccountSelectorResults(container, conditions, message = '') {
   container.replaceChildren();
   conditions.forEach((condition) => {
+    const summaryKind = {
+      account: 'account',
+      account_interface: 'interface',
+      field: 'field',
+      room: 'room',
+    }[condition.kind] || 'account-condition';
     container.append(accountSelectorSummary(condition.label, accountConditionKindLabel(condition), async () => {
       try {
         await saveAccountCondition(condition);
@@ -843,7 +852,7 @@ function renderAccountSelectorResults(container, conditions, message = '') {
       } catch (error) {
         renderAccountSelectorResults(container, [], error.message);
       }
-    }));
+    }, summaryKind));
   });
   if (!conditions.length || message) {
     const empty = selectorEmpty(message || '該当する項目はありません。');
@@ -885,6 +894,7 @@ function renderFieldSelectorItems(container, fields) {
       `${field.name}@${field.creator} v${field.version}/Field`,
       `最終更新 ${updated}`,
       () => openAccountFieldDetail(field),
+      'field',
     ));
   });
   if (!fields.length) container.append(selectorEmpty('該当するFieldはありません。'));
@@ -1156,6 +1166,7 @@ function populateInterfaceSearch() {
     const query = input.value.trim().toLocaleLowerCase(); results.replaceChildren();
     interfaceCatalog.filter((item) => !query || `${item.name}@${item.creator}`.toLocaleLowerCase().includes(query)).slice(0, 10).forEach((item) => {
       const button = document.createElement('button'); button.className = 'ui-summary-item'; button.type = 'button';
+      button.dataset.summaryKind = 'interface';
       button.innerHTML = `<span class="ui-summary-item-context"></span><strong class="ui-summary-item-title"></strong><small class="ui-summary-item-updated"></small>`;
       button.querySelector('strong').textContent = `${item.name}@${item.creator} v${item.version}/${item.kind}`;
       button.querySelector('small').textContent = `最終更新 ${new Date(item.updated_at).toLocaleString('ja-JP')}`;
@@ -1374,7 +1385,7 @@ async function openEmbeddedRoomList(title, url, kind, shouldUpdateUrl = true) {
     NiixyUI.bindTabs(ui.content);
     ui.content.addEventListener('click', (event) => {
       const board = event.target.closest('[data-open-board]');
-      if (board) openEmbeddedBoard(board.dataset.openBoard, board.querySelector('.ui-summary-item-title').textContent, board.dataset.boardUrl);
+      if (board) openEmbeddedBoard(board.dataset.openBoard, board.dataset.boardTitle, board.dataset.boardUrl);
     });
   } catch {
     if (current === roomRequestId) ui.content.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
@@ -1513,7 +1524,7 @@ async function applyThreadStateFromUrl() {
     if (!boardId) return;
     const board = document.querySelector(`.niimap-room-list-pane [data-open-board="${boardId}"]`);
     if (!board) return;
-    await openEmbeddedBoard(boardId, board.querySelector('.ui-summary-item-title').textContent, board.dataset.boardUrl, false);
+    await openEmbeddedBoard(boardId, board.dataset.boardTitle, board.dataset.boardUrl, false);
     const roomThreadId = url.searchParams.get('thread');
     if (roomThreadId) await openEmbeddedRoomThread(roomThreadId, false);
     return;

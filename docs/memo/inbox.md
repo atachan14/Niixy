@@ -19,21 +19,39 @@
 
 ## Inbox
 
+
+
+- SummaryListのレイアウト見直し
+
+具体的にはよくわからん。
+
+SummaryItemの左にBorderを入れた分、Itemがちょっと右に寄ったように感じるし、仕方ないようにも思うし。
+余白なしで左にベタ付けでもいいんじゃないかって気もするし、良くない気もするし。
+とりあえず、背景色は保留にしても、上下右のBorderは1pxとか2pxとかで入れてみて良い気がするし、やめたほうが良い気もするし？
+やるなら角丸のほうが良い気がするし、そうとも限らない気もするし？
+左Borderを16pxとかにして、画面左にベタ付けって案もある気がするし、何も見やすくはならない気がするし。
+
+てか、そもそもSummaryItemが縦に太すぎるって問題もありそう。
+スマホ版で特にそうだけど、PC版でも既に太そう。
+でもSummaryItemだけ細くするとバランスが崩れそうだから、HeaderやらTabやらなんやらも小さくする必要ありそう？っていうかスマホ版のAccountPageやRoomPageの機能ボタン群のサイズ感がとても良い。全体的にそのくらいの調整にすると良くなりそうな気もするし、大がかりな調整で大変そうにも思うし。
+
+Codexくんはデザインもできるじゃん？どう思う？？
+
+## now
+
+
+
+## Idea
+
+
+
+## backlog
+
 - Policy周り
     - 書き込み不可理由に、Policyに表記のない[RoomAに参加]が表記されてる。
-
-- Account > Room
-    - tab
-        - OwnerTab
-        - 参加中Tab（Owner含む）
-        - RoomListA（ユーザーが追加するやつ）
-        - RoomListB（ユーザーが追加するやつ）
-        - love
-        - hate
-    - SummaryList
-        - RoomA
-        - RoomB
-        - RoomC
+    - Roomの初期Board
+        - お知らせ（Thread作成権限がOwnerのみ）
+        - 掲示板（権限がフリー）
 
 - Account > Board
     - tab
@@ -45,44 +63,8 @@
         - BoardA
         - BoardB
         - BoardC
-## now
 
 
-
-## Idea
-
-- Roomの初期Board
-    - お知らせ（Thread作成権限がOwnerのみ）
-    - 掲示板（権限がフリー）
-- Roomの[メンバーX]の表記を[Member(X)]に変更。
-- Board一覧のSummaryItemをBoard名([Thread数])表記にする。
-- SummaryItemの色について、カード的な表現は保留としても、Spot以外のSummaryListにも色を反映させるとこまでは確定として共通化したい。
-
-- Threadの座標行をfixed化。かつ、NiiMap座標のときに初見で何の数字だかわかりづらいから表記も工夫したい。座標:X=xxxxxxx,Y=xxxxxxxとか？緯度や軽度ってXとかYとかって書き方はしないのかな？
-- Room>Collection>Boardに配置しているThreadの座標行の表記を[RoomA > CollectionA > BoardA]にしようかなぁ。それぞれ別のlinkで。（RoomAをクリックしたらRoomPageに遷移。）
-- 
-
-
-- RoomPageやAccountPageのスマホレイアウトについて
-    - [Thumb左上配置について]Thumbを左上にするレイアウトで統一するって話だったけどRoomPageでしかその仕様になってない。AccountPageではThumbの下に機能ボタン群を配置する以前の仕様のままになってる。
-    - [文字サイズについて]Thumb左上配置を適応すると、すごくぎゅうぎゅう詰めになるけど、そもそもスマホ用として文字やボタンが大きすぎる。もっと小さくして～～で、Thumbの高さは機能ボタン群の高さに合わせて～～。更に、Thumbはもっと細くてもいいかも？現状はThumbと機能ボタン群が1:1かな？35:65とかでもいいかもしれない～～要調整！
-
-- Profileの機能ボタン上に予定していたボタン群を廃止して、Feedbackに移す。
-
-- AccountPageの機能ボタン群修正案
-[AccountIF] [Account]
-[Thread] [Response]
-[Room] [Board]
-[Timeline] [Module]
-    - AccountIF
-        実装済みのAccountIFをSummaryListに表示。クリックで[実装済みAccountIF閲覧Pane]を展開。
-    - Account（AccountIFと文字列が似すぎてるからリネームしたい）
-        - Tabs
-            - AccountListA
-            - AccountListB
-            - Love
-            - Hate
-        - SummaryList
 
 - Feedback（もっと端的な言葉にリネームしたい）
 love/hateは排他的で紹介文とセット。

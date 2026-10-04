@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import transaction
+from django.db.models import Count
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -129,6 +130,7 @@ def room_boards(request, room_id):
         collection.visible_boards = list(
             Board.objects.filter(placement__collection=collection)
             .select_related('placement__collection')
+            .annotate(thread_count=Count('thread_placements'))
             .order_by('-last_activity_at', '-created_at')
         )
     return render(request, 'rooms/partials/board_list.html', {

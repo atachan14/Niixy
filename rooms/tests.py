@@ -253,6 +253,9 @@ class RoomViewTests(TestCase):
         self.assertLess(owner_html.index('room-board-create'), owner_html.index(f'data-open-board="{self.board.pk}"'))
         self.assertNotContains(owner_response, 'data-board-status-tab')
         self.assertNotContains(owner_response, '削除済み')
+        self.assertContains(owner_response, f'{self.board.name} (0)')
+        self.assertContains(owner_response, f'data-board-title="{self.board.name}"')
+        self.assertContains(owner_response, 'data-summary-kind="board"')
         self.assertNotContains(member_response, reverse('rooms:board-create', args=[self.room.pk]))
 
     def test_board_information_and_edit_actions_are_exposed_below_header(self):
@@ -368,15 +371,33 @@ class RoomViewTests(TestCase):
         self.assertContains(pane_response, 'data-capability="view" data-default-audiences="guest account"')
         self.assertContains(pane_response, 'data-capability="write" data-default-audiences="account"')
 
+    def test_board_thread_summary_uses_thread_color_kind(self):
+        thread = Thread.objects.create(creator=self.owner, title='色分けThread')
+        ThreadPost.objects.create(thread=thread, number=1, creator=self.owner, body='本文')
+        ThreadPlacement.objects.create(thread=thread, kind=ThreadPlacement.BOARD, board=self.board)
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse('rooms:board-threads', args=[self.room.pk, self.board.pk]))
+
+        self.assertContains(response, 'data-summary-kind="thread"')
+
     def test_room_overview_uses_compact_controls_without_description(self):
         response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
         board_response = self.client.get(reverse('rooms:boards', args=[self.room.pk]))
 
         self.assertContains(response, 'RoomIF')
-        self.assertContains(response, 'メンバー 1')
+        self.assertContains(response, 'Member(1)')
         self.assertContains(response, '>Board<')
         self.assertContains(response, 'Timeline')
         self.assertContains(response, 'Policy')
+        self.assertContains(response, 'class="room-overview-body identity-overview-content"')
+        self.assertContains(response, 'class="room-hero identity-overview-hero"')
+        self.assertContains(response, '<h2>評価</h2>')
+        self.assertContains(response, '<h2>Profile</h2>')
+        self.assertLess(
+            response.content.index(b'class="ui-placement-row'),
+            response.content.index(b'class="room-overview-body'),
+        )
         self.assertNotContains(response, 'もっと見る')
         self.assertNotContains(response, '最初のBoard')
         self.assertNotContains(response, 'Roomの説明')
@@ -425,7 +446,12 @@ class RoomViewTests(TestCase):
         outsider_response = self.client.get(account_url)
 
         self.assertContains(outsider_response, 'class="thread-detail"')
-        self.assertContains(outsider_response, f'{self.room.name} / {self.board.name}')
+        self.assertContains(outsider_response, self.room.name)
+        self.assertContains(outsider_response, self.board.placement.collection.name)
+        self.assertContains(outsider_response, self.board.name)
+        self.assertContains(outsider_response, f'href="{reverse("rooms:detail", args=[self.room.pk])}"')
+        self.assertContains(outsider_response, f'href="{reverse("rooms:detail", args=[self.room.pk])}?boards=1"')
+        self.assertContains(outsider_response, f'href="{reverse("rooms:detail", args=[self.room.pk])}?board={self.board.pk}"')
         self.assertNotContains(outsider_response, 'class="thread-reply-form"')
         self.assertContains(outsider_response, 'class="thread-reply-unavailable"')
         self.assertContains(outsider_response, '以下の必要条件を満たしていません。')
@@ -452,6 +478,7 @@ class RoomViewTests(TestCase):
         response = self.client.get(reverse('events:map'))
 
         self.assertContains(response, 'View Room')
+        self.assertContains(response, 'data-summary-kind="room"')
         self.assertNotContains(response, 'Room Only Thread')
 
     def test_niimap_search_filters_rooms_without_mixing_internal_threads(self):

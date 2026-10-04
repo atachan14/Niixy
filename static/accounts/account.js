@@ -5,6 +5,8 @@ const accountId = accountPage.dataset.accountId;
 const modulePaneUrl = accountPage.dataset.modulePaneUrl;
 const moduleFieldDetailTemplate = accountPage.dataset.moduleFieldDetailTemplate;
 const moduleInterfaceDetailTemplate = accountPage.dataset.moduleInterfaceDetailTemplate;
+const roomPaneUrl = accountPage.dataset.roomPaneUrl;
+const roomDetailTemplate = accountPage.dataset.roomDetailTemplate;
 sessionStorage.removeItem(`niixy:account:${accountId}:thread-pane`);
 sessionStorage.removeItem(`niixy:account:${accountId}:thread-detail`);
 const paneContainer = document.querySelector('[data-thread-pane-container]');
@@ -21,10 +23,21 @@ const detailTitle = document.getElementById('account-thread-detail-title');
 const detailEmpty = document.getElementById('account-thread-detail-empty');
 const accountIdentity = document.getElementById('account-page-identity');
 const accountListTitle = document.getElementById('account-list-title');
+const accountRoomListContainer = document.querySelector('[data-account-room-list-container]');
+const accountRoomDetailContainer = document.querySelector('[data-account-room-detail-container]');
+const accountRoomDetailTitle = document.getElementById('account-room-detail-title');
+const roomPaneCache = new Map();
+let roomRequestId = 0;
+let activeRoomQuery = '';
 const profileStack = NiixyUI.createWorkspace(accountWorkspace, {
   overview: {root: true},
   list: {target: '.account-thread-pane', width: 'fixed'},
   detail: {target: '.account-thread-detail-pane', width: 'remaining'},
+  'room-list': {target: '.account-room-list-pane', width: 'fixed'},
+  'room-detail': {target: '.account-room-detail-pane', width: 'remaining'},
+  'account-if-list': {target: '#account-if-list-pane', width: 'fixed'},
+  'account-if-detail': {target: '#account-if-detail-pane', width: 'remaining'},
+  'people-list': {target: '#people-list-pane', width: 'fixed'},
   'module-list': {target: '.profile-module-list-pane', width: 'fixed'},
   'module-detail': {target: '.profile-module-management .ui-detail-pane', width: 'remaining'},
 }, {track: document.querySelector('.account-track')});
@@ -33,7 +46,7 @@ let activeModuleState = {type: 'element', subtype: 'field', collection: 'self'};
 
 function updateAccountNavigation() {
   const isPaneOpen = !profileStack.is('overview');
-  const label = activePane === 'response' ? 'Response' : activePane === 'module' ? 'Module' : 'Thread';
+  const label = {'account-if': 'AccountIF', people: 'People', response: 'Response', room: 'Room', module: 'Module'}[activePane] || 'Thread';
   accountListTitle.textContent = `${label}一覧`;
   accountIdentity.disabled = !isPaneOpen;
 }
@@ -94,6 +107,7 @@ async function loadPane(pane, query = '') {
 
 function openPane(pane, query = '', shouldUpdateUrl = true) {
   removeProfileModule();
+  resetAccountRoomDetail();
   resetThreadDetail();
   profileFeatures.activate('conversation');
   activePane = pane;
@@ -101,6 +115,17 @@ function openPane(pane, query = '', shouldUpdateUrl = true) {
   updateAccountNavigation();
   if (shouldUpdateUrl) updateUrl(paneParams({pane, query}));
   loadPane(pane, query);
+}
+
+function openStaticFeature(pane, stage, shouldUpdateUrl = true) {
+  removeProfileModule();
+  resetThreadDetail();
+  resetAccountRoomDetail();
+  activePane = pane;
+  profileFeatures.activate(pane);
+  profileStack.set(stage);
+  updateAccountNavigation();
+  if (shouldUpdateUrl) updateUrl(new URLSearchParams({pane}));
 }
 
 function moduleStateFromParams(params = new URLSearchParams(window.location.search)) {
@@ -138,6 +163,7 @@ function removeProfileModule() {
 async function openProfileModule(initialState = moduleStateFromParams(), shouldUpdateUrl = true) {
   removeProfileModule();
   resetThreadDetail();
+  resetAccountRoomDetail();
   activePane = 'module';
   activeModuleState = initialState;
   const management = document.createElement('section');
@@ -233,6 +259,127 @@ function resetThreadDetail() {
   detailTitle.textContent = '';
 }
 
+function accountRoomParams(query = activeRoomQuery, roomId = null) {
+  const params = new URLSearchParams(query);
+  params.set('pane', 'room');
+  if (roomId) params.set('room', roomId);
+  return params;
+}
+
+function resetAccountRoomDetail() {
+  roomRequestId += 1;
+  accountRoomDetailTitle.textContent = '';
+  accountRoomDetailContainer.innerHTML = '<p class="account-thread-detail-empty">Roomを選択してください。</p>';
+}
+
+function bindAccountRoomList(query = '') {
+  NiixyUI.bindTabs(accountRoomListContainer);
+  if (new URLSearchParams(query).has('member_page')) {
+    accountRoomListContainer.querySelector('[data-ui-tab="member"]')?.click();
+  }
+}
+
+async function loadAccountRoomPane(query = '') {
+  const cacheKey = query || 'default';
+  activeRoomQuery = query;
+  if (roomPaneCache.has(cacheKey)) {
+    accountRoomListContainer.innerHTML = roomPaneCache.get(cacheKey);
+    bindAccountRoomList(query);
+    return true;
+  }
+  accountRoomListContainer.innerHTML = '<p class="account-pane-loading">読み込み中...</p>';
+  try {
+    const response = await fetch(`${roomPaneUrl}${query}`, {headers: {'X-Requested-With': 'fetch'}});
+    if (!response.ok) throw new Error('Room pane request failed');
+    const html = await response.text();
+    roomPaneCache.set(cacheKey, html);
+    if (activeRoomQuery === query) {
+      accountRoomListContainer.innerHTML = html;
+      bindAccountRoomList(query);
+    }
+    return true;
+  } catch {
+    if (activeRoomQuery === query) renderPaneError(accountRoomListContainer);
+    return false;
+  }
+}
+
+async function openAccountRooms(query = '', shouldUpdateUrl = true) {
+  removeProfileModule();
+  resetThreadDetail();
+  resetAccountRoomDetail();
+  activePane = 'room';
+  profileFeatures.activate('room');
+  profileStack.set('room-list');
+  updateAccountNavigation();
+  if (shouldUpdateUrl) updateUrl(accountRoomParams(query));
+  return loadAccountRoomPane(query);
+}
+
+function roomDetailUrl(roomId) {
+  return roomDetailTemplate.replace('/0/', `/${roomId}/`);
+}
+
+function roomPageSectionUrl(fragment, section) {
+  const url = new URL(fragment.dataset.roomPageUrl, location.origin);
+  url.searchParams.set(section, '1');
+  return url;
+}
+
+function bindAccountRoomDetail(fragment, roomId) {
+  fragment.querySelector('[data-open-room-members]')?.addEventListener('click', () => {
+    location.assign(roomPageSectionUrl(fragment, 'members'));
+  });
+  fragment.querySelector('[data-open-room-boards]')?.addEventListener('click', () => {
+    location.assign(roomPageSectionUrl(fragment, 'boards'));
+  });
+  fragment.addEventListener('submit', async (event) => {
+    const form = event.target.closest('[data-room-action]');
+    if (!form) return;
+    event.preventDefault();
+    const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
+    if (!pending) return;
+    try {
+      const response = await fetch(form.action, {method: 'POST', body: new FormData(form)});
+      if (!response.ok) throw new Error();
+      roomPaneCache.clear();
+      await loadAccountRoomPane(activeRoomQuery);
+      await openAccountRoomDetail(roomId, false);
+    } catch {
+      pending.restore();
+    }
+  });
+}
+
+async function openAccountRoomDetail(roomId, shouldUpdateUrl = true) {
+  const requestId = ++roomRequestId;
+  accountRoomDetailTitle.textContent = '読み込み中...';
+  accountRoomDetailContainer.innerHTML = '<p class="account-pane-loading">読み込み中...</p>';
+  profileStack.set('room-detail');
+  document.querySelector('.account-room-detail-pane').scrollTo({top: 0});
+  if (shouldUpdateUrl) updateUrl(accountRoomParams(activeRoomQuery, roomId));
+  try {
+    const fragment = await NiixyUI.fetchFragment(roomDetailUrl(roomId));
+    if (requestId !== roomRequestId) return false;
+    accountRoomDetailTitle.textContent = fragment.dataset.roomTitle;
+    accountRoomDetailContainer.replaceChildren(fragment);
+    bindAccountRoomDetail(fragment, roomId);
+    return true;
+  } catch {
+    if (requestId === roomRequestId) {
+      accountRoomDetailTitle.textContent = '';
+      renderPaneError(accountRoomDetailContainer);
+    }
+    return false;
+  }
+}
+
+function closeAccountRoomDetail(shouldUpdateUrl = true) {
+  resetAccountRoomDetail();
+  profileStack.set('room-list');
+  if (shouldUpdateUrl) updateUrl(accountRoomParams());
+}
+
 function closeDetail(shouldUpdateUrl = true) {
   resetThreadDetail();
   profileStack.set('list');
@@ -243,6 +390,7 @@ function closeDetail(shouldUpdateUrl = true) {
 
 function closePane() {
   resetThreadDetail();
+  resetAccountRoomDetail();
   removeProfileModule();
   profileFeatures.clear();
   profileStack.set('overview');
@@ -298,10 +446,22 @@ async function openDetail(threadId, postNumber = null, shouldUpdateUrl = true) {
 
 document.querySelectorAll('[data-open-account-threads]').forEach((button) => button.addEventListener('click', () => openPane('thread')));
 document.querySelectorAll('[data-open-account-responses]').forEach((button) => button.addEventListener('click', () => openPane('response')));
+document.querySelectorAll('[data-open-account-rooms]').forEach((button) => button.addEventListener('click', () => openAccountRooms()));
+document.querySelectorAll('[data-open-account-account-if]').forEach((button) => button.addEventListener('click', () => openStaticFeature('account-if', 'account-if-list')));
+document.querySelectorAll('[data-open-account-people]').forEach((button) => button.addEventListener('click', () => openStaticFeature('people', 'people-list')));
 document.querySelectorAll('[data-open-account-modules]').forEach((button) => button.addEventListener('click', () => openProfileModule()));
+NiixyUI.bindTabs(document.querySelector('.account-people-list-pane'));
 accountIdentity.addEventListener('click', closePane);
 document.getElementById('close-account-list').addEventListener('click', closePane);
 document.getElementById('close-account-thread-detail').addEventListener('click', () => closeDetail());
+document.getElementById('close-account-room-list').addEventListener('click', closePane);
+document.getElementById('close-account-room-detail').addEventListener('click', () => closeAccountRoomDetail());
+document.getElementById('close-account-if-list').addEventListener('click', closePane);
+document.getElementById('close-account-if-detail').addEventListener('click', () => {
+  profileStack.set('account-if-list');
+  updateUrl(new URLSearchParams({pane: 'account-if'}));
+});
+document.getElementById('close-people-list').addEventListener('click', closePane);
 
 paneContainer.addEventListener('click', (event) => {
   const pagination = event.target.closest('[data-pane-pagination]');
@@ -317,6 +477,22 @@ paneContainer.addEventListener('click', (event) => {
   if (detailTrigger) openDetail(detailTrigger.dataset.threadDetail);
   const responseHeader = event.target.closest('[data-response-thread]');
   if (responseHeader) openDetail(responseHeader.dataset.responseThread, responseHeader.dataset.responsePost);
+});
+
+accountRoomListContainer.addEventListener('click', (event) => {
+  const pagination = event.target.closest('[data-room-pagination]');
+  if (pagination) {
+    event.preventDefault();
+    const query = new URL(pagination.href, location.origin).search;
+    closeAccountRoomDetail(false);
+    updateUrl(accountRoomParams(query));
+    loadAccountRoomPane(query);
+    return;
+  }
+  const room = event.target.closest('[data-account-room-detail]');
+  if (!room) return;
+  event.preventDefault();
+  openAccountRoomDetail(room.dataset.accountRoomDetail);
 });
 
 threadDetailContainer.addEventListener('submit', async (event) => {
@@ -342,6 +518,19 @@ function applyStateFromUrl() {
     const threadId = params.get('thread');
     if (threadId) openDetail(threadId, params.get('post'), false);
     else closeDetail(false);
+  } else if (pane === 'room') {
+    const roomQuery = new URLSearchParams(params);
+    roomQuery.delete('pane');
+    roomQuery.delete('room');
+    const query = roomQuery.toString() ? `?${roomQuery}` : '';
+    openAccountRooms(query, false).then(() => {
+      const roomId = params.get('room');
+      if (roomId) openAccountRoomDetail(roomId, false);
+    });
+  } else if (pane === 'account-if') {
+    openStaticFeature('account-if', 'account-if-list', false);
+  } else if (pane === 'people') {
+    openStaticFeature('people', 'people-list', false);
   } else if (pane === 'module') {
     const state = moduleStateFromParams(params);
     openProfileModule(state, false).then(() => {
@@ -369,6 +558,19 @@ if (['thread', 'response'].includes(initialParams.get('pane'))) {
   openPane(pane, query, false);
   const threadId = initialParams.get('thread');
   if (threadId) openDetail(threadId, initialParams.get('post'), false);
+} else if (initialParams.get('pane') === 'room') {
+  const roomQuery = new URLSearchParams(initialParams);
+  roomQuery.delete('pane');
+  roomQuery.delete('room');
+  const query = roomQuery.toString() ? `?${roomQuery}` : '';
+  openAccountRooms(query, false).then(() => {
+    const roomId = initialParams.get('room');
+    if (roomId) openAccountRoomDetail(roomId, false);
+  });
+} else if (initialParams.get('pane') === 'account-if') {
+  openStaticFeature('account-if', 'account-if-list', false);
+} else if (initialParams.get('pane') === 'people') {
+  openStaticFeature('people', 'people-list', false);
 } else if (initialParams.get('pane') === 'module') {
   const state = moduleStateFromParams(initialParams);
   openProfileModule(state, false).then(() => {

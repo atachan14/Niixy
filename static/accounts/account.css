@@ -70,35 +70,6 @@
   overflow-y: auto;
 }
 
-.account-overview-content {
-  display: grid;
-  gap: 28px;
-  margin: 0 auto;
-  max-width: 1280px;
-  padding: 32px 48px 56px;
-}
-
-.account-hero {
-  display: grid;
-  gap: 40px;
-  grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.1fr);
-}
-
-.account-thumbnail-placeholder,
-.account-placeholder-section {
-  border: 1px solid var(--line);
-}
-
-.account-thumbnail-placeholder {
-  align-items: center;
-  aspect-ratio: 4 / 3;
-  background: #ece9e4;
-  color: var(--muted);
-  display: flex;
-  font-weight: 700;
-  justify-content: center;
-}
-
 .account-actions-grid {
   align-content: center;
   display: grid;
@@ -128,41 +99,32 @@
   cursor: not-allowed;
 }
 
-.account-placeholder-section {
-  min-height: 150px;
-  padding: 20px;
-}
-
-.account-placeholder-section h2 {
-  font-size: 18px;
-  margin: 0;
-}
-
-.account-placeholder-section p {
-  color: var(--muted);
-  margin: 20px 0 0;
-}
-
-.account-profile-placeholder {
-  min-height: 320px;
-}
-
 .account-thread-workspace {
   display: contents;
 }
 
-.account-thread-track {
+.account-thread-track,
+.account-room-workspace,
+.account-room-track,
+.account-static-workspace,
+.account-static-track {
   display: contents;
 }
 
 .account-thread-pane,
-.account-thread-detail-pane {
+.account-thread-detail-pane,
+.account-room-list-pane,
+.account-room-detail-pane,
+.account-static-list-pane,
+.account-static-detail-pane {
   background: var(--panel);
   min-width: 0;
   overflow-y: auto;
 }
 
-.account-thread-pane {
+.account-thread-pane,
+.account-room-list-pane,
+.account-static-list-pane {
   flex: 0 0 var(--ui-workspace-fixed-width);
   width: var(--ui-workspace-fixed-width);
 }
@@ -173,7 +135,9 @@
   text-align: center;
 }
 
-.account-thread-column {
+.account-thread-column,
+.account-room-column,
+.account-static-column {
   padding: 18px 20px 28px;
 }
 
@@ -239,13 +203,16 @@
   color: var(--accent-dark);
 }
 
-.account-thread-detail-pane {
+.account-thread-detail-pane,
+.account-room-detail-pane,
+.account-static-detail-pane {
   flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width));
   padding: 0 20px 24px;
   width: calc(100vw - var(--ui-workspace-fixed-width));
 }
 
-.account-thread-detail-header {
+.account-thread-detail-header,
+.account-room-detail-header {
   align-items: center;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
@@ -257,7 +224,8 @@
   z-index: 2;
 }
 
-.account-thread-detail-header h2 {
+.account-thread-detail-header h2,
+.account-room-detail-header h2 {
   font-size: 18px;
   margin: 0;
   min-width: 0;
@@ -295,36 +263,23 @@
     padding: 0 16px;
   }
 
-  .account-overview-content {
-    gap: 20px;
-    padding: 20px 16px 36px;
-  }
-
-  .account-hero {
-    gap: 20px;
-    grid-template-columns: 1fr;
-  }
-
-  .account-thumbnail-placeholder {
-    aspect-ratio: 16 / 9;
-  }
+  .account-actions-grid { gap: 6px; }
 
   .account-actions-grid button {
-    font-size: 16px;
-    min-height: 50px;
-  }
-
-  .account-placeholder-section {
-    min-height: 130px;
-    padding: 18px;
-  }
-
-  .account-profile-placeholder {
-    min-height: 280px;
+    font-size: 13px;
+    min-height: 36px;
+    overflow: hidden;
+    padding: 4px 6px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .account-thread-pane,
-  .account-thread-detail-pane {
+  .account-thread-detail-pane,
+  .account-room-list-pane,
+  .account-room-detail-pane,
+  .account-static-list-pane,
+  .account-static-detail-pane {
     flex: 0 0 100vw;
     width: 100vw;
   }
@@ -335,11 +290,15 @@
     padding: 0 13px;
   }
 
-  .account-thread-column {
+  .account-thread-column,
+  .account-room-column,
+  .account-static-column {
     padding: 16px;
   }
 
-  .account-thread-detail-pane {
+  .account-thread-detail-pane,
+  .account-room-detail-pane,
+  .account-static-detail-pane {
     padding: 0 16px calc(24px + env(safe-area-inset-bottom));
   }
 }

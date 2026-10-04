@@ -156,6 +156,8 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, 'data-thread-placement-link')
         self.assertContains(response, 'data-latitude="35.681236"')
         self.assertContains(response, 'data-longitude="139.767125"')
+        self.assertContains(response, 'class="ui-placement-row is-sticky"')
+        self.assertContains(response, '緯度 35.681236 / 経度 139.767125')
         self.assertContains(
             response,
             f'href="{reverse("events:map")}?latitude=35.681236&amp;longitude=139.767125&amp;zoom=15"',
@@ -232,6 +234,7 @@ class ThreadViewTests(TestCase):
         response = self.client.get(reverse('events:map'))
         self.assertContains(response, '公開Thread')
         self.assertContains(response, '非公開Thread')
+        self.assertContains(response, 'data-summary-kind="thread"', count=2)
         self.assertContains(response, 'このThreadは閲覧できません。')
 
     def test_map_and_search_exclude_unplaced_threads(self):
@@ -313,7 +316,7 @@ class ThreadViewTests(TestCase):
         self.assertLess(search_toggle, create_toggle)
         self.assertLess(search_controls, create_controls)
         self.assertLess(create_controls, thread_list)
-        self.assertContains(response, 'map.js?v=20261004-27')
+        self.assertContains(response, 'map.js?v=20261004-29')
         self.assertNotContains(response, 'class="map-filter"')
         self.assertContains(response, 'niixy:resume:niimap')
         self.assertNotContains(response, 'niimap:open-thread')

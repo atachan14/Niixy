@@ -19,6 +19,7 @@ from .models import AccountCondition, AccountProfile
 from .services import condition_payload, save_account_condition
 from interfaces.models import FieldDefinition, Interface
 from interfaces.views import mark_interface_update_status, module_list_context, profile_module_list_context
+from rooms.models import Room
 
 
 User = get_user_model()
@@ -161,6 +162,24 @@ def account_response_pane(request, username):
     return render(request, 'accounts/partials/response_pane.html', {
         'account': account,
         'response_page': response_page,
+    })
+
+
+def account_room_pane(request, username):
+    account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    base_rooms = Room.objects.select_related('owner__niixy_profile')
+    owner_page = Paginator(
+        base_rooms.filter(owner=account).order_by('-last_activity_at', '-created_at'),
+        20,
+    ).get_page(request.GET.get('owner_page'))
+    member_page = Paginator(
+        base_rooms.filter(memberships__account=account).distinct().order_by('-last_activity_at', '-created_at'),
+        20,
+    ).get_page(request.GET.get('member_page'))
+    return render(request, 'accounts/partials/room_pane.html', {
+        'account': account,
+        'owner_page': owner_page,
+        'member_page': member_page,
     })
 
 

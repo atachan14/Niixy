@@ -3,29 +3,29 @@
 
 {% block title %}{{ account.niixy_profile.display_label }} | Niixy{% endblock %}
 {% block main_class %}account-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261004-1"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261004-4"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-12">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
 {% block content %}
-<script>if (['thread', 'response', 'module'].includes(new URLSearchParams(location.search).get('pane'))) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
-<section class="account-page" data-account-id="{{ account.username }}" data-module-pane-url="{% url 'accounts:module-pane' account.username %}" data-module-field-detail-template="{% url 'accounts:module-field-detail' account.username 0 %}" data-module-interface-detail-template="{% url 'accounts:module-interface-detail' account.username 0 %}">
+<script>if (['account-if', 'people', 'thread', 'response', 'room', 'module'].includes(new URLSearchParams(location.search).get('pane'))) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
+<section class="account-page" data-account-id="{{ account.username }}" data-room-pane-url="{% url 'accounts:room-pane' account.username %}" data-room-detail-template="{% url 'rooms:pane' 0 %}" data-module-pane-url="{% url 'accounts:module-pane' account.username %}" data-module-field-detail-template="{% url 'accounts:module-field-detail' account.username 0 %}" data-module-interface-detail-template="{% url 'accounts:module-interface-detail' account.username 0 %}">
   <header class="account-page-header"><h1><button id="account-page-identity" type="button" disabled>{{ account.niixy_profile.display_label }}</button><span> のプロフィール</span></h1></header>
   <div class="account-workspace">
     <div class="account-track ui-workspace-track">
       <section class="account-overview-pane" aria-label="Account概要">
-        <div class="account-overview-content">
-          <section class="account-hero">
-            <div class="account-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
+        <div class="account-overview-content identity-overview-content">
+          <section class="account-hero identity-overview-hero">
+            <div class="account-thumbnail-placeholder identity-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
             <div class="account-actions-grid" aria-label="Account機能">
-              <button type="button" disabled>フォロー</button><button type="button" disabled>フォロワー</button>
+              <button class="is-active" type="button" data-open-account-account-if>AccountIF</button><button class="is-active" type="button" data-open-account-people>People</button>
               <button class="is-active" type="button" data-open-account-threads>Thread</button><button class="is-active" type="button" data-open-account-responses>Response</button>
-              <button type="button" disabled>Tweet</button><button type="button" disabled>Book</button>
-              <button type="button" disabled>Room</button><button class="is-active" type="button" data-open-account-modules>Module</button>
+              <button class="is-active" type="button" data-open-account-rooms>Room</button><button type="button" disabled>Board</button>
+              <button type="button" disabled>Timeline</button><button class="is-active" type="button" data-open-account-modules>Module</button>
             </div>
           </section>
-          <section class="account-placeholder-section"><h2>紹介文</h2><p>未実装</p></section>
-          <section class="account-placeholder-section account-profile-placeholder"><h2>プロフィール</h2><p>未実装</p></section>
+          <section class="account-placeholder-section identity-overview-section"><h2>評価</h2><p>未実装</p></section>
+          <section class="account-placeholder-section account-profile-placeholder identity-overview-section identity-profile-placeholder"><h2>Profile</h2><p>未実装</p></section>
         </div>
       </section>
 
@@ -39,9 +39,46 @@
           </aside>
         </div>
       </section>
+      <section class="account-room-workspace ui-feature-workspace" aria-label="Room" data-ui-feature-workspace="room" hidden>
+        <div class="account-room-track">
+          <section class="ui-list-pane account-room-list-pane" aria-label="Room一覧"><header class="ui-pane-header ui-list-pane-header"><h2>Room一覧</h2><button id="close-account-room-list" class="icon-button" type="button" aria-label="Profileに戻る">×</button></header><div data-account-room-list-container><p class="account-pane-loading">読み込み中...</p></div></section>
+          <aside class="ui-detail-pane account-room-detail-pane" aria-label="Room詳細"><header class="ui-pane-header ui-detail-pane-header account-room-detail-header"><h2 id="account-room-detail-title"></h2><button id="close-account-room-detail" class="icon-button" type="button" aria-label="Room一覧に戻る">×</button></header><div data-account-room-detail-container><p class="account-thread-detail-empty">Roomを選択してください。</p></div></aside>
+        </div>
+      </section>
+      <section class="account-static-workspace ui-feature-workspace" aria-label="AccountIF" data-ui-feature-workspace="account-if" hidden>
+        <div class="account-static-track">
+          <section id="account-if-list-pane" class="ui-list-pane account-static-list-pane" aria-label="実装済みAccountIF一覧">
+            <header class="ui-pane-header ui-list-pane-header"><h2>AccountIF一覧</h2><button id="close-account-if-list" class="icon-button" type="button" aria-label="Profileに戻る">×</button></header>
+            <div class="account-static-column"><div class="ui-summary-list"><p class="empty">未実装</p></div></div>
+          </section>
+          <aside id="account-if-detail-pane" class="ui-detail-pane account-static-detail-pane" aria-label="実装済みAccountIF詳細">
+            <header class="ui-pane-header ui-detail-pane-header account-thread-detail-header"><h2></h2><button id="close-account-if-detail" class="icon-button" type="button" aria-label="AccountIF一覧に戻る">×</button></header>
+            <p class="account-thread-detail-empty">AccountIFを選択してください。</p>
+          </aside>
+        </div>
+      </section>
+      <section class="account-static-workspace ui-feature-workspace" aria-label="People" data-ui-feature-workspace="people" hidden>
+        <div class="account-static-track">
+          <section id="people-list-pane" class="ui-list-pane account-static-list-pane account-people-list-pane" aria-label="People一覧">
+            <header class="ui-pane-header ui-list-pane-header"><h2>People一覧</h2><button id="close-people-list" class="icon-button" type="button" aria-label="Profileに戻る">×</button></header>
+            <div class="ui-tabs account-thread-tabs" role="tablist" aria-label="Peopleの種類">
+              <button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="list-a">AccountListA</button>
+              <button type="button" role="tab" aria-selected="false" data-ui-tab="list-b">AccountListB</button>
+              <button type="button" role="tab" aria-selected="false" data-ui-tab="love">Love</button>
+              <button type="button" role="tab" aria-selected="false" data-ui-tab="hate">Hate</button>
+            </div>
+            <div class="account-static-lists">
+              <section class="ui-tab-panel account-static-column is-active" data-ui-tab-panel="list-a"><div class="ui-summary-list"><p class="empty">未実装</p></div></section>
+              <section class="ui-tab-panel account-static-column" data-ui-tab-panel="list-b"><div class="ui-summary-list"><p class="empty">未実装</p></div></section>
+              <section class="ui-tab-panel account-static-column" data-ui-tab-panel="love"><div class="ui-summary-list"><p class="empty">未実装</p></div></section>
+              <section class="ui-tab-panel account-static-column" data-ui-tab-panel="hate"><div class="ui-summary-list"><p class="empty">未実装</p></div></section>
+            </div>
+          </section>
+        </div>
+      </section>
     </div>
   </div>
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261004-2"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261004-4"></script>{% endblock %}

@@ -18,12 +18,14 @@
 .room-workspace { height: calc(100% - var(--room-header-height)); overflow: hidden; }
 .room-track { --ui-workspace-fixed-width: 360px; display: flex; height: 100%; width: max-content; }
 .room-overview-pane { background: var(--panel); flex: 0 0 100vw; overflow-y: auto; width: 100vw; }
-.room-overview-content { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0 auto; max-width: 1280px; min-width: 0; padding: 0 48px 56px; }
-.room-hero { align-items: start; display: grid; gap: 40px; grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.1fr); margin-top: 24px; min-width: 0; }
-.room-thumbnail-placeholder { align-items: center; aspect-ratio: 4 / 3; background: #ece9e4; border: 1px solid var(--line); color: var(--muted); display: flex; font-weight: 700; justify-content: center; }
+.room-overview-content { min-width: 0; }
+.room-overview-content > .ui-placement-row { margin: 0 auto; max-width: 1280px; padding: 0 48px; }
 .room-controls { display: grid; gap: 12px; min-width: 0; }
 .room-control-row { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .room-control-row .button, .room-wide-control, .room-participation-action .button, .room-participation-action form { box-sizing: border-box; width: 100%; }
+.room-controls .button { background: var(--panel); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-weight: 400; }
+.room-controls .button:not(:disabled):hover { background: var(--panel); border-color: var(--accent); color: var(--accent-dark); }
+.room-controls .button:disabled, .room-controls .button:disabled:hover { background: #f2f1ef; border-color: var(--line); color: var(--muted); }
 .room-participation-action form { margin: 0; }
 .room-list-pane, .room-thread-list-pane { background: var(--panel); flex: 0 0 var(--ui-workspace-fixed-width); overflow-y: auto; width: var(--ui-workspace-fixed-width); }
 .room-thread-detail-pane { background: var(--panel); box-sizing: border-box; flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width)); min-width: 0; overflow-y: auto; padding: 0 20px 24px; width: calc(100vw - var(--ui-workspace-fixed-width)); }
@@ -63,12 +65,20 @@
 .room-track .thread-create-module-list-pane, .room-track .thread-create-module-detail-pane { background: var(--panel); border-left: 1px solid var(--line); box-sizing: border-box; display: block; min-height: 0; min-width: 0; overflow-y: auto; }
 .room-track .thread-create-module-list-pane { flex: 0 0 var(--ui-workspace-fixed-width); width: var(--ui-workspace-fixed-width); }
 .room-track .thread-create-module-detail-pane { flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width)); width: calc(100vw - var(--ui-workspace-fixed-width)); }
-.thread-detail-pane .room-detail-fragment .room-overview-content { padding: 0 0 40px; }
+.thread-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row,
+.account-room-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row { padding-left: 0; padding-right: 0; }
+.thread-detail-pane .room-detail-fragment .identity-overview-content,
+.account-room-detail-pane .room-detail-fragment .identity-overview-content { padding: 32px 0 40px; }
 
-@media (max-width: 720px) {
-  .room-overview-content { padding: 0 16px 40px; }
-  .room-hero { gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .room-control-row .button { min-width: 0; overflow: hidden; padding: 0 6px; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 780px) {
+  .room-overview-content > .ui-placement-row { padding: 0 16px; }
+  .thread-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row,
+  .account-room-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row { padding-left: 0; padding-right: 0; }
+  .thread-detail-pane .room-detail-fragment .identity-overview-content,
+  .account-room-detail-pane .room-detail-fragment .identity-overview-content { padding: 20px 0 40px; }
+  .room-controls { gap: 6px; }
+  .room-control-row { gap: 6px; }
+  .room-control-row .button, .room-wide-control, .room-participation-action .button { font-size: 13px; min-height: 36px; min-width: 0; overflow: hidden; padding: 4px 6px; text-overflow: ellipsis; white-space: nowrap; }
   .room-page-header { padding: 0 16px; }
   .room-track { --ui-workspace-fixed-width: 100vw; }
   .room-list-pane, .room-thread-list-pane, .room-thread-detail-pane, .room-track .thread-create-module-list-pane, .room-track .thread-create-module-detail-pane { flex-basis: 100vw; width: 100vw; }

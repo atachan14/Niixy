@@ -8,6 +8,7 @@ from accounts.services import account_condition_catalog, save_account_condition
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from interfaces.models import FieldType, Interface, InterfaceDraft
 from interfaces.services import publish_draft, publish_field_definition
+from rooms.models import Room, RoomMembership
 
 
 class AccountConditionTests(TestCase):
@@ -229,11 +230,51 @@ class AccountPageTests(TestCase):
         response = self.client.get(reverse('accounts:detail', args=[account.username]))
 
         self.assertContains(response, 'data-open-account-modules')
+        self.assertContains(response, 'data-open-account-account-if')
+        self.assertContains(response, 'data-open-account-people')
+        self.assertContains(response, 'data-open-account-rooms')
         self.assertContains(response, reverse('accounts:module-pane', args=[account.username]))
+        self.assertContains(response, reverse('accounts:room-pane', args=[account.username]))
         self.assertContains(response, 'data-ui-feature-workspace="conversation"')
+        self.assertContains(response, 'data-ui-feature-workspace="room"')
+        self.assertContains(response, 'data-ui-feature-workspace="account-if"')
+        self.assertContains(response, 'data-ui-feature-workspace="people"')
         self.assertContains(response, 'class="account-thread-workspace ui-feature-workspace"')
+        self.assertContains(response, 'aria-label="実装済みAccountIF一覧"')
+        self.assertContains(response, 'AccountIFを選択してください。')
+        self.assertContains(response, '>People</button>')
+        self.assertContains(response, '>AccountListA</button>')
+        self.assertContains(response, '>AccountListB</button>')
+        self.assertContains(response, '>Love</button>')
+        self.assertContains(response, '>Hate</button>')
+        self.assertContains(response, 'account.js?v=20261004-4')
+        self.assertContains(response, 'class="account-overview-content identity-overview-content"')
+        self.assertContains(response, 'class="account-hero identity-overview-hero"')
+        self.assertContains(response, '<h2>評価</h2>')
+        self.assertContains(response, '<h2>Profile</h2>')
         self.assertNotContains(response, 'id="account-page-context"')
         self.assertNotContains(response, '>Interface</button>')
+
+    def test_room_pane_separates_owned_and_joined_rooms(self):
+        account = get_user_model().objects.create_user('room_account', password='eightchars')
+        other = get_user_model().objects.create_user('other_room_owner', password='eightchars')
+        owned = Room.objects.create(owner=account, created_by=account, name='Owned Room')
+        joined = Room.objects.create(owner=other, created_by=other, name='Joined Room')
+        hidden = Room.objects.create(owner=other, created_by=other, name='Hidden Room')
+        RoomMembership.objects.create(room=owned, account=account)
+        RoomMembership.objects.create(room=joined, account=account)
+
+        response = self.client.get(reverse('accounts:room-pane', args=[account.username]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(response.context['owner_page'].object_list, [owned])
+        self.assertCountEqual(response.context['member_page'].object_list, [owned, joined])
+        self.assertContains(response, 'data-ui-tab="owner"')
+        self.assertContains(response, 'data-ui-tab="member"')
+        self.assertContains(response, f'data-account-room-detail="{owned.pk}"', count=2)
+        self.assertContains(response, f'data-account-room-detail="{joined.pk}"', count=1)
+        self.assertContains(response, 'data-summary-kind="room"', count=3)
+        self.assertNotContains(response, hidden.name)
 
     def test_profile_module_pane_shows_only_published_active_modules(self):
         account = get_user_model().objects.create_user('module_owner', password='eightchars')
@@ -265,6 +306,8 @@ class AccountPageTests(TestCase):
         self.assertNotContains(response, '>新規作成<')
         self.assertContains(response, field.name)
         self.assertContains(response, interface.name)
+        self.assertContains(response, 'data-summary-kind="field"')
+        self.assertContains(response, 'data-summary-kind="interface"')
         self.assertNotContains(response, deleted_field.name)
         self.assertNotContains(response, '編集中Interface')
 
@@ -321,6 +364,7 @@ class AccountPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '作成したThread')
         self.assertContains(response, f'data-thread-detail="{thread.pk}"')
+        self.assertContains(response, 'data-summary-kind="thread"')
         self.assertNotContains(response, '詳細を見る')
 
     def test_profile_thread_detail_links_niimap_placement_coordinates(self):
@@ -335,6 +379,8 @@ class AccountPageTests(TestCase):
         response = self.client.get(reverse('accounts:thread-detail', args=[account.username, thread.pk]))
 
         self.assertContains(response, 'data-thread-placement-link')
+        self.assertContains(response, 'class="ui-placement-row is-sticky"')
+        self.assertContains(response, '緯度 35.681236 / 経度 139.767125')
         self.assertContains(
             response,
             f'href="{reverse("events:map")}?latitude=35.681236&amp;longitude=139.767125&amp;zoom=15"',

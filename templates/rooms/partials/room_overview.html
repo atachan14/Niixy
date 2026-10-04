@@ -4,25 +4,29 @@
   {% with latitude=room.placement.latitude|unlocalize longitude=room.placement.longitude|unlocalize %}
     {% include 'shared/placement_row.html' with placement_url=niimap_url|add:'?latitude='|add:latitude|add:'&longitude='|add:longitude|add:'&zoom=15' placement_label=latitude|add:', '|add:longitude placement_on_map=True placement_latitude=room.placement.latitude placement_longitude=room.placement.longitude %}
   {% endwith %}
-  <section class="room-hero">
-    <div class="room-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
-    <div class="room-controls">
-      <div class="room-control-row"><button class="button secondary" type="button" disabled title="未対応">RoomIF</button><button class="button secondary" type="button" data-open-room-members>メンバー {{ room.memberships.all|length }}</button></div>
-      <div class="room-control-row"><button class="button secondary" type="button" data-open-room-boards>Board</button><button class="button secondary" type="button" disabled title="未対応">Timeline</button></div>
-      <button class="button secondary room-wide-control" type="button" disabled title="未対応">Policy</button>
-      <div class="room-participation-action">
-        {% if room.is_owner %}
-          <button class="button secondary" type="button" disabled>Owner</button>
-        {% elif room.is_member %}
-          <form action="{% url 'rooms:leave' room.pk %}" data-room-action>{% csrf_token %}<button class="button secondary" type="submit" data-pending-label="退会中...">退会</button></form>
-        {% elif user.is_authenticated %}
-          <form action="{% url 'rooms:join' room.pk %}" data-room-action>{% csrf_token %}<button class="button primary" type="submit" data-pending-label="参加中...">参加</button></form>
-        {% else %}
-          <button class="button secondary" type="button" data-explanation-target="[data-room-participation-dialog]" aria-haspopup="dialog">参加不可</button>
-        {% endif %}
+  <div class="room-overview-body identity-overview-content">
+    <section class="room-hero identity-overview-hero">
+      <div class="room-thumbnail-placeholder identity-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
+      <div class="room-controls">
+        <div class="room-control-row"><button class="button secondary" type="button" disabled title="未対応">RoomIF</button><button class="button secondary" type="button" data-open-room-members>Member({{ room.memberships.all|length }})</button></div>
+        <div class="room-control-row"><button class="button secondary" type="button" data-open-room-boards>Board</button><button class="button secondary" type="button" disabled title="未対応">Timeline</button></div>
+        <button class="button secondary room-wide-control" type="button" disabled title="未対応">Policy</button>
+        <div class="room-participation-action">
+          {% if room.is_owner %}
+            <button class="button secondary" type="button" disabled>Owner</button>
+          {% elif room.is_member %}
+            <form action="{% url 'rooms:leave' room.pk %}" data-room-action>{% csrf_token %}<button class="button secondary" type="submit" data-pending-label="退会中...">退会</button></form>
+          {% elif user.is_authenticated %}
+            <form action="{% url 'rooms:join' room.pk %}" data-room-action>{% csrf_token %}<button class="button primary" type="submit" data-pending-label="参加中...">参加</button></form>
+          {% else %}
+            <button class="button secondary" type="button" data-explanation-target="[data-room-participation-dialog]" aria-haspopup="dialog">参加不可</button>
+          {% endif %}
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+    <section class="room-placeholder-section identity-overview-section"><h2>評価</h2><p>未実装</p></section>
+    <section class="room-placeholder-section room-profile-placeholder identity-overview-section identity-profile-placeholder"><h2>Profile</h2><p>未実装</p></section>
+  </div>
   {% if not user.is_authenticated %}<dialog class="ui-dialog room-participation-dialog" data-room-participation-dialog>
     <form method="dialog">
       <header><h2>参加できません</h2><button class="icon-button" value="cancel" aria-label="閉じる">×</button></header>

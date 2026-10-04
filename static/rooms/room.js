@@ -139,7 +139,7 @@ document.getElementById('close-room-thread-detail').addEventListener('click', ()
 roomListContent.addEventListener('click', (event) => {
   const board = event.target.closest('[data-open-board]');
   if (!board) return;
-  openBoard(board.dataset.openBoard, board.querySelector('.ui-summary-item-title').textContent, board.dataset.boardUrl);
+  openBoard(board.dataset.openBoard, board.dataset.boardTitle, board.dataset.boardUrl);
 });
 roomThreadListContent.addEventListener('click', (event) => {
   const trigger = event.target.closest('[data-room-thread]');
@@ -202,7 +202,7 @@ if (initialBoard) {
   openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false).then(() => {
     const board = roomListContent.querySelector(`[data-open-board="${initialBoard}"]`);
     if (!board) return;
-    openBoard(initialBoard, board.querySelector('.ui-summary-item-title').textContent, board.dataset.boardUrl, false).then(() => {
+    openBoard(initialBoard, board.dataset.boardTitle, board.dataset.boardUrl, false).then(() => {
       const thread = initial.get('thread');
       if (thread) openThread(thread, false);
     });
