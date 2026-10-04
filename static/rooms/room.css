@@ -31,7 +31,7 @@
 .room-thread-detail-pane { background: var(--panel); box-sizing: border-box; flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width)); min-width: 0; overflow-y: auto; padding: 0 20px 24px; width: calc(100vw - var(--ui-workspace-fixed-width)); }
 .room-thread-detail-pane > header { position: sticky; top: 0; z-index: 2; }
 .room-pane-loading, .room-list-pane .empty { color: var(--muted); margin: 32px 20px; text-align: center; }
-.room-board-list, .room-board-thread-list, .room-member-list { padding: 16px 20px 28px; }
+.room-board-list, .room-board-thread-list, .room-member-list { --summary-list-gutter: 20px; padding: 16px 20px 28px; }
 .room-board-create { margin: 0 0 12px; }
 .room-board-create form, .room-board-edit { display: grid; gap: 10px; }
 .room-board-create label { display: grid; font-weight: 700; gap: 5px; }

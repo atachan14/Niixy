@@ -136,6 +136,7 @@
 }
 
 .module-list-panel {
+  --summary-list-gutter: 20px;
   display: none;
   padding: 16px 20px 28px;
 }
@@ -585,13 +586,13 @@
   border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
-  min-height: 60px;
+  min-height: 52px;
   position: sticky;
   top: 0;
 }
 
 .basic-info-header h2 {
-  font-size: 18px;
+  font-size: 16px;
   margin: 0;
 }
 
