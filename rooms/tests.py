@@ -509,6 +509,47 @@ class RoomViewTests(TestCase):
         self.assertFalse(self.board.evaluate_policy(self.outsider, 'view').allowed)
         self.assertTrue(self.board.evaluate_policy(self.owner, 'view').allowed)
 
+    def test_board_thread_create_requires_view_and_create_permissions(self):
+        RoomMembership.objects.create(room=self.room, account=self.member)
+        url = reverse('rooms:board-thread-create', args=[self.room.pk, self.board.pk])
+        for actor, allow_view, deny_view, allow_create, expected_status in (
+            (self.member, False, False, True, 403),
+            (self.member, True, True, True, 403),
+            (self.member, True, False, False, 403),
+            (self.member, True, False, True, 200),
+            (self.owner, False, True, True, 200),
+            (self.owner, False, True, False, 403),
+        ):
+            with self.subTest(actor=actor.username, allow_view=allow_view,
+                              deny_view=deny_view, allow_create=allow_create):
+                self.board.policy_conditions.all().delete()
+                for capability, decision, enabled in (
+                    (BoardPolicyCondition.VIEW, BoardPolicyCondition.ALLOW, allow_view),
+                    (BoardPolicyCondition.VIEW, BoardPolicyCondition.DENY, deny_view),
+                    (BoardPolicyCondition.CREATE_THREAD, BoardPolicyCondition.ALLOW, allow_create),
+                ):
+                    if enabled:
+                        BoardPolicyCondition.objects.create(
+                            board=self.board, capability=capability, decision=decision,
+                            kind='default', definition={'code': 'account'}, label='NiixyAccount',
+                        )
+                self.client.force_login(actor)
+                before = (Thread.objects.count(), ThreadPost.objects.count(),
+                          ThreadPlacement.objects.count())
+                response = self.client.post(url, {
+                    'submission_id': str(uuid4()), 'title': 'Permission check', 'body': 'Body',
+                })
+                self.assertEqual(response.status_code, expected_status)
+                after = (Thread.objects.count(), ThreadPost.objects.count(),
+                         ThreadPlacement.objects.count())
+                if expected_status == 403:
+                    self.assertEqual(after, before)
+                else:
+                    self.assertEqual(after, tuple(count + 1 for count in before))
+                    thread = Thread.objects.get(pk=response.json()['thread_id'])
+                    self.assertEqual(thread.creator, actor)
+                    self.assertEqual(thread.placements.get().board, self.board)
+
     def test_thread_create_post_rechecks_board_policy(self):
         self.client.force_login(self.owner)
         self.client.post(

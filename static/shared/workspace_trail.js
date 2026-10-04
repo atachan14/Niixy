@@ -64,6 +64,7 @@ window.NiixyWorkspaceTrail = (() => {
     function align(entry, instant = false) {
       if (!entry?.pane?.isConnected) return;
       const apply = () => {
+        if (!entry.pane.isConnected) return;
         const trackRect = track.getBoundingClientRect();
         const paneRect = entry.pane.getBoundingClientRect();
         const width = entry.width;
@@ -76,7 +77,8 @@ window.NiixyWorkspaceTrail = (() => {
         track.style.setProperty('--ui-workspace-offset', `${offset}px`);
         if (instant) requestAnimationFrame(() => track.classList.remove('is-workspace-trail-aligning'));
       };
-      requestAnimationFrame(() => requestAnimationFrame(apply));
+      if (instant) apply();
+      else requestAnimationFrame(() => requestAnimationFrame(apply));
     }
 
     function restore(snapshot) {
@@ -89,6 +91,7 @@ window.NiixyWorkspaceTrail = (() => {
     function pop(entry = entries.at(-1)) {
       if (!entry || entries.at(-1) !== entry) return false;
       entry.abort?.abort();
+      entry.dispose?.();
       entry.pane.remove();
       entries.pop();
       if (entries.length) {
@@ -102,7 +105,26 @@ window.NiixyWorkspaceTrail = (() => {
       return true;
     }
 
-    function push({title, width = 'full', url = location.href}) {
+    function discardAfter(anchor = null) {
+      const index = anchor ? entries.indexOf(anchor) : -1;
+      if (anchor && index < 0) return false;
+      const removed = entries.splice(index + 1);
+      if (!removed.length) return false;
+      removed.forEach((entry) => {
+        entry.abort?.abort();
+        entry.dispose?.();
+        entry.pane.remove();
+      });
+      restore(removed[0].previous);
+      if (!entries.length) {
+        root.classList.remove('is-workspace-trail-open');
+        baseState = null;
+      }
+      return true;
+    }
+
+    function push({title, width = 'full', url = location.href, after = undefined}) {
+      const replaced = after !== undefined && discardAfter(after);
       if (!entries.length) baseState = state();
       const previous = state();
       const ui = createPane(title, width);
@@ -112,7 +134,7 @@ window.NiixyWorkspaceTrail = (() => {
       entries.push(entry);
       ui.close.addEventListener('click', () => pop(entry));
       history.replaceState(history.state, '', entry.url);
-      align(entry);
+      align(entry, replaced);
       return entry;
     }
 
@@ -121,7 +143,7 @@ window.NiixyWorkspaceTrail = (() => {
       align({pane: element, width});
     }
 
-    return {align, entries, focus, pop, push, track};
+    return {align, discardAfter, entries, focus, pop, push, track};
   }
 
   function paneUrl(template, id) {
@@ -172,7 +194,7 @@ window.NiixyWorkspaceTrail = (() => {
 
   function openThreadDetail(trail, source, threadId, postNumber = null) {
     const detailUrl = paneUrl(source.dataset.threadDetailTemplate, threadId);
-    const url = childUrl(source.dataset.accountPageUrl || source.dataset.roomPageUrl, {thread: threadId, post: postNumber});
+    const url = childUrl(source.dataset.accountPageUrl || source.dataset.roomPageUrl, {pane: source.dataset.accountPageUrl ? (postNumber ? 'response' : 'thread') : null, thread: threadId, post: postNumber});
     const entry = trail.push({title: '読み込み中...', width: 'remaining', url});
     fetchInto(entry, detailUrl).then(() => {
       const detail = entry.body.querySelector('[data-thread-title], [data-thread-detail-pane]');
@@ -185,7 +207,7 @@ window.NiixyWorkspaceTrail = (() => {
     }).catch((error) => showError(entry, error));
   }
 
-  function openAccountFeature(trail, account, kind) {
+  function openAccountFeature(trail, account, kind, origin) {
     const definitions = {
       thread: ['Thread一覧', account.dataset.threadPaneUrl],
       response: ['Response一覧', account.dataset.responsePaneUrl],
@@ -194,12 +216,12 @@ window.NiixyWorkspaceTrail = (() => {
     };
     const definition = definitions[kind];
     if (!definition) {
-      const entry = trail.push({title: kind === 'account-if' ? 'AccountIF一覧' : 'People一覧', width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind})});
+      const entry = trail.push({title: kind === 'account-if' ? 'AccountIF一覧' : 'People一覧', width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind}), after: origin});
       entry.body.innerHTML = '<p class="ui-pane-status">未実装</p>';
       return;
     }
     const [title, listUrl] = definition;
-    const entry = trail.push({title, width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind})});
+    const entry = trail.push({title, width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind}), after: origin});
     entry.body.addEventListener('click', (event) => {
       const pagination = event.target.closest('[data-pane-pagination], [data-room-pagination], [data-summary-page]');
       if (pagination) {
@@ -232,7 +254,7 @@ window.NiixyWorkspaceTrail = (() => {
       ['[data-open-account-account-if]', 'account-if'],
       ['[data-open-account-people]', 'people'],
     ];
-    actions.forEach(([selector, kind]) => account.querySelector(selector)?.addEventListener('click', () => openAccountFeature(trail, account, kind)));
+    actions.forEach(([selector, kind]) => account.querySelector(selector)?.addEventListener('click', () => openAccountFeature(trail, account, kind, entry)));
   }
 
   async function submitJsonForm(form, submitter = null) {
@@ -315,6 +337,7 @@ window.NiixyWorkspaceTrail = (() => {
       });
       const boardUrl = board.dataset.boardUrl;
       let accountConditions = null;
+      boardEntry.dispose = () => accountConditions?.destroy();
 
       const loadBoard = async () => {
         accountConditions?.destroy();
@@ -459,7 +482,7 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   const host = workspaceHost();
-  if (!host) return {open() {}};
+  if (!host) return {clear() {}, open() {}};
   const trail = create(host);
   document.addEventListener('click', (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -471,7 +494,11 @@ window.NiixyWorkspaceTrail = (() => {
     event.stopImmediatePropagation();
     openEntity(trail, entity);
   }, true);
-  return {open: (url) => {
+  return {clear: () => {
+    const url = location.href;
+    trail.discardAfter();
+    history.replaceState(history.state, '', url);
+  }, open: (url) => {
     const anchor = document.createElement('a');
     anchor.href = url;
     const entity = entityLink(anchor);

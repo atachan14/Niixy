@@ -106,6 +106,7 @@ async function loadPane(pane, query = '') {
 }
 
 function openPane(pane, query = '', shouldUpdateUrl = true) {
+  NiixyWorkspaceTrail.clear();
   removeProfileModule();
   resetAccountRoomDetail();
   resetThreadDetail();
@@ -118,6 +119,7 @@ function openPane(pane, query = '', shouldUpdateUrl = true) {
 }
 
 function openStaticFeature(pane, stage, shouldUpdateUrl = true) {
+  NiixyWorkspaceTrail.clear();
   removeProfileModule();
   resetThreadDetail();
   resetAccountRoomDetail();
@@ -161,6 +163,7 @@ function removeProfileModule() {
 }
 
 async function openProfileModule(initialState = moduleStateFromParams(), shouldUpdateUrl = true) {
+  NiixyWorkspaceTrail.clear();
   removeProfileModule();
   resetThreadDetail();
   resetAccountRoomDetail();
@@ -305,6 +308,7 @@ async function loadAccountRoomPane(query = '') {
 }
 
 async function openAccountRooms(query = '', shouldUpdateUrl = true) {
+  NiixyWorkspaceTrail.clear();
   removeProfileModule();
   resetThreadDetail();
   resetAccountRoomDetail();
@@ -389,6 +393,7 @@ function closeDetail(shouldUpdateUrl = true) {
 }
 
 function closePane() {
+  NiixyWorkspaceTrail.clear();
   resetThreadDetail();
   resetAccountRoomDetail();
   removeProfileModule();
@@ -504,6 +509,7 @@ threadDetailContainer.addEventListener('submit', async (event) => {
 });
 
 function applyStateFromUrl() {
+  NiixyWorkspaceTrail.clear();
   const params = new URLSearchParams(window.location.search);
   const pane = params.get('pane');
   isApplyingHistory = true;

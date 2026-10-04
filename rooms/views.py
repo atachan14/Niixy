@@ -337,8 +337,10 @@ def room_thread_detail(request, room_id, thread_id):
 def board_thread_create(request, room_id, board_id):
     room = _room(request, room_id)
     board = get_object_or_404(_room_boards(room), pk=board_id)
+    view_policy = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
+    can_view = room.is_owner or view_policy.allowed
     create_policy = board.evaluate_policy(request.user, BoardPolicyCondition.CREATE_THREAD)
-    if not create_policy.allowed:
+    if not can_view or not create_policy.allowed:
         return JsonResponse({'error': 'BoardのThread作成条件を満たしていません。'}, status=403)
     form = BoardThreadCreateForm(request.POST)
     if not form.is_valid():

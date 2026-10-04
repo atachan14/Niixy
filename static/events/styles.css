@@ -939,6 +939,8 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .ui-workspace-trail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; flex: 0 0 42px; justify-content: space-between; min-height: 42px; padding: 0 20px; }
 .ui-workspace-trail-header h2 { font-size: 15px; margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-workspace-trail-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.ui-workspace-trail-body > .thread-detail { padding: 0 20px 24px; }
+.ui-workspace-trail-body > .thread-detail > .ui-placement-row.is-sticky { top: 0; }
 .ui-workspace-trail-body > .account-detail-fragment,
 .ui-workspace-trail-body > .room-detail-fragment { min-height: 100%; }
 .ui-workspace-trail-body .ui-pane-status { color: var(--muted); margin: 32px 20px; text-align: center; }
@@ -957,6 +959,7 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
   .ui-workspace-trail-pane[data-workspace-trail-width="fixed"],
   .ui-workspace-trail-pane[data-workspace-trail-width="remaining"] { flex-basis: 100vw; width: 100vw; }
   .ui-workspace-trail-header { padding: 0 16px; }
+  .ui-workspace-trail-body > .thread-detail { padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
   .account-detail-fragment .account-actions-grid { gap: 6px; }
   .account-detail-fragment .account-actions-grid button { font-size: 13px; min-height: 36px; overflow: hidden; padding: 4px 6px; text-overflow: ellipsis; white-space: nowrap; }
   .identity-overview-content { gap: 20px; padding: 20px 16px 36px; }
@@ -1068,7 +1071,7 @@ html.has-restored-niimap-workspace .thread-track { transition: none; visibility:
 .spot-summary { transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
 .thread-summary.is-selected { color: var(--accent-dark); }
 .thread-detail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; min-height: 52px; position: sticky; top: 0; z-index: 2; }
-.thread-detail { display: grid; gap: 16px; min-width: 0; }
+.thread-detail { align-content: start; display: grid; gap: 16px; min-width: 0; }
 .thread-detail[hidden] { display: none !important; }
 .thread-post { border-bottom: 1px solid var(--line); min-width: 0; padding: 14px 0; }
 .thread-post-layout-area { display: grid; gap: 12px; grid-template-columns: clamp(56px, 12%, 96px) minmax(0, 1fr); min-width: 0; }
@@ -1076,7 +1079,7 @@ html.has-restored-niimap-workspace .thread-track { transition: none; visibility:
 .thread-thumbnail { aspect-ratio: 1; background: #e7e4df; border: 1px solid var(--line); border-radius: 6px; }
 .thread-post-info { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; font-weight: 700; }
 .thread-post-info time { color: var(--muted); font-weight: 400; margin-left: auto; white-space: nowrap; }
-.thread-post-body { line-height: 1.7; margin-top: 8px; white-space: pre-wrap; }
+.thread-post-body { line-height: 1.7; margin-top: 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .thread-reply-form { display: grid; gap: 10px; min-width: 0; }
 .thread-reply-form textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; max-width: 100%; min-height: 110px; min-width: 0; padding: 10px; resize: vertical; width: 100%; }
 .thread-reply-form .button { justify-self: end; }
