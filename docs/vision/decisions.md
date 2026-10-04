@@ -226,7 +226,7 @@ Room の初期状態では、Main Collection 内に `最初のBoard`を自動作
 
 ## 2026-10-03 - RoomPane に表示する Collection を選択する
 
-状態: 採用・詳細保留
+状態: 置換済み（2026-10-04 の「RoomPageではBoardボタンから一覧Paneを開く」を採用）
 
 RoomPane に表示する Board は、Main 固定ではなく、Room 管理者が選択した一つの Collection から取得する。初期状態では Main を表示用 Collection とするが、公式情報や交流などの運用に応じて別の Collection へ変更できるようにする。
 
@@ -306,7 +306,7 @@ RoomはRoom管理者がNiiMap座標の変更、未配置化、再配置を行え
 
 Boardは独立したOwnerを持たない。Account配下のCollectionに配置されたBoardはそのAccountが、Room配下のCollectionに配置されたBoardはそのRoomの管理者が管理する。NiiMapへ直接配置されたBoardには配置先管理者が存在しないため、配置後の移動、未配置化、編集、削除を認めない。Boardを作成した実Accountを監査情報として残すかは、監査機能の実装時に改めて決める。
 
-Collectionを削除する場合、そのCollectionへ配置されているBoardを未配置にせず、同じAccountまたはRoom配下のシステムCollection「未分類」へ移す。「未分類」がなければ自動作成し、既にあれば再利用する。表示名ではなくシステム上の役割で通常のCollectionと区別する。参照として掲載されているBoardやCollectionは、Collection削除時に参照だけを解除する。
+Collectionを削除する場合、そのCollectionへ配置されているBoardを未配置にせず、同じAccountまたはRoom配下のシステムCollection「未分類」へ移す。「未分類」はAccountまたはRoomの作成時から常設し、固定名、削除不可、並び替え不可とする。Boardの作成先には指定でき、それ以外は通常Collectionと同様に扱う。表示名ではなくシステム上の役割で通常のCollectionと区別する。参照として掲載されているBoardやCollectionは、Collection削除時に参照だけを解除する。
 
 参照先Boardが物理削除された場合、Collection側の参照Itemを対象なしの状態で残すことを認める。参照Itemは「削除されました」と表示し、Collection管理者がそのItemをCollectionから削除できる。参照追加時の名称などを表示し続けるSnapshotの要否は参照機能の実装時に決める。
 
@@ -327,3 +327,13 @@ RoomのBoardTemplateとBoardのThreadTemplateは、子対象を作成すると�
 Boardの削除は復元を前提としたSoft Deleteではなく物理削除とする。Board本体、Board自身の配置、そのBoardが保持する参照を削除し、削除済みBoard一覧と復元機能は設けない。削除操作は取り消せないことと、Board内のThreadおよびResponseは削除されないことを実行前に案内する。
 
 削除されたBoardに配置されていたThreadは未配置となるが、Thread本体、Response、ThreadPolicy、Field、Interfaceを保持する。Board削除後もThreadPolicyに従ってResponse投稿と編集可能なThread情報の変更を認める。別のBoard、AccountのList、fav、badなどがそのThreadへ持つ参照は維持する。
+
+## 2026-10-04 - RoomPageではBoardボタンから一覧Paneを開く
+
+状態: 採用（2026-10-03 の「RoomPaneに表示するCollectionを選択する」を置換）
+
+RoomPageには特定CollectionのBoardを直接表示しない。機能ボタン群の`Board`からBoard一覧Paneを開き、一覧Pane内のTabで各Collectionを切り替える。したがって、RoomがRoomPage表示用Collectionを保持する必要はない。
+
+`Main`はRoomまたはAccountの作成時に用意される初期Collection名にすぎず、特別な機能やシステム上の役割を持たない。通常Collectionと同様に名称変更と削除を認める。システム上の識別が必要なのは、Collection削除時のBoard退避先となる常設の`未分類`だけとする。
+
+Board一覧PaneのTabは、作成順の通常Collection群、固定の`未分類`、管理者だけに表示する`管理`の順に並べる。`管理`はCollection実体ではなく管理UIであり、Collection作成をここへ配置する。新規Collectionは通常Collection群の末尾へ追加する。編集、削除、並び替えの管理UIは後続の検討で拡張する。

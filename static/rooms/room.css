@@ -32,10 +32,22 @@
 .room-thread-detail-pane > header { position: sticky; top: 0; z-index: 2; }
 .room-pane-loading, .room-list-pane .empty { color: var(--muted); margin: 32px 20px; text-align: center; }
 .room-board-list, .room-board-thread-list, .room-member-list { --summary-list-gutter: 20px; padding: 16px 20px 28px; }
-.room-board-create { margin: 0 0 12px; }
-.room-board-create form, .room-board-edit { display: grid; gap: 10px; }
-.room-board-create label { display: grid; font-weight: 700; gap: 5px; }
-.room-board-create input, .room-board-edit input, .room-board-edit textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; min-width: 0; padding: 9px; width: 100%; }
+.room-collection-management { padding: 16px 20px 28px; }
+.room-collection-create, .room-collection-edit, .room-board-create { margin: 0; }
+.room-collection-create form, .room-collection-edit, .room-collection-edit form, .room-board-create form, .room-board-edit { display: grid; gap: 10px; }
+.room-collection-create label, .room-collection-edit label, .room-board-create label { display: grid; font-weight: 700; gap: 5px; }
+.room-collection-create input, .room-collection-edit input, .room-board-create input, .room-board-edit input, .room-board-edit textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; min-width: 0; padding: 9px; width: 100%; }
+.room-collection-window-actions { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
+.room-collection-window-actions .button { justify-content: center; width: 100%; }
+.room-collection-window-actions .button:only-child { grid-column: 1 / -1; }
+.room-collection-window { margin-bottom: 12px; }
+.room-collection-window-body { border-bottom: 1px solid var(--line); display: grid; gap: 0; padding-bottom: 12px; }
+.room-collection-information, .room-collection-editor { display: grid; gap: 0; }
+.room-collection-information[hidden], .room-collection-editor[hidden] { display: none; }
+.room-collection-edit label { align-items: start; grid-template-columns: 88px minmax(0, 1fr); }
+.room-collection-edit-actions { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 12px; }
+.room-collection-edit-actions .button, .room-collection-edit-actions form { margin: 0; width: 100%; }
+.room-collection-edit-toggle { justify-self: end; margin-top: 12px; }
 .room-board-window-actions { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
 .room-board-window-actions .button { justify-content: center; width: 100%; }
 .room-board-window-actions .button:disabled { cursor: not-allowed; opacity: .5; }

@@ -24,6 +24,7 @@ const roomStack = NiixyUI.createWorkspace(roomWorkspace, {
   'field-detail': {target: '.thread-create-module-detail-pane.thread-field-detail-pane'},
 }, {track: roomTrack});
 let activeBoardId = null;
+let activeCollectionId = null;
 const requests = {list: 0, threads: 0, detail: 0};
 
 function roomUrl(template, id) {
@@ -32,7 +33,11 @@ function roomUrl(template, id) {
 
 function updateUrl(values = {}) {
   const url = new URL(location.href);
-  url.search = new URLSearchParams(values).toString();
+  const params = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') params.set(key, value);
+  });
+  url.search = params.toString();
   history.pushState({}, '', url);
 }
 
@@ -44,6 +49,80 @@ function clearThreadPanes() {
   roomThreadListContent.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
   roomDetailTitle.textContent = '';
   roomDetailContent.innerHTML = '<p class="empty">Threadを選択してください。</p>';
+}
+
+function activateCollectionTab(tab) {
+  if (!tab) return;
+  roomListContent.querySelectorAll('[data-ui-tab]').forEach((item) => {
+    const selected = item === tab;
+    item.classList.toggle('is-active', selected);
+    item.setAttribute('aria-selected', String(selected));
+  });
+  roomListContent.querySelectorAll('[data-ui-tab-panel]').forEach((panel) => {
+    panel.classList.toggle('is-active', panel.dataset.uiTabPanel === tab.dataset.uiTab);
+  });
+}
+
+function activateCollection(collectionId) {
+  if (!collectionId) return;
+  const tab = roomListContent.querySelector(`[data-collection-id="${collectionId}"]`);
+  if (!tab) return;
+  activeCollectionId = String(collectionId);
+  activateCollectionTab(tab);
+}
+
+function activateCollectionManagement() {
+  activeCollectionId = null;
+  activateCollectionTab(roomListContent.querySelector('[data-collection-management-tab]'));
+}
+
+function initializeCollectionControls(root) {
+  root.querySelectorAll('[data-collection-panel-id]:not([data-collection-controls-ready])').forEach((collection) => {
+    collection.dataset.collectionControlsReady = 'true';
+    const informationToggle = collection.querySelector('[data-collection-information-toggle]');
+    const createToggle = collection.querySelector('[data-collection-create-toggle]');
+    const editToggle = collection.querySelector('[data-collection-edit-toggle]');
+    const informationWindow = collection.querySelector('[data-collection-information-window]');
+    const createWindow = collection.querySelector('[data-collection-create-window]');
+    const informationView = collection.querySelector('[data-collection-information-view]');
+    const editor = collection.querySelector('[data-collection-editor]');
+    const editForm = editor?.querySelector('.room-collection-edit');
+
+    const showInformationView = () => {
+      if (!editor || !editToggle) return;
+      editor.hidden = true;
+      informationView.hidden = false;
+      editToggle.textContent = '編集';
+      editToggle.setAttribute('aria-expanded', 'false');
+      editForm?.reset();
+    };
+
+    NiixyUI.createExclusivePanels(collection, {
+      information: {
+        toggle: informationToggle,
+        panel: informationWindow,
+        label: '詳細確認',
+        onClose: showInformationView,
+      },
+      create: {
+        toggle: createToggle,
+        panel: createWindow,
+        label: 'Board作成',
+      },
+    });
+
+    editToggle?.addEventListener('click', () => {
+      const shouldOpen = editor.hidden;
+      if (shouldOpen) {
+        informationView.hidden = true;
+        editor.hidden = false;
+        editToggle.textContent = 'キャンセル';
+        editToggle.setAttribute('aria-expanded', 'true');
+      } else {
+        showInformationView();
+      }
+    });
+  });
 }
 
 async function openRoomList(title, url, listKind = 'members', updateHistory = true) {
@@ -61,21 +140,26 @@ async function openRoomList(title, url, listKind = 'members', updateHistory = tr
     if (current !== requests.list) return;
     roomListContent.innerHTML = html;
     NiixyUI.bindTabs(roomListContent);
+    initializeCollectionControls(roomListContent);
+    const params = new URLSearchParams(location.search);
+    if (params.has('manage')) activateCollectionManagement();
+    else activateCollection(params.get('collection'));
   } catch {
     if (current === requests.list) roomListContent.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
   }
 }
 
-async function openBoard(boardId, title, url, updateHistory = true) {
+async function openBoard(boardId, title, url, collectionId = null, updateHistory = true) {
   const current = ++requests.threads;
   requests.detail += 1;
   activeBoardId = String(boardId);
+  activeCollectionId = collectionId ? String(collectionId) : activeCollectionId;
   roomThreadListTitle.textContent = title;
   roomThreadListContent.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
   roomDetailTitle.textContent = '';
   roomDetailContent.innerHTML = '<p class="empty">Threadを選択してください。</p>';
   roomStack.set('thread-list');
-  if (updateHistory) updateUrl({boards: 1, board: activeBoardId});
+  if (updateHistory) updateUrl({boards: 1, collection: activeCollectionId, board: activeBoardId});
   try {
     const response = await fetch(url, {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error();
@@ -98,7 +182,7 @@ async function openThread(threadId, updateHistory = true) {
   roomDetailTitle.textContent = '';
   roomDetailContent.innerHTML = '<p class="room-pane-loading">読み込み中...</p>';
   roomStack.set('detail');
-  if (updateHistory) updateUrl({boards: 1, board: activeBoardId, thread: threadId});
+  if (updateHistory) updateUrl({boards: 1, collection: activeCollectionId, board: activeBoardId, thread: threadId});
   try {
     const response = await fetch(roomUrl(roomPage.dataset.threadDetailTemplate, threadId), {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error();
@@ -116,6 +200,7 @@ function showOverview() {
   roomStack.set('overview');
   roomIdentity.disabled = true;
   activeBoardId = null;
+  activeCollectionId = null;
   updateUrl();
 }
 
@@ -128,18 +213,30 @@ document.getElementById('close-room-thread-list').addEventListener('click', () =
   requests.detail += 1;
   activeBoardId = null;
   roomStack.set('list');
-  updateUrl({boards: 1});
+  updateUrl({boards: 1, collection: activeCollectionId});
 });
 document.getElementById('close-room-thread-detail').addEventListener('click', () => {
   requests.detail += 1;
   roomStack.set('thread-list');
-  updateUrl({boards: 1, board: activeBoardId});
+  updateUrl({boards: 1, collection: activeCollectionId, board: activeBoardId});
 });
 
 roomListContent.addEventListener('click', (event) => {
+  const managementTab = event.target.closest('[data-collection-management-tab]');
+  if (managementTab) {
+    activeCollectionId = null;
+    updateUrl({boards: 1, manage: 1});
+    return;
+  }
+  const collectionTab = event.target.closest('[data-collection-id]');
+  if (collectionTab) {
+    activeCollectionId = collectionTab.dataset.collectionId;
+    updateUrl({boards: 1, collection: activeCollectionId});
+    return;
+  }
   const board = event.target.closest('[data-open-board]');
   if (!board) return;
-  openBoard(board.dataset.openBoard, board.dataset.boardTitle, board.dataset.boardUrl);
+  openBoard(board.dataset.openBoard, board.dataset.boardTitle, board.dataset.boardUrl, board.dataset.boardCollection);
 });
 roomThreadListContent.addEventListener('click', (event) => {
   const trigger = event.target.closest('[data-room-thread]');
@@ -179,6 +276,13 @@ document.addEventListener('submit', (event) => {
     submitJsonForm(boardAction, (result) => location.assign(result.redirect_url), event.submitter);
     return;
   }
+  const collectionAction = event.target.closest('[data-collection-action]');
+  if (collectionAction) {
+    event.preventDefault();
+    if (collectionAction.dataset.confirmMessage && !window.confirm(collectionAction.dataset.confirmMessage)) return;
+    submitJsonForm(collectionAction, (result) => location.assign(result.redirect_url), event.submitter);
+    return;
+  }
   const create = event.target.closest('[data-board-thread-create]');
   if (create) {
     event.preventDefault();
@@ -202,7 +306,8 @@ if (initialBoard) {
   openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false).then(() => {
     const board = roomListContent.querySelector(`[data-open-board="${initialBoard}"]`);
     if (!board) return;
-    openBoard(initialBoard, board.dataset.boardTitle, board.dataset.boardUrl, false).then(() => {
+    activateCollection(board.dataset.boardCollection);
+    openBoard(initialBoard, board.dataset.boardTitle, board.dataset.boardUrl, board.dataset.boardCollection, false).then(() => {
       const thread = initial.get('thread');
       if (thread) openThread(thread, false);
     });

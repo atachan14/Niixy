@@ -1,7 +1,7 @@
 import uuid
 
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Case, Count, IntegerField, Value, When
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -13,9 +13,9 @@ from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from events.services import prepare_thread_for_view, prepare_thread_modules, thread_queryset
 from interfaces.services import save_thread_fields, thread_field_catalog, thread_interface_catalog
 
-from .forms import BoardForm, BoardThreadCreateForm, RoomCreateForm, RoomEditForm
-from .models import Board, Room, RoomMembership
-from .services import create_board, create_room, touch_thread_containers
+from .forms import BoardForm, BoardThreadCreateForm, CollectionForm, RoomCreateForm, RoomEditForm
+from .models import Board, Collection, Room, RoomMembership
+from .services import create_board, create_room, delete_collection, touch_thread_containers
 
 
 def _room(request, room_id):
@@ -40,6 +40,20 @@ def _room_boards(room):
 
 def _managed_board(room, board_id):
     return get_object_or_404(_room_boards(room), pk=board_id)
+
+
+def _room_collections(room):
+    return room.collections.annotate(
+        collection_order=Case(
+            When(is_uncategorized=True, then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        ),
+    ).order_by('collection_order', 'created_at')
+
+
+def _managed_collection(room, collection_id):
+    return get_object_or_404(room.collections, pk=collection_id)
 
 
 def _require_room_owner(request, room):
@@ -125,7 +139,7 @@ def room_members(request, room_id):
 
 def room_boards(request, room_id):
     room = _room(request, room_id)
-    collections = list(room.collections.order_by('-is_main', 'created_at'))
+    collections = list(_room_collections(room))
     for collection in collections:
         collection.visible_boards = list(
             Board.objects.filter(placement__collection=collection)
@@ -133,15 +147,73 @@ def room_boards(request, room_id):
             .annotate(thread_count=Count('thread_placements'))
             .order_by('-last_activity_at', '-created_at')
         )
+        collection.board_submission_id = uuid.uuid4()
     return render(request, 'rooms/partials/board_list.html', {
         'room': room,
         'collections': collections,
-        'board_submission_id': uuid.uuid4(),
     })
 
 
 @require_POST
-def board_create(request, room_id):
+def collection_create(request, room_id):
+    room = _room(request, room_id)
+    denied = _require_room_owner(request, room)
+    if denied:
+        return denied
+    form = CollectionForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
+    collection = Collection.objects.create(
+        room=room,
+        name=form.cleaned_data['name'],
+    )
+    return JsonResponse({
+        'collection_id': collection.pk,
+        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&collection={collection.pk}',
+    })
+
+
+@require_POST
+def collection_edit(request, room_id, collection_id):
+    room = _room(request, room_id)
+    denied = _require_room_owner(request, room)
+    if denied:
+        return denied
+    collection = _managed_collection(room, collection_id)
+    if collection.is_uncategorized:
+        return JsonResponse({'error': '未分類Collectionは編集できません。'}, status=400)
+    form = CollectionForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
+    collection.name = form.cleaned_data['name']
+    collection.save(update_fields=['name', 'updated_at'])
+    return JsonResponse({
+        'collection_id': collection.pk,
+        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&collection={collection.pk}',
+    })
+
+
+@require_POST
+def collection_delete(request, room_id, collection_id):
+    room = _room(request, room_id)
+    denied = _require_room_owner(request, room)
+    if denied:
+        return denied
+    collection = _managed_collection(room, collection_id)
+    if collection.is_uncategorized:
+        return JsonResponse({'error': '未分類Collectionは削除できません。'}, status=400)
+    fallback = delete_collection(collection)
+    query = '?boards=1'
+    if fallback:
+        query += f'&collection={fallback.pk}'
+    return JsonResponse({
+        'collection_id': collection_id,
+        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}{query}',
+    })
+
+
+@require_POST
+def board_create(request, room_id, collection_id):
     room = _room(request, room_id)
     denied = _require_room_owner(request, room)
     if denied:
@@ -149,15 +221,16 @@ def board_create(request, room_id):
     form = BoardForm(request.POST)
     if not form.is_valid():
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
+    collection = _managed_collection(room, collection_id)
     board, _ = create_board(
         submission_id=submission_id_from(request.POST.get('submission_id')),
-        room=room,
+        collection=collection,
         name=form.cleaned_data['name'],
         description=form.cleaned_data['description'],
     )
     return JsonResponse({
         'board_id': board.pk,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&board={board.pk}',
+        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&collection={collection.pk}&board={board.pk}',
     })
 
 

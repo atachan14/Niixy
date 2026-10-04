@@ -79,7 +79,7 @@ v0.6では次の管理操作を提供しない。
 - Boardの追加、名称変更、削除、移動
 - Collectionの追加、名称変更、削除、並び替え
 - BoardまたはCollectionの参照追加
-- RoomPaneへ表示するCollectionの変更
+- RoomPaneへ表示するCollectionの変更（後続仕様で機能自体を廃止）
 - Account向けMain CollectionとブログBoardの作成
 
 最後のBoardを削除してBoardなしのRoomを作れる最終方針は維持するが、その操作はBoard管理機能を実装する後続Versionで提供する。
@@ -114,6 +114,8 @@ BoardPolicyはv0.6で実装しない。Room内の共同利用を確認するた�
 
 ## RoomPage
 
+> 後続仕様で更新済み: RoomPageへBoardを直接表示する構成は廃止した。現在は`Board`ボタンからCollection Tab付きのBoard一覧Paneを開く。
+
 RoomPageはAccountPageと同じWorkspaceの考え方を使用するが、ProfileAreaとProfileLayoutはまだ実装しない。少なくとも次を表示する。
 
 - Room名を表示する固定Header
@@ -123,11 +125,11 @@ RoomPageはAccountPageと同じWorkspaceの考え方を使用するが、Profile
 - RoomOwner
 - 参加者数と参加者一覧への導線
 - 参加または退出Action
-- Main Collection内のBoard一覧
+- Board一覧Paneへの導線
 
-RoomPageではMain Collection内のBoardを更新が新しい順に最大三件表示する。v0.6では`最初のBoard`だけが存在するが、後続のBoard管理を前提としたSummaryListを使用する。
+Room作成時に`Main` Collectionと`最初のBoard`を用意するが、`Main`は初期名称だけを持つ通常Collectionとして扱う。
 
-Boardを選択するとBoard内Thread一覧Paneを開き、Threadを選択すると既存のThreadDetailPaneを開く。Pane追加と読み込み表示には既存のWorkspace共通処理を利用する。
+`Board`ボタンからBoard一覧Paneを開き、Collection TabからBoardを選択するとBoard内Thread一覧Paneを開く。Threadを選択すると既存のThreadDetailPaneを開く。Pane追加と読み込み表示には既存のWorkspace共通処理を利用する。
 
 ## Room作成
 
@@ -147,7 +149,7 @@ RoomOwnerだけがRoom名、Description、NiiMap座標を編集できる。編�
 - Roomの削除
 - ProfileAreaとProfileLayout
 - サムネイルとAlbum
-- 表示用Collectionの変更
+- 表示用Collectionの変更（後続仕様で機能自体を廃止）
 - RoomInterface
 
 Room削除は、内部BoardとThreadを削除・移動・存続のどれとして扱うかをBoard管理機能と合わせて決める。

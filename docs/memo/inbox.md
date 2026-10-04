@@ -19,13 +19,26 @@
 
 ## Inbox
 
+- RoomPolicy
+    - 参加制限
+    - 閲覧制限
+        - 不可の場合、SummaryItem:Roomが「閲覧不可」と表示。
+            - クリックでRoomPageへ遷移は可能。RoomPageではThumbやFeedbackやProfileを非表示にして、ボタンをグレーアウトし、Popupで閲覧条件のみを表示。
+    - BoardTemplate
+        - 
+
+- BoardPolicy
+
 
 
 ## now
 
 
 
+
+
 ## Idea
+
 
 
 
@@ -48,8 +61,6 @@
         - BoardB
         - BoardC
 
-
-
 - Feedback（もっと端的な言葉にリネームしたい）
 love/hateは排他的で紹介文とセット。
 muteは紹介文無しでも可。紹介文と関係ない。
@@ -62,8 +73,10 @@ muteは紹介文無しでも可。紹介文と関係ない。
             - クリックでBodyに紹介文作成窓を展開。
         - [Mute] 色でTrue/falseを表現。
             - クリックでMuteに追加/解除。
-        - [Listに追加]（紹介文作成済（Love or Hate選択済）の場合だけ表示）
+        - [追加]（紹介文作成済（Love or Hate選択済）の場合だけ表示）
             - クリックでAccountList選択Paneを追加。
+        - [DM]（送信条件はAccountPolicy）
+            - クリックでDM送信Paneに遷移。
     - Body
         - Tabs
             - 全ての紹介文(x)
@@ -80,3 +93,8 @@ muteは紹介文無しでも可。紹介文と関係ない。
             - 紹介文
             - 紹介文
             - もっと見る（クリックで一覧を、紹介文10個分くらい+ページネーション+畳む（収納導線） くらいに拡張。）
+
+- AccountPageやRoomPageのHeaderの右端に作成日
+- 各PaneのHeaderを座標行くらい細くして、座標行は更に細くする。
+- RoomPageの座標行もstickyにする。
+- 全幅や残り幅のPaneのBorder（Headerや座標行やThreadPost等）もPaneの端から端までにする。Roomの座標行が.room-overview-contentの中に入ってるのもよくない。

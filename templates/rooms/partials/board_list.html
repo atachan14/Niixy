@@ -1,11 +1,98 @@
 <div class="room-collection-browser">
-  <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="Collection一覧">
-    {% for collection in collections %}<button class="{% if forloop.first %}is-active{% endif %}" type="button" role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" data-ui-tab="collection-{{ collection.pk }}">{{ collection.name }}</button>{% endfor %}
-  </div>
-  {% for collection in collections %}<section class="ui-tab-panel room-collection-panel{% if forloop.first %} is-active{% endif %}" data-ui-tab-panel="collection-{{ collection.pk }}">
-    <div class="room-board-list ui-summary-list">
-      {% if room.is_owner %}<details class="ui-control-accordion room-board-create"><summary>Board作成</summary><div class="ui-control-accordion-body"><form action="{% url 'rooms:board-create' room.pk %}" data-board-action data-board-action-kind="create">{% csrf_token %}<input name="submission_id" type="hidden" value="{{ board_submission_id }}"><label>Board名<input name="name" maxlength="120" required></label><p class="room-form-error" hidden></p><button class="button primary" type="submit" data-pending-label="作成中...">作成する</button></form></div></details>{% endif %}
-      {% for board in collection.visible_boards %}<button class="ui-summary-item" type="button" data-open-board="{{ board.pk }}" data-board-title="{{ board.name }}" data-board-url="{% url 'rooms:board-threads' room.pk board.pk %}" data-summary-kind="board"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ board.name }} ({{ board.thread_count }})</strong><small class="ui-summary-item-updated">最終更新 {{ board.last_activity_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">Boardはありません。</p>{% endfor %}
+  {% if collections or room.is_owner %}
+    <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="Collection一覧">
+      {% for collection in collections %}
+        <button class="{% if forloop.first %}is-active{% endif %}" type="button" role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" data-ui-tab="collection-{{ collection.pk }}" data-collection-id="{{ collection.pk }}">{{ collection.name }}</button>
+      {% endfor %}
+      {% if room.is_owner %}<button type="button" role="tab" aria-selected="false" data-ui-tab="collection-management" data-collection-management-tab>管理</button>{% endif %}
     </div>
-  </section>{% empty %}<p class="empty">Collectionはありません。</p>{% endfor %}
+  {% endif %}
+
+  {% for collection in collections %}
+    <section class="ui-tab-panel room-collection-panel{% if forloop.first %} is-active{% endif %}" data-ui-tab-panel="collection-{{ collection.pk }}" data-collection-panel-id="{{ collection.pk }}">
+      <div class="room-board-list ui-summary-list">
+        <div class="room-collection-window-actions">
+          <button class="button secondary" type="button" data-collection-information-toggle aria-controls="collection-information-{{ collection.pk }}" aria-expanded="false">詳細確認</button>
+          {% if room.is_owner %}<button class="button secondary" type="button" data-collection-create-toggle aria-controls="collection-board-create-{{ collection.pk }}" aria-expanded="false">Board作成</button>{% endif %}
+        </div>
+
+        <div id="collection-information-{{ collection.pk }}" class="ui-accordion-content room-collection-window" data-collection-information-window aria-hidden="true">
+          <div class="ui-accordion-content-inner">
+            <div class="room-collection-window-body">
+              <section class="room-collection-information" data-collection-information-view>
+                <dl class="room-board-information-list">
+                  <div><dt>Collection名</dt><dd>{{ collection.name }}</dd></div>
+                  <div><dt>Board数</dt><dd>{{ collection.visible_boards|length }}</dd></div>
+                </dl>
+              </section>
+              {% if room.is_owner and not collection.is_uncategorized %}
+                <section class="room-collection-editor" data-collection-editor hidden>
+                  <form id="collection-edit-form-{{ collection.pk }}" class="room-collection-edit" action="{% url 'rooms:collection-edit' room.pk collection.pk %}" data-collection-action data-collection-action-kind="edit">
+                    {% csrf_token %}
+                    <label><span>Collection名</span><input name="name" maxlength="120" value="{{ collection.name }}" required></label>
+                    <p class="room-form-error" hidden></p>
+                  </form>
+                  <div class="room-collection-edit-actions">
+                    <button class="button primary" type="submit" form="collection-edit-form-{{ collection.pk }}" data-pending-label="保存中...">保存する</button>
+                    <form action="{% url 'rooms:collection-delete' room.pk collection.pk %}" data-collection-action data-collection-action-kind="delete" data-confirm-message="Collectionを削除しますか？配置されているBoardは未分類Collectionへ移動します。">
+                      {% csrf_token %}
+                      <p class="room-form-error" hidden></p>
+                      <button class="button event-delete-button" type="submit" data-pending-label="削除中...">Collectionを削除する</button>
+                    </form>
+                  </div>
+                </section>
+                <button class="button secondary room-collection-edit-toggle" type="button" data-collection-edit-toggle aria-expanded="false">編集</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if room.is_owner %}
+          <div id="collection-board-create-{{ collection.pk }}" class="ui-accordion-content room-collection-window" data-collection-create-window aria-hidden="true">
+            <div class="ui-accordion-content-inner">
+              <div class="room-collection-window-body room-board-create">
+                <form action="{% url 'rooms:board-create' room.pk collection.pk %}" data-board-action data-board-action-kind="create">
+                  {% csrf_token %}
+                  <input name="submission_id" type="hidden" value="{{ collection.board_submission_id }}">
+                  <label>Board名<input name="name" maxlength="120" required></label>
+                  <p class="room-form-error" hidden></p>
+                  <button class="button primary" type="submit" data-pending-label="作成中...">作成する</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% for board in collection.visible_boards %}
+          <button class="ui-summary-item" type="button" data-open-board="{{ board.pk }}" data-board-title="{{ board.name }}" data-board-url="{% url 'rooms:board-threads' room.pk board.pk %}" data-board-collection="{{ collection.pk }}" data-summary-kind="board">
+            <span class="ui-summary-item-context" aria-hidden="true"></span>
+            <strong class="ui-summary-item-title">{{ board.name }} ({{ board.thread_count }})</strong>
+            <small class="ui-summary-item-updated">最終更新 {{ board.last_activity_at|date:'Y/m/d H:i' }}</small>
+          </button>
+        {% empty %}
+          <p class="empty">Boardはありません。</p>
+        {% endfor %}
+      </div>
+    </section>
+  {% empty %}
+    <p class="empty">Collectionはありません。</p>
+  {% endfor %}
+
+  {% if room.is_owner %}
+    <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="collection-management">
+      <div class="room-collection-management">
+        <details class="ui-control-accordion room-collection-create">
+          <summary>Collection作成</summary>
+          <div class="ui-control-accordion-body">
+            <form action="{% url 'rooms:collection-create' room.pk %}" data-collection-action data-collection-action-kind="create">
+              {% csrf_token %}
+              <label>Collection名<input name="name" maxlength="120" required></label>
+              <p class="room-form-error" hidden></p>
+              <button class="button primary" type="submit" data-pending-label="作成中...">作成する</button>
+            </form>
+          </div>
+        </details>
+      </div>
+    </section>
+  {% endif %}
 </div>

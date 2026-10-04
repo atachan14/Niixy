@@ -85,7 +85,7 @@ class Collection(models.Model):
         on_delete=models.CASCADE,
         related_name='collections',
     )
-    is_main = models.BooleanField(default=False)
+    is_uncategorized = models.BooleanField(default=False)
     created_at = models.DateTimeField('作成日時', auto_now_add=True)
     updated_at = models.DateTimeField('更新日時', auto_now=True)
     last_activity_at = models.DateTimeField('最終活動日時', auto_now_add=True)
@@ -101,13 +101,19 @@ class Collection(models.Model):
             ),
             models.UniqueConstraint(
                 fields=['account'],
-                condition=models.Q(is_main=True, account__isnull=False),
-                name='unique_account_main_collection',
+                condition=models.Q(
+                    account__isnull=False,
+                    is_uncategorized=True,
+                ),
+                name='unique_account_uncategorized_collection',
             ),
             models.UniqueConstraint(
                 fields=['room'],
-                condition=models.Q(is_main=True, room__isnull=False),
-                name='unique_room_main_collection',
+                condition=models.Q(
+                    is_uncategorized=True,
+                    room__isnull=False,
+                ),
+                name='unique_room_uncategorized_collection',
             ),
         ]
         ordering = ['-last_activity_at', '-created_at']

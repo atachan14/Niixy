@@ -20,6 +20,10 @@ class BoardForm(forms.Form):
     description = forms.CharField(required=False, max_length=10000, widget=forms.Textarea)
 
 
+class CollectionForm(forms.Form):
+    name = forms.CharField(max_length=120)
+
+
 class BoardThreadCreateForm(forms.Form):
     title = forms.CharField(max_length=120)
     body = forms.CharField(widget=forms.Textarea, max_length=10000)

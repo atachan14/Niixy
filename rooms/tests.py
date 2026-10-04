@@ -37,10 +37,13 @@ class RoomCreationServiceTests(TestCase):
         self.assertTrue(room.has_member(self.owner))
         self.assertEqual(RoomMembership.objects.get().account, self.owner)
         self.assertEqual(RoomPlacement.objects.get().latitude, Decimal('35.681236'))
-        main = Collection.objects.get()
+        main = Collection.objects.get(name='Main')
+        uncategorized = Collection.objects.get(is_uncategorized=True)
         self.assertEqual(main.name, 'Main')
         self.assertEqual(main.room, room)
-        self.assertTrue(main.is_main)
+        self.assertFalse(main.is_uncategorized)
+        self.assertEqual(uncategorized.name, '未分類')
+        self.assertEqual(uncategorized.room, room)
         board = Board.objects.get()
         self.assertEqual(board.name, '最初のBoard')
         self.assertEqual(board.placement.kind, BoardPlacement.COLLECTION)
@@ -57,7 +60,7 @@ class RoomCreationServiceTests(TestCase):
         self.assertEqual(second, first)
         self.assertEqual(Room.objects.count(), 1)
         self.assertEqual(RoomMembership.objects.count(), 1)
-        self.assertEqual(Collection.objects.count(), 1)
+        self.assertEqual(Collection.objects.count(), 2)
         self.assertEqual(Board.objects.count(), 1)
         self.assertEqual(BoardPlacement.objects.count(), 1)
         self.assertEqual(RoomPlacement.objects.count(), 1)
@@ -71,19 +74,20 @@ class RoomCreationServiceTests(TestCase):
     def test_create_board_is_idempotent_and_uses_main_collection(self):
         room, _ = self.create()
         submission_id = uuid4()
+        main = room.collections.get(name='Main')
 
         first, first_created = create_board(
-            submission_id=submission_id, room=room, name='お知らせ',
+            submission_id=submission_id, collection=main, name='お知らせ',
         )
         second, second_created = create_board(
-            submission_id=submission_id, room=room, name='重複送信',
+            submission_id=submission_id, collection=main, name='重複送信',
         )
 
         self.assertTrue(first_created)
         self.assertFalse(second_created)
         self.assertEqual(first, second)
         self.assertEqual(second.name, 'お知らせ')
-        self.assertTrue(second.placement.collection.is_main)
+        self.assertFalse(second.placement.collection.is_uncategorized)
         self.assertEqual(Board.objects.filter(placement__collection__room=room).count(), 2)
 
 
@@ -140,6 +144,8 @@ class RoomViewTests(TestCase):
             latitude='35.0', longitude='139.0',
         )
         self.board = Board.objects.get(placement__collection__room=self.room)
+        self.main = self.board.placement.collection
+        self.uncategorized = self.room.collections.get(is_uncategorized=True)
 
     def test_logged_in_account_creates_room_and_initial_structure(self):
         self.client.force_login(self.member)
@@ -152,7 +158,7 @@ class RoomViewTests(TestCase):
         room = Room.objects.get(name='New Room')
         self.assertEqual(response.json()['redirect_url'], reverse('rooms:detail', args=[room.pk]))
         self.assertTrue(room.has_member(self.member))
-        self.assertTrue(room.collections.get(is_main=True).board_placements.filter(board__name='最初のBoard').exists())
+        self.assertTrue(room.collections.get(name='Main').board_placements.filter(board__name='最初のBoard').exists())
 
     def test_guest_cannot_create_or_join_room(self):
         create_response = self.client.post(reverse('rooms:create'), {
@@ -217,7 +223,7 @@ class RoomViewTests(TestCase):
         self.assertEqual(self.room.placement.latitude, Decimal('34.700000'))
 
     def test_only_owner_can_create_edit_and_delete_board(self):
-        create_url = reverse('rooms:board-create', args=[self.room.pk])
+        create_url = reverse('rooms:board-create', args=[self.room.pk, self.main.pk])
         submission_id = str(uuid4())
         self.client.force_login(self.outsider)
         denied = self.client.post(create_url, {'submission_id': submission_id, 'name': 'Denied'})
@@ -242,21 +248,94 @@ class RoomViewTests(TestCase):
         self.assertEqual(deleted.json()['redirect_url'], f'{reverse("rooms:detail", args=[self.room.pk])}?boards=1')
         self.assertFalse(Board.objects.filter(pk=board.pk).exists())
 
+    def test_owner_manages_collections_and_deleted_collection_moves_boards(self):
+        create_url = reverse('rooms:collection-create', args=[self.room.pk])
+        self.client.force_login(self.outsider)
+        denied = self.client.post(create_url, {'name': 'Denied'})
+
+        self.client.force_login(self.owner)
+        created = self.client.post(create_url, {'name': '交流用'})
+        collection = self.room.collections.get(name='交流用')
+        list_response = self.client.get(reverse('rooms:boards', args=[self.room.pk]))
+        list_html = list_response.content.decode()
+        board_response = self.client.post(
+            reverse('rooms:board-create', args=[self.room.pk, collection.pk]),
+            {'submission_id': str(uuid4()), 'name': '会員Board'},
+        )
+        board = Board.objects.get(name='会員Board')
+        edited = self.client.post(
+            reverse('rooms:collection-edit', args=[self.room.pk, collection.pk]),
+            {'name': '交流'},
+        )
+        deleted = self.client.post(
+            reverse('rooms:collection-delete', args=[self.room.pk, collection.pk]),
+        )
+
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(created.status_code, 200)
+        self.assertLess(list_html.index('>Main</button>'), list_html.index('>交流用</button>'))
+        self.assertLess(list_html.index('>交流用</button>'), list_html.index('>未分類</button>'))
+        self.assertLess(list_html.index('>未分類</button>'), list_html.index('>管理</button>'))
+        self.assertEqual(board_response.status_code, 200)
+        self.assertEqual(edited.status_code, 200)
+        self.assertFalse(Collection.objects.filter(pk=collection.pk).exists())
+        uncategorized = self.room.collections.get(is_uncategorized=True)
+        board.placement.refresh_from_db()
+        self.assertEqual(board.placement.collection, uncategorized)
+        self.assertEqual(
+            deleted.json()['redirect_url'],
+            f'{reverse("rooms:detail", args=[self.room.pk])}?boards=1&collection={uncategorized.pk}',
+        )
+
+    def test_uncategorized_collection_cannot_be_edited_or_deleted(self):
+        collection = self.uncategorized
+        self.client.force_login(self.owner)
+
+        edited = self.client.post(
+            reverse('rooms:collection-edit', args=[self.room.pk, collection.pk]),
+            {'name': 'Renamed'},
+        )
+        deleted = self.client.post(
+            reverse('rooms:collection-delete', args=[self.room.pk, collection.pk]),
+        )
+
+        self.assertEqual(edited.status_code, 400)
+        self.assertEqual(deleted.status_code, 400)
+        self.assertTrue(Collection.objects.filter(pk=collection.pk).exists())
+
     def test_board_list_has_create_action_without_status_tabs(self):
         self.client.force_login(self.owner)
         owner_response = self.client.get(reverse('rooms:boards', args=[self.room.pk]))
         self.client.force_login(self.member)
         member_response = self.client.get(reverse('rooms:boards', args=[self.room.pk]))
 
-        self.assertContains(owner_response, reverse('rooms:board-create', args=[self.room.pk]))
+        self.assertContains(owner_response, reverse('rooms:collection-create', args=[self.room.pk]))
+        self.assertContains(owner_response, reverse('rooms:collection-edit', args=[self.room.pk, self.main.pk]))
+        self.assertContains(owner_response, reverse('rooms:board-create', args=[self.room.pk, self.main.pk]))
+        self.assertContains(owner_response, reverse('rooms:board-create', args=[self.room.pk, self.uncategorized.pk]))
+        self.assertContains(owner_response, 'data-collection-information-toggle', count=2)
+        self.assertContains(owner_response, 'data-collection-create-toggle', count=2)
+        self.assertContains(owner_response, 'data-collection-information-window', count=2)
+        self.assertContains(owner_response, 'data-collection-create-window', count=2)
+        self.assertContains(owner_response, 'data-collection-edit-toggle', count=1)
+        self.assertContains(owner_response, f'<dd>{self.main.name}</dd>')
+        self.assertContains(owner_response, '<dt>Board数</dt><dd>1</dd>')
         owner_html = owner_response.content.decode()
         self.assertLess(owner_html.index('room-board-create'), owner_html.index(f'data-open-board="{self.board.pk}"'))
+        self.assertLess(owner_html.index('>Main</button>'), owner_html.index('>未分類</button>'))
+        self.assertLess(owner_html.index('>未分類</button>'), owner_html.index('>管理</button>'))
+        self.assertLess(owner_html.index('data-ui-tab-panel="collection-management"'), owner_html.index('room-collection-create'))
         self.assertNotContains(owner_response, 'data-board-status-tab')
         self.assertNotContains(owner_response, '削除済み')
         self.assertContains(owner_response, f'{self.board.name} (0)')
         self.assertContains(owner_response, f'data-board-title="{self.board.name}"')
         self.assertContains(owner_response, 'data-summary-kind="board"')
-        self.assertNotContains(member_response, reverse('rooms:board-create', args=[self.room.pk]))
+        self.assertNotContains(member_response, reverse('rooms:collection-create', args=[self.room.pk]))
+        self.assertNotContains(member_response, reverse('rooms:board-create', args=[self.room.pk, self.main.pk]))
+        self.assertContains(member_response, 'data-collection-information-toggle', count=2)
+        self.assertNotContains(member_response, 'data-collection-create-toggle')
+        self.assertNotContains(member_response, 'data-collection-edit-toggle')
+        self.assertNotContains(member_response, '>管理</button>')
 
     def test_board_information_and_edit_actions_are_exposed_below_header(self):
         self.client.force_login(self.owner)
@@ -404,8 +483,9 @@ class RoomViewTests(TestCase):
         self.assertNotContains(response, 'Owner:')
         self.assertContains(response, 'room-thread-list-pane')
         self.assertContains(board_response, '最初のBoard')
-        self.assertContains(board_response, 'data-ui-tab=', count=1)
+        self.assertContains(board_response, 'data-ui-tab=', count=2)
         self.assertContains(board_response, '>Main<')
+        self.assertContains(board_response, '>未分類<')
 
     def test_room_pane_exposes_workspace_endpoints(self):
         response = self.client.get(reverse('rooms:pane', args=[self.room.pk]))

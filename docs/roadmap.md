@@ -124,6 +124,24 @@ RoomのMain Collection内でBoardを追加・編集・削除できるように�
 
 ---
 
+## v0.8 - Collection Management
+
+Status: In Progress
+
+RoomOwnerがRoom内のCollectionを追加・編集・削除し、Boardの配置先をCollection単位で管理できる状態を完成させる。
+
+主な対象:
+
+* RoomOwnerによるCollectionの新規作成と名称編集
+* 選択中CollectionへのBoard作成
+* 常設のシステムCollection「未分類」と、Collection削除時の配置Board退避
+* 通常Collection、未分類、管理のTab構成
+* 通常Collectionと、Board退避用のシステムCollection「未分類」を識別
+
+BoardおよびCollectionの参照機能と、Account側のCollection管理への展開は後続段階で扱う。
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。

@@ -17,7 +17,8 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
         )
         RoomMembership.objects.create(room=room, account=owner)
         RoomPlacement.objects.create(room=room, latitude=latitude, longitude=longitude)
-        main = Collection.objects.create(name='Main', room=room, is_main=True)
+        main = Collection.objects.create(name='Main', room=room)
+        Collection.objects.create(name='未分類', room=room, is_uncategorized=True)
         board = Board.objects.create(name='最初のBoard')
         BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
         return room
@@ -25,10 +26,10 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
     return run_once(Room, submission_id, operation)
 
 
-def create_board(*, submission_id, room, name, description=''):
+def create_board(*, submission_id, collection, name, description=''):
     def operation():
         with transaction.atomic():
-            main = room.collections.select_for_update().get(is_main=True)
+            target = Collection.objects.select_for_update().get(pk=collection.pk)
             board = Board.objects.create(
                 submission_id=submission_id,
                 name=name,
@@ -37,11 +38,33 @@ def create_board(*, submission_id, room, name, description=''):
             BoardPlacement.objects.create(
                 board=board,
                 kind=BoardPlacement.COLLECTION,
-                collection=main,
+                collection=target,
             )
             return board
 
     return run_once(Board, submission_id, operation)
+
+
+def delete_collection(collection):
+    with transaction.atomic():
+        source = Collection.objects.select_for_update().get(pk=collection.pk)
+        if source.is_uncategorized:
+            raise ValueError('The Uncategorized collection cannot be deleted.')
+
+        placements = BoardPlacement.objects.select_for_update().filter(collection=source)
+        fallback = None
+        if placements.exists():
+            container = {'account_id': source.account_id, 'room_id': source.room_id}
+            fallback, _ = Collection.objects.get_or_create(
+                **container,
+                is_uncategorized=True,
+                defaults={'name': '未分類'},
+            )
+            placements.update(collection=fallback)
+            Collection.objects.filter(pk=fallback.pk).update(last_activity_at=timezone.now())
+
+        source.delete()
+        return fallback
 
 
 def board_for_thread(thread):

@@ -3,7 +3,7 @@
 
 {% block title %}{{ room.name }} | Niixy{% endblock %}
 {% block main_class %}room-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-12">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-15">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
@@ -23,4 +23,4 @@
 {{ thread_field_catalog|json_script:'room-thread-field-catalog' }}
 {{ thread_interface_catalog|json_script:'room-thread-interface-catalog' }}
 {% endblock %}
-{% block scripts %}<script src="{% static 'rooms/forms.js' %}?v=20261004-6"></script><script src="{% static 'rooms/room.js' %}?v=20261004-10"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'rooms/forms.js' %}?v=20261004-6"></script><script src="{% static 'rooms/room.js' %}?v=20261004-13"></script>{% endblock %}

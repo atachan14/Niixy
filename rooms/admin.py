@@ -21,7 +21,7 @@ class RoomPlacementAdmin(admin.ModelAdmin):
 
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
-    list_display = ('name', 'account', 'room', 'is_main', 'last_activity_at')
+    list_display = ('name', 'account', 'room', 'is_uncategorized', 'last_activity_at')
 
 
 @admin.register(Board)
