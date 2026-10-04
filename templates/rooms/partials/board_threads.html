@@ -1,37 +1,64 @@
 <div class="room-board-thread-list" data-board-id="{{ board.pk }}" data-board-name="{{ board.name }}" data-board-manageable="{{ room.is_owner|yesno:'true,false' }}">
-  <div class="room-board-window-actions">
-    <button class="button secondary" type="button" data-board-information-toggle aria-controls="board-information-{{ board.pk }}" aria-expanded="false">詳細情報</button>
-    <button class="button secondary" type="button" data-board-create-toggle aria-controls="board-thread-create-{{ board.pk }}" aria-expanded="false"{% if not room.is_member %} disabled title="Roomへの参加が必要です"{% endif %}>Thread作成</button>
-  </div>
+  {% if not board.can_view %}
+    <section class="room-board-unavailable" data-board-view-unavailable>
+      <p><strong>「{{ board.name }}」を閲覧できません。</strong></p>
+      {% if view_policy.unmet_allow_labels %}
+        <div class="room-board-policy-reasons">
+          <p>以下の必要条件を満たしていません。</p>
+          <div>{% for label in view_policy.unmet_allow_labels %}<span>{{ label }}</span>{% endfor %}</div>
+        </div>
+      {% elif not view_policy.has_allow_conditions %}
+        <p>現在、閲覧可能な条件が設定されていません。</p>
+      {% endif %}
+      {% if view_policy.matched_deny_labels %}
+        <div class="room-board-policy-reasons">
+          <p>また、以下の閲覧不可条件に該当しています。</p>
+          <div>{% for label in view_policy.matched_deny_labels %}<span>{{ label }}</span>{% endfor %}</div>
+        </div>
+      {% endif %}
+    </section>
+  {% else %}
+    <div class="room-board-window-actions">
+      <button class="button secondary" type="button" data-board-information-toggle aria-controls="board-information-{{ board.pk }}" aria-expanded="false">詳細情報</button>
+      <button class="button secondary" type="button" data-board-create-toggle aria-controls="board-thread-create-{{ board.pk }}" aria-expanded="false"{% if not board.can_create_thread %} disabled title="BoardのThread作成条件を満たしていません"{% endif %}>Thread作成</button>
+    </div>
 
-  <div id="board-information-{{ board.pk }}" class="ui-accordion-content room-board-window" data-board-information-window aria-hidden="true">
-    <div class="ui-accordion-content-inner">
-      <div class="room-board-window-body">
-        <section class="room-board-information" data-board-information-view>
-          <dl class="room-board-information-list"><div><dt>Board名</dt><dd>{{ board.name }}</dd></div><div><dt>詳細</dt><dd>{{ board.description|default:'未設定'|linebreaksbr }}</dd></div></dl>
-          <details class="room-board-information-section"><summary>Policy</summary><div class="room-board-information-section-body"><div class="room-board-policy-row"><strong>Thread作成可能</strong><div><span>Room参加者</span></div></div><div class="room-board-policy-row"><strong>閲覧可能</strong><div><span>Guest</span><span>NiixyAccount</span></div></div></div></details>
-          <details class="room-board-information-section"><summary>Layout</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
-          <details class="room-board-information-section"><summary>ThreadTemplate</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
-        </section>
-        {% if room.is_owner %}<section class="room-board-editor" data-board-editor hidden>
-          <form id="board-edit-form-{{ board.pk }}" class="room-board-edit" action="{% url 'rooms:board-edit' room.pk board.pk %}" data-board-action data-board-action-kind="edit">{% csrf_token %}<label><span>Board名</span><input name="name" maxlength="120" value="{{ board.name }}" required></label><label><span>詳細</span><textarea name="description" maxlength="10000" rows="4">{{ board.description }}</textarea></label><p class="room-form-error" hidden></p></form>
-          <details class="room-board-information-section"><summary>Policy</summary><div class="room-board-information-section-body"><div class="room-board-policy-row"><strong>Thread作成可能</strong><div><span>Room参加者</span></div></div><div class="room-board-policy-row"><strong>閲覧可能</strong><div><span>Guest</span><span>NiixyAccount</span></div></div></div></details>
-          <details class="room-board-information-section"><summary>Layout</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
-          <details class="room-board-information-section"><summary>ThreadTemplate</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
-          <div class="room-board-edit-actions"><button class="button primary" type="submit" form="board-edit-form-{{ board.pk }}" data-pending-label="保存中...">保存する</button><form class="room-board-delete" action="{% url 'rooms:board-delete' room.pk board.pk %}" data-board-action data-board-action-kind="delete" data-confirm-message="Boardの削除は取り消せません。Board内のThreadとResponseは削除されず、未配置のThreadとして残ります。Boardを削除しますか？">{% csrf_token %}<p class="room-form-error" hidden></p><button class="button event-delete-button" type="submit" data-pending-label="削除中...">Boardを削除する</button></form></div>
-        </section>
-        <button class="button secondary room-board-edit-toggle" type="button" data-board-edit-toggle aria-expanded="false">編集</button>{% endif %}
+    <div id="board-information-{{ board.pk }}" class="ui-accordion-content room-board-window" data-board-information-window aria-hidden="true">
+      <div class="ui-accordion-content-inner">
+        <div class="room-board-window-body">
+          <section class="room-board-information" data-board-information-view>
+            <dl class="room-board-information-list"><div><dt>Board名</dt><dd>{{ board.name }}</dd></div><div><dt>詳細</dt><dd>{{ board.description|default:'未設定'|linebreaksbr }}</dd></div></dl>
+            <details class="room-board-information-section"><summary>Policy</summary><div class="room-board-information-section-body">
+              {% for row in board_policy_rows %}
+                <div class="room-board-policy-row"><strong>{{ row.label }}可能</strong><div>{% for label in row.allow_labels %}<span>{{ label }}</span>{% empty %}<span>条件なし</span>{% endfor %}</div></div>
+                <div class="room-board-policy-row"><strong>{{ row.label }}不可</strong><div>{% for label in row.deny_labels %}<span>{{ label }}</span>{% empty %}<span>条件なし</span>{% endfor %}</div></div>
+              {% endfor %}
+            </div></details>
+            <details class="room-board-information-section"><summary>Layout</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
+            <details class="room-board-information-section"><summary>ThreadTemplate</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
+          </section>
+          {% if room.is_owner %}<section class="room-board-editor" data-board-editor hidden>
+            <form id="board-edit-form-{{ board.pk }}" class="room-board-edit" action="{% url 'rooms:board-edit' room.pk board.pk %}" data-board-action data-board-action-kind="edit">{% csrf_token %}<input name="policy_present" type="hidden" value="true"><label><span>Board名</span><input name="name" maxlength="120" value="{{ board.name }}" required></label><label><span>詳細</span><textarea name="description" maxlength="10000" rows="4">{{ board.description }}</textarea></label>
+              <details class="room-board-information-section"><summary>Policy</summary><div class="room-board-information-section-body">{% for row in board_policy_editor_rows %}{% for decision in row.decisions %}<fieldset class="room-board-policy-editor-row"><legend>{{ decision.label }}</legend><div>{% for candidate in decision.candidates %}<label><input name="policy_{{ row.capability }}_{{ decision.decision }}_{{ candidate.key }}" type="checkbox" value="true"{% if candidate.checked %} checked{% endif %}>{{ candidate.label }}</label>{% endfor %}</div></fieldset>{% endfor %}{% endfor %}</div></details>
+              <details class="room-board-information-section"><summary>Layout</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
+              <details class="room-board-information-section"><summary>ThreadTemplate</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
+              <p class="room-form-error" hidden></p>
+            </form>
+            <div class="room-board-edit-actions"><button class="button primary" type="submit" form="board-edit-form-{{ board.pk }}" data-pending-label="保存中...">保存する</button><form class="room-board-delete" action="{% url 'rooms:board-delete' room.pk board.pk %}" data-board-action data-board-action-kind="delete" data-confirm-message="Boardの削除は取り消せません。Board内のThreadとResponseは削除されず、未配置のThreadとして残ります。Boardを削除しますか？">{% csrf_token %}<p class="room-form-error" hidden></p><button class="button event-delete-button" type="submit" data-pending-label="削除中...">Boardを削除する</button></form></div>
+          </section>
+          <button class="button secondary room-board-edit-toggle" type="button" data-board-edit-toggle aria-expanded="false">編集</button>{% endif %}
+        </div>
       </div>
     </div>
-  </div>
 
-  {% if room.is_member %}<div id="board-thread-create-{{ board.pk }}" class="ui-accordion-content room-board-window" data-board-create-window aria-hidden="true">
-    <div class="ui-accordion-content-inner">
-      <div class="room-board-window-body room-thread-create"><form action="{% url 'rooms:board-thread-create' room.pk board.pk %}" data-thread-create-form data-board-thread-create>{% csrf_token %}<input name="submission_id" type="hidden" value="{{ thread_submission_id }}"><label>タイトル<input name="title" maxlength="120" required></label><label>本文<textarea name="body" rows="5" required></textarea></label>
-        {% include 'events/partials/thread_create_modules.html' with rule_capabilities=rule_capabilities %}
-        <p class="room-form-error" hidden></p><button class="button primary" type="submit" data-pending-label="作成中...">作成する</button></form></div>
-    </div>
-  </div>{% endif %}
+    {% if board.can_create_thread %}<div id="board-thread-create-{{ board.pk }}" class="ui-accordion-content room-board-window" data-board-create-window aria-hidden="true">
+      <div class="ui-accordion-content-inner">
+        <div class="room-board-window-body room-thread-create"><form action="{% url 'rooms:board-thread-create' room.pk board.pk %}" data-thread-create-form data-board-thread-create>{% csrf_token %}<input name="submission_id" type="hidden" value="{{ thread_submission_id }}"><label>タイトル<input name="title" maxlength="120" required></label><label>本文<textarea name="body" rows="5" required></textarea></label>
+          {% include 'events/partials/thread_create_modules.html' with rule_capabilities=rule_capabilities %}
+          <p class="room-form-error" hidden></p><button class="button primary" type="submit" data-pending-label="作成中...">作成する</button></form></div>
+      </div>
+    </div>{% endif %}
 
-  <div class="ui-summary-list">{% for thread in threads %}<button class="ui-summary-item" type="button" data-room-thread="{{ thread.pk }}" data-summary-kind="thread"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ thread.title }} ({{ thread.posts.all|length }})</strong><small class="ui-summary-item-updated">最終更新 {{ thread.last_activity_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">まだThreadはありません。</p>{% endfor %}</div>
+    <div class="ui-summary-list">{% for thread in threads %}<button class="ui-summary-item" type="button" data-room-thread="{{ thread.pk }}" data-summary-kind="thread"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ thread.title }} ({{ thread.posts.all|length }})</strong><small class="ui-summary-item-updated">最終更新 {{ thread.last_activity_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">まだThreadはありません。</p>{% endfor %}</div>
+  {% endif %}
 </div>

@@ -2,8 +2,129 @@ from django.utils import timezone
 from django.db import transaction
 
 from events.idempotency import run_once
+from accounts.policies import condition_groups
 
-from .models import Board, BoardPlacement, Collection, Room, RoomMembership, RoomPlacement
+from .models import Board, BoardPlacement, BoardPolicyCondition, Collection, Room, RoomMembership, RoomPlacement
+
+
+def default_board_policy_conditions(board, room):
+    return [
+        BoardPolicyCondition(
+            board=board,
+            capability=BoardPolicyCondition.VIEW,
+            decision=BoardPolicyCondition.ALLOW,
+            kind='default',
+            definition={'code': 'guest'},
+            label='Guest',
+        ),
+        BoardPolicyCondition(
+            board=board,
+            capability=BoardPolicyCondition.VIEW,
+            decision=BoardPolicyCondition.ALLOW,
+            kind='default',
+            definition={'code': 'account'},
+            label='NiixyAccount',
+        ),
+        BoardPolicyCondition(
+            board=board,
+            capability=BoardPolicyCondition.CREATE_THREAD,
+            decision=BoardPolicyCondition.ALLOW,
+            kind='room',
+            definition={'room_id': room.pk, 'relation': 'member'},
+            label=f'{room.name}に参加',
+        ),
+    ]
+
+
+def seed_board_policy(board, room):
+    if not board.policy_conditions.exists():
+        BoardPolicyCondition.objects.bulk_create(default_board_policy_conditions(board, room))
+
+
+@transaction.atomic
+def update_board_policy(board, room, data):
+    candidates = {
+        'guest': ('default', {'code': 'guest'}, 'Guest'),
+        'account': ('default', {'code': 'account'}, 'NiixyAccount'),
+        'room_member': ('room', {'room_id': room.pk, 'relation': 'member'}, f'{room.name}に参加'),
+    }
+    conditions = []
+    for capability, _ in BoardPolicyCondition.CAPABILITY_CHOICES:
+        for decision, _ in BoardPolicyCondition.DECISION_CHOICES:
+            for key, (kind, definition, label) in candidates.items():
+                if data.get(f'policy_{capability}_{decision}_{key}') != 'true':
+                    continue
+                conditions.append(BoardPolicyCondition(
+                    board=board,
+                    capability=capability,
+                    decision=decision,
+                    kind=kind,
+                    definition=definition,
+                    label=label,
+                ))
+    board.policy_conditions.all().delete()
+    BoardPolicyCondition.objects.bulk_create(conditions)
+
+
+def board_policy_rows(board):
+    conditions = list(board.policy_conditions.all())
+    rows = []
+    labels = {
+        BoardPolicyCondition.VIEW: '閲覧',
+        BoardPolicyCondition.CREATE_THREAD: 'Thread作成',
+    }
+    for capability, _ in BoardPolicyCondition.CAPABILITY_CHOICES:
+        capability_conditions = [item for item in conditions if item.capability == capability]
+        rows.append({
+            'capability': capability,
+            'label': labels[capability],
+            'allow_labels': [
+                ' AND '.join(item.label for item in group)
+                for group in condition_groups(
+                    item for item in capability_conditions if item.decision == BoardPolicyCondition.ALLOW
+                )
+            ],
+            'deny_labels': [
+                ' AND '.join(item.label for item in group)
+                for group in condition_groups(
+                    item for item in capability_conditions if item.decision == BoardPolicyCondition.DENY
+                )
+            ],
+        })
+    return rows
+
+
+def board_policy_editor_rows(board, room):
+    conditions = list(board.policy_conditions.all())
+    candidate_specs = [
+        ('guest', 'Guest', 'default', {'code': 'guest'}),
+        ('account', 'NiixyAccount', 'default', {'code': 'account'}),
+        ('room_member', f'{room.name}に参加', 'room', {'room_id': room.pk, 'relation': 'member'}),
+    ]
+    rows = []
+    for capability, label in BoardPolicyCondition.CAPABILITY_CHOICES:
+        decisions = []
+        for decision, decision_label in BoardPolicyCondition.DECISION_CHOICES:
+            candidates = []
+            for key, candidate_label, kind, definition in candidate_specs:
+                candidates.append({
+                    'key': key,
+                    'label': candidate_label,
+                    'checked': any(
+                        item.capability == capability
+                        and item.decision == decision
+                        and item.kind == kind
+                        and item.definition == definition
+                        for item in conditions
+                    ),
+                })
+            decisions.append({
+                'decision': decision,
+                'label': f'{label}{decision_label}',
+                'candidates': candidates,
+            })
+        rows.append({'capability': capability, 'label': label, 'decisions': decisions})
+    return rows
 
 
 def create_room(*, submission_id, owner, name, description, latitude, longitude):
@@ -21,6 +142,7 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
         Collection.objects.create(name='未分類', room=room, is_uncategorized=True)
         board = Board.objects.create(name='最初のBoard')
         BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
+        seed_board_policy(board, room)
         return room
 
     return run_once(Room, submission_id, operation)
@@ -40,6 +162,9 @@ def create_board(*, submission_id, collection, name, description=''):
                 kind=BoardPlacement.COLLECTION,
                 collection=target,
             )
+            room = target.room
+            if room is not None:
+                seed_board_policy(board, room)
             return board
 
     return run_once(Board, submission_id, operation)

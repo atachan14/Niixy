@@ -142,6 +142,24 @@ BoardおよびCollectionの参照機能と、Account側のCollection管理への
 
 ---
 
+## v0.9 - BoardPolicy Foundation
+
+Status: In Progress
+
+Account条件を使う共通Policy評価の基盤を追加し、Boardの閲覧とThread作成をBoardPolicyで制御できる状態を完成させる。
+
+主な対象:
+
+* 許可OR、ANDグループ、不可優先を扱う共通Policy評価
+* Boardの閲覧制限とThread作成制限
+* RoomOwner向けBoardPolicy編集
+* 閲覧不可BoardのSummary表示と理由だけを返すBoardPane
+* 既存Boardの固定ルールを明示的な初期Policyへ移行
+
+RoomPolicy、既存ThreadPolicyの共通基盤への移行、TemplateとLayoutは後続段階で扱う。
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。

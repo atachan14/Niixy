@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Board, BoardPlacement, Collection, Room, RoomMembership, RoomPlacement
+from .models import Board, BoardPlacement, BoardPolicyCondition, Collection, Room, RoomMembership, RoomPlacement
 
 
 @admin.register(Room)
@@ -40,3 +40,8 @@ class BoardAdmin(admin.ModelAdmin):
 @admin.register(BoardPlacement)
 class BoardPlacementAdmin(admin.ModelAdmin):
     list_display = ('board', 'kind', 'collection', 'latitude', 'longitude')
+
+
+@admin.register(BoardPolicyCondition)
+class BoardPolicyConditionAdmin(admin.ModelAdmin):
+    list_display = ('board', 'capability', 'decision', 'label', 'group_key', 'position')

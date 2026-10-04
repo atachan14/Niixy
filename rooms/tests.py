@@ -2,6 +2,7 @@ from uuid import uuid4
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -10,7 +11,7 @@ from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from interfaces.models import FieldType, ThreadDirectField
 from interfaces.services import publish_field_definition
 
-from .models import Board, BoardPlacement, Collection, Room, RoomMembership, RoomPlacement
+from .models import Board, BoardPlacement, BoardPolicyCondition, Collection, Room, RoomMembership, RoomPlacement
 from .services import create_board, create_room
 
 
@@ -48,6 +49,9 @@ class RoomCreationServiceTests(TestCase):
         self.assertEqual(board.name, '最初のBoard')
         self.assertEqual(board.placement.kind, BoardPlacement.COLLECTION)
         self.assertEqual(board.placement.collection, main)
+        self.assertEqual(board.policy_conditions.count(), 3)
+        self.assertTrue(board.evaluate_policy(self.owner, BoardPolicyCondition.VIEW).allowed)
+        self.assertTrue(board.evaluate_policy(self.owner, BoardPolicyCondition.CREATE_THREAD).allowed)
 
     def test_duplicate_submission_returns_existing_room_without_duplicates(self):
         submission_id = uuid4()
@@ -64,6 +68,7 @@ class RoomCreationServiceTests(TestCase):
         self.assertEqual(Board.objects.count(), 1)
         self.assertEqual(BoardPlacement.objects.count(), 1)
         self.assertEqual(RoomPlacement.objects.count(), 1)
+        self.assertEqual(BoardPolicyCondition.objects.count(), 3)
 
     def test_room_membership_is_unique_per_account(self):
         room, _ = self.create()
@@ -89,6 +94,7 @@ class RoomCreationServiceTests(TestCase):
         self.assertEqual(second.name, 'お知らせ')
         self.assertFalse(second.placement.collection.is_uncategorized)
         self.assertEqual(Board.objects.filter(placement__collection__room=room).count(), 2)
+        self.assertEqual(second.policy_conditions.count(), 3)
 
 
 class PlacementConstraintTests(TestCase):
@@ -361,9 +367,112 @@ class RoomViewTests(TestCase):
         self.assertNotContains(member_response, 'data-board-edit-toggle')
         self.assertContains(member_response, 'data-board-information-toggle')
         self.assertContains(member_response, 'data-board-create-toggle')
-        self.assertContains(member_response, 'disabled title="Roomへの参加が必要です"')
+        self.assertContains(member_response, 'disabled title="BoardのThread作成条件を満たしていません"')
         self.assertNotContains(member_response, 'data-board-create-window')
         self.assertContains(board_response, 'Boardの削除は取り消せません。')
+
+    def test_board_policy_supports_and_groups_and_deny_precedence(self):
+        group_key = uuid4()
+        self.board.policy_conditions.all().delete()
+        BoardPolicyCondition.objects.bulk_create([
+            BoardPolicyCondition(
+                board=self.board, capability='view', decision='allow', group_key=group_key,
+                position=0, kind='default', definition={'code': 'account'}, label='NiixyAccount',
+            ),
+            BoardPolicyCondition(
+                board=self.board, capability='view', decision='allow', group_key=group_key,
+                position=1, kind='room', definition={'room_id': self.room.pk, 'relation': 'member'},
+                label=f'{self.room.name}に参加',
+            ),
+        ])
+
+        outsider_result = self.board.evaluate_policy(self.outsider, 'view')
+        RoomMembership.objects.create(room=self.room, account=self.member)
+        member_result = self.board.evaluate_policy(self.member, 'view')
+
+        self.assertFalse(outsider_result.allowed)
+        self.assertEqual(
+            outsider_result.unmet_allow_labels,
+            (f'NiixyAccount AND {self.room.name}に参加',),
+        )
+        self.assertTrue(member_result.allowed)
+
+        BoardPolicyCondition.objects.create(
+            board=self.board, capability='view', decision='deny',
+            kind='default', definition={'code': 'account'}, label='NiixyAccount',
+        )
+        denied_result = self.board.evaluate_policy(self.member, 'view')
+        self.assertFalse(denied_result.allowed)
+        self.assertEqual(denied_result.matched_deny_labels, ('NiixyAccount',))
+
+    def test_board_view_policy_keeps_summary_but_withholds_board_contents(self):
+        thread = Thread.objects.create(creator=self.owner, title='Secret Thread')
+        ThreadPost.objects.create(thread=thread, number=1, creator=self.owner, body='Secret Body')
+        ThreadPlacement.objects.create(thread=thread, kind=ThreadPlacement.BOARD, board=self.board)
+        self.board.description = 'Secret Board Description'
+        self.board.save(update_fields=['description'])
+        self.board.policy_conditions.filter(capability='view').delete()
+        BoardPolicyCondition.objects.create(
+            board=self.board, capability='view', decision='allow',
+            kind='default', definition={'code': 'account'}, label='NiixyAccount',
+        )
+
+        list_response = self.client.get(reverse('rooms:boards', args=[self.room.pk]))
+        detail_response = self.client.get(reverse('rooms:board-threads', args=[self.room.pk, self.board.pk]))
+
+        self.assertContains(list_response, '閲覧不可')
+        self.assertContains(list_response, self.board.name)
+        self.assertNotContains(list_response, f'{self.board.name} (1)')
+        self.assertContains(detail_response, 'data-board-view-unavailable')
+        self.assertContains(detail_response, 'NiixyAccount')
+        self.assertNotContains(detail_response, 'Secret Board Description')
+        self.assertNotContains(detail_response, 'Secret Thread')
+        self.assertNotContains(detail_response, 'Secret Body')
+        self.assertNotContains(detail_response, 'data-board-information-toggle')
+
+    def test_owner_updates_board_policy_with_board_information(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse('rooms:board-edit', args=[self.room.pk, self.board.pk]),
+            {
+                'name': self.board.name,
+                'description': self.board.description,
+                'policy_present': 'true',
+                'policy_view_allow_account': 'true',
+                'policy_view_deny_guest': 'true',
+                'policy_create_thread_allow_room_member': 'true',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        conditions = self.board.policy_conditions.order_by('capability', 'decision', 'label')
+        self.assertEqual(conditions.count(), 3)
+        self.assertTrue(self.board.evaluate_policy(self.outsider, 'view').allowed)
+        guest_result = self.board.evaluate_policy(AnonymousUser(), 'view')
+        self.assertFalse(guest_result.allowed)
+        self.assertEqual(guest_result.matched_deny_labels, ('Guest',))
+
+    def test_thread_create_post_rechecks_board_policy(self):
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse('rooms:board-edit', args=[self.room.pk, self.board.pk]),
+            {
+                'name': self.board.name,
+                'description': self.board.description,
+                'policy_present': 'true',
+                'policy_view_allow_guest': 'true',
+                'policy_view_allow_account': 'true',
+            },
+        )
+
+        response = self.client.post(
+            reverse('rooms:board-thread-create', args=[self.room.pk, self.board.pk]),
+            {'submission_id': str(uuid4()), 'title': 'Denied', 'body': 'Denied'},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Thread.objects.filter(title='Denied').exists())
 
     def test_deleting_board_keeps_thread_and_allows_policy_authorized_reply(self):
         thread = Thread.objects.create(creator=self.owner, title='Unplaced Thread')

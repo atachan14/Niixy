@@ -136,6 +136,37 @@ class Board(models.Model):
     def __str__(self):
         return self.name
 
+    def evaluate_policy(self, user, capability):
+        from accounts.policies import evaluate_policy
+
+        prefetched = getattr(self, '_prefetched_objects_cache', {}).get('policy_conditions')
+        conditions = prefetched if prefetched is not None else self.policy_conditions.all()
+        return evaluate_policy(
+            (condition for condition in conditions if condition.capability == capability),
+            user,
+        )
+
+
+class BoardPolicyCondition(models.Model):
+    VIEW = 'view'
+    CREATE_THREAD = 'create_thread'
+    ALLOW = 'allow'
+    DENY = 'deny'
+    CAPABILITY_CHOICES = [(VIEW, '閲覧'), (CREATE_THREAD, 'Thread作成')]
+    DECISION_CHOICES = [(ALLOW, '可能'), (DENY, '不可')]
+
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='policy_conditions')
+    capability = models.CharField(max_length=24, choices=CAPABILITY_CHOICES)
+    decision = models.CharField(max_length=8, choices=DECISION_CHOICES)
+    group_key = models.UUIDField(default=uuid.uuid4)
+    position = models.PositiveSmallIntegerField(default=0)
+    kind = models.CharField(max_length=24)
+    definition = models.JSONField(default=dict)
+    label = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ['capability', 'decision', 'group_key', 'position', 'pk']
+
 
 class BoardPlacement(models.Model):
     COLLECTION = 'collection'
