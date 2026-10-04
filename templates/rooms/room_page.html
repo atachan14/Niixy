@@ -3,12 +3,13 @@
 
 {% block title %}{{ room.name }} | Niixy{% endblock %}
 {% block main_class %}room-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-16">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-19">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
 {% block content %}
-<section class="room-page" data-room-id="{{ room.pk }}" data-current-account="{{ user.username }}" data-members-url="{% url 'rooms:members' room.pk %}" data-boards-url="{% url 'rooms:boards' room.pk %}" data-board-template="{% url 'rooms:board-threads' room.pk 0 %}" data-thread-detail-template="{% url 'rooms:thread-detail' room.pk 0 %}">
+<script>if (['boards', 'members', 'board', 'thread'].some((name) => new URLSearchParams(location.search).has(name))) document.documentElement.classList.add('has-restored-room-workspace');</script>
+<section class="room-page" data-room-id="{{ room.pk }}" data-current-account="{{ user.username }}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-members-url="{% url 'rooms:members' room.pk %}" data-boards-url="{% url 'rooms:boards' room.pk %}" data-board-template="{% url 'rooms:board-threads' room.pk 0 %}" data-thread-detail-template="{% url 'rooms:thread-detail' room.pk 0 %}" data-account-condition-list-url="{% url 'accounts:account-condition-list' %}" data-account-search-url="{% url 'accounts:account-condition-search' %}" data-account-condition-room-search-url="{% url 'accounts:account-condition-room-search' %}" data-account-condition-save-url="{% url 'accounts:account-condition-save' %}" data-account-condition-delete-url="{% url 'accounts:account-condition-delete' 0 %}">
   <header class="room-page-header">
     <h1><button id="room-page-identity" type="button" disabled>{{ room.name }}</button></h1>
     <div class="room-header-actions">{% if room.is_owner %}<details class="room-edit-menu"><summary class="button secondary">編集</summary><form action="{% url 'rooms:edit' room.pk %}" data-room-action>{% csrf_token %}<label>Room名<input name="name" maxlength="120" value="{{ room.name }}" required></label><label>説明<textarea name="description" rows="5">{{ room.description }}</textarea></label><label>緯度<input name="latitude" type="number" min="-90" max="90" step="0.000001" value="{{ room.placement.latitude|unlocalize }}" required></label><label>経度<input name="longitude" type="number" min="-180" max="180" step="0.000001" value="{{ room.placement.longitude|unlocalize }}" required></label><p class="room-form-error" hidden></p><button class="button primary" type="submit" data-pending-label="保存中...">保存</button></form></details>{% endif %}<a class="icon-button" href="{% url 'events:map' %}" aria-label="Roomを閉じる">×</a></div>
@@ -23,4 +24,4 @@
 {{ thread_field_catalog|json_script:'room-thread-field-catalog' }}
 {{ thread_interface_catalog|json_script:'room-thread-interface-catalog' }}
 {% endblock %}
-{% block scripts %}<script src="{% static 'rooms/forms.js' %}?v=20261004-6"></script><script src="{% static 'rooms/room.js' %}?v=20261004-13"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'rooms/room.js' %}?v=20261004-17"></script>{% endblock %}

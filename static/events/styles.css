@@ -927,6 +927,26 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .ui-control-accordion > summary::-webkit-details-marker { display: none; }
 .ui-control-accordion-body { display: grid; gap: 10px; padding: 0 12px 12px; }
 .ui-workspace-track { transform: translateX(calc(-1 * var(--ui-workspace-offset, 0px))); transition: transform 260ms ease; }
+.ui-workspace-track.is-workspace-trail-aligning { transition: none; }
+.thread-workspace.is-workspace-trail-open .thread-track,
+.account-page.is-workspace-trail-open .account-track,
+.room-page.is-workspace-trail-open .room-track,
+.mypage.is-workspace-trail-open .mypage-workspace { display: flex !important; width: max-content !important; }
+.ui-workspace-trail-pane { background: var(--panel); border-left: 1px solid var(--line); box-sizing: border-box; display: flex; flex-direction: column; height: 100%; min-width: 0; overflow: hidden; }
+.ui-workspace-trail-pane[data-workspace-trail-width="full"] { flex: 0 0 100vw; width: 100vw; }
+.ui-workspace-trail-pane[data-workspace-trail-width="fixed"] { flex: 0 0 var(--ui-workspace-fixed-width, 360px); width: var(--ui-workspace-fixed-width, 360px); }
+.ui-workspace-trail-pane[data-workspace-trail-width="remaining"] { flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width, 360px)); width: calc(100vw - var(--ui-workspace-fixed-width, 360px)); }
+.ui-workspace-trail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; flex: 0 0 42px; justify-content: space-between; min-height: 42px; padding: 0 20px; }
+.ui-workspace-trail-header h2 { font-size: 15px; margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-workspace-trail-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.ui-workspace-trail-body > .account-detail-fragment,
+.ui-workspace-trail-body > .room-detail-fragment { min-height: 100%; }
+.ui-workspace-trail-body .ui-pane-status { color: var(--muted); margin: 32px 20px; text-align: center; }
+.ui-workspace-trail-body .ui-pane-status.has-load-error { color: #b42318; }
+.account-detail-fragment .account-actions-grid { align-content: center; display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.account-detail-fragment .account-actions-grid button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--text); cursor: pointer; font: inherit; font-size: 18px; min-height: 58px; }
+.account-detail-fragment .account-actions-grid button.is-active:hover { border-color: var(--accent); color: var(--accent-dark); }
+.account-detail-fragment .account-actions-grid button:disabled { background: #f2f1ef; color: var(--muted); cursor: not-allowed; }
 .ui-accordion-content { display: grid; grid-template-rows: 0fr; opacity: 0; overflow: hidden; transition: grid-template-rows 240ms ease, opacity 180ms ease; }
 .ui-accordion-content.is-open { grid-template-rows: 1fr; opacity: 1; }
 .ui-accordion-content-inner { min-height: 0; overflow: hidden; }
@@ -934,6 +954,11 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
   .ui-accordion-content { transition: none; }
 }
 @media (max-width: 780px) {
+  .ui-workspace-trail-pane[data-workspace-trail-width="fixed"],
+  .ui-workspace-trail-pane[data-workspace-trail-width="remaining"] { flex-basis: 100vw; width: 100vw; }
+  .ui-workspace-trail-header { padding: 0 16px; }
+  .account-detail-fragment .account-actions-grid { gap: 6px; }
+  .account-detail-fragment .account-actions-grid button { font-size: 13px; min-height: 36px; overflow: hidden; padding: 4px 6px; text-overflow: ellipsis; white-space: nowrap; }
   .identity-overview-content { gap: 20px; padding: 20px 16px 36px; }
   .identity-overview-hero { align-items: stretch; gap: 10px; grid-template-columns: minmax(0, 35fr) minmax(0, 65fr); }
   .identity-thumbnail-placeholder { aspect-ratio: auto; font-size: 12px; min-height: 0; }
@@ -947,24 +972,26 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane, .thread-workspace.is-field-list-open .thread-detail-pane, .thread-workspace.is-field-detail-open .thread-detail-pane { display: none; }
 .thread-workspace.is-interface-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width) minmax(0, var(--main-width)); width: 200vw; }
 .thread-workspace.is-field-list-open .thread-track, .thread-workspace.is-field-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width) minmax(0, var(--main-width)); width: 200vw; }
-.thread-workspace.is-account-conditions-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width); width: calc(100vw + var(--list-width)); }
-.thread-workspace.is-account-selector-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(3, var(--list-width)); width: calc(100vw + (2 * var(--list-width))); }
-.thread-workspace.is-account-condition-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(3, var(--list-width)) minmax(0, var(--main-width)); width: calc(200vw + var(--list-width)); }
-.thread-workspace.is-account-condition-history-edit-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) repeat(2, var(--list-width)) minmax(0, var(--main-width)); width: 200vw; }
+.thread-workspace.is-account-conditions-open .thread-track, .thread-workspace.is-account-selector-open .thread-track, .thread-workspace.is-account-condition-detail-open .thread-track, .thread-workspace.is-account-condition-history-edit-open .thread-track { display: flex; width: max-content; }
 .thread-workspace.is-room-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw; width: 200vw; }
 .thread-workspace.is-room-list-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw var(--list-width); width: calc(200vw + var(--list-width)); }
 .thread-workspace.is-room-board-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw repeat(2, var(--list-width)); width: calc(200vw + (2 * var(--list-width))); }
 .thread-workspace.is-room-thread-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw repeat(2, var(--list-width)) minmax(0, var(--main-width)); width: calc(300vw + var(--list-width)); }
-.thread-workspace.is-account-conditions-open .thread-detail-pane, .thread-workspace.is-account-selector-open .thread-detail-pane, .thread-workspace.is-account-condition-detail-open .thread-detail-pane, .thread-workspace.is-account-condition-history-edit-open .thread-detail-pane { display: none; }
+.thread-track[data-account-condition-return-stage="list"] > .thread-detail-pane { display: none; }
+.thread-workspace .thread-track[data-account-condition-return-stage^="room"] > .thread-detail-pane { flex-basis: 100vw; width: 100vw; }
 .thread-workspace.is-interface-list-open .thread-interface-list-pane:not(.thread-field-list-pane), .thread-workspace.is-interface-list-open .thread-interface-detail-pane:not(.thread-field-detail-pane), .thread-workspace.is-interface-detail-open .thread-interface-list-pane:not(.thread-field-list-pane), .thread-workspace.is-interface-detail-open .thread-interface-detail-pane:not(.thread-field-detail-pane) { display: block; }
 .thread-workspace.is-field-list-open .thread-field-list-pane, .thread-workspace.is-field-list-open .thread-field-detail-pane, .thread-workspace.is-field-detail-open .thread-field-list-pane, .thread-workspace.is-field-detail-open .thread-field-detail-pane { display: block; }
 .thread-workspace.is-account-conditions-open .account-condition-pane, .thread-workspace.is-account-selector-open .account-condition-pane, .thread-workspace.is-account-selector-open .account-selector-pane, .thread-workspace.is-account-condition-detail-open .account-condition-pane, .thread-workspace.is-account-condition-detail-open .account-selector-pane, .thread-workspace.is-account-condition-detail-open .account-condition-detail-pane { display: block; }
 .thread-workspace.is-account-condition-history-edit-open .account-condition-pane, .thread-workspace.is-account-condition-history-edit-open .account-condition-detail-pane { display: block; }
+.thread-workspace.is-account-conditions-open .thread-detail-pane, .thread-workspace.is-account-selector-open .thread-detail-pane, .thread-workspace.is-account-condition-detail-open .thread-detail-pane, .thread-workspace.is-account-condition-history-edit-open .thread-detail-pane { width: var(--main-width); }
 html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100vw + var(--list-width))); transition: none; }
+html.has-restored-niimap-workspace .thread-track { transition: none; visibility: hidden; }
 .thread-workspace.is-restoring-detail .thread-track { transition: none; }
 .thread-map-list-pane { display: contents; }
+.thread-track > .thread-map-list-pane > .map-frame { flex: 0 0 var(--main-width); width: var(--main-width); }
+.thread-track > .thread-map-list-pane > .thread-list-pane { flex: 0 0 var(--list-width); width: var(--list-width); }
 .thread-list-pane { background: var(--panel); overflow-y: auto; padding: 20px; }
-.thread-detail-pane { background: var(--panel); overflow-y: auto; padding: 0 20px 20px; }
+.thread-detail-pane { background: var(--panel); flex: 0 0 var(--main-width); overflow-y: auto; padding: 0 20px 20px; }
 .thread-list-pane { border-left: 1px solid var(--line); }
 .thread-detail-pane { border-left: 1px solid var(--line); position: relative; }
 .thread-pane-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 40px; }
@@ -1001,15 +1028,15 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .niimap-selected-account-condition { align-items: center; background: #eef6f4; border: 1px solid #b8ddd6; border-radius: 4px; display: flex; font-size: 13px; gap: 5px; max-width: 100%; padding: 5px 7px; }
 .niimap-selected-account-condition > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .niimap-selected-account-condition button { background: transparent; border: 0; cursor: pointer; flex: 0 0 auto; font: inherit; padding: 0 2px; }
-.account-condition-pane, .account-selector-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; min-height: 0; min-width: 0; overflow-y: auto; width: var(--list-width); }
-.account-condition-detail-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; min-height: 0; min-width: 0; overflow-y: auto; width: var(--main-width); }
-.niimap-room-list-pane, .niimap-room-thread-list-pane { width: var(--list-width); }
-.niimap-room-thread-detail-pane { min-height: 0; overflow-y: auto; padding: 0 20px 24px; width: var(--main-width); }
+.account-condition-pane, .account-selector-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; flex: 0 0 var(--list-width); min-height: 0; min-width: 0; overflow-y: auto; width: var(--list-width); }
+.account-condition-detail-pane { background: var(--panel); border-left: 1px solid var(--line); display: none; flex: 0 0 var(--main-width); min-height: 0; min-width: 0; overflow-y: auto; width: var(--main-width); }
+.niimap-room-list-pane, .niimap-room-thread-list-pane { flex: 0 0 var(--list-width); width: var(--list-width); }
+.niimap-room-thread-detail-pane { flex: 0 0 var(--main-width); min-height: 0; overflow-y: auto; padding: 0 20px 24px; width: var(--main-width); }
 .niimap-room-thread-detail-pane > div:last-child { min-width: 0; }
 .account-condition-controls { display: grid; gap: 12px; padding: 16px 20px 20px; }
-#browse-account-conditions { justify-content: center; margin: 0; width: 100%; }
-.account-condition-group-actions { align-items: stretch; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(92px, auto); }
-.account-condition-group-actions .button { justify-content: center; margin: 0; min-width: 92px; white-space: nowrap; width: 100%; }
+[data-browse-account-conditions] { justify-content: center; margin: 0; width: 100%; }
+.account-condition-group-actions { display: flex; justify-content: flex-end; }
+.account-condition-group-actions .button { justify-content: center; margin: 0; min-width: 112px; white-space: nowrap; }
 .account-condition-list { --summary-list-gutter: 20px; padding: 0 20px 20px; }
 .account-condition-summary { align-items: stretch; background: color-mix(in srgb, var(--summary-account-condition-color) 18%, var(--panel)); border-bottom: 1px solid var(--summary-account-condition-color); display: flex; margin-inline: -20px; }
 .account-condition-summary:hover { background: color-mix(in srgb, var(--summary-account-condition-color) 26%, var(--panel)); }
@@ -1152,6 +1179,7 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
   .thread-post-layout-area { grid-template-columns: clamp(44px, 18%, 64px) minmax(0, 1fr); }
   .thread-post-info time { flex-basis: 100%; margin-left: 0; }
   .thread-workspace.is-interface-list-open .thread-track, .thread-workspace.is-interface-detail-open .thread-track, .thread-workspace.is-field-list-open .thread-track, .thread-workspace.is-field-detail-open .thread-track, .thread-workspace.is-account-conditions-open .thread-track, .thread-workspace.is-account-selector-open .thread-track, .thread-workspace.is-account-condition-detail-open .thread-track, .thread-workspace.is-account-condition-history-edit-open .thread-track, .thread-workspace.is-room-open .thread-track, .thread-workspace.is-room-list-open .thread-track, .thread-workspace.is-room-board-open .thread-track, .thread-workspace.is-room-thread-open .thread-track { width: 700vw; }
+  .thread-workspace.is-account-conditions-open .thread-track, .thread-workspace.is-account-selector-open .thread-track, .thread-workspace.is-account-condition-detail-open .thread-track, .thread-workspace.is-account-condition-history-edit-open .thread-track { width: max-content; }
   .thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane, .thread-workspace.is-field-list-open .thread-detail-pane, .thread-workspace.is-field-detail-open .thread-detail-pane { display: block; }
   .thread-interface-list-pane, .thread-interface-detail-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }
   .account-condition-pane, .account-selector-pane { box-sizing: border-box; flex: 0 0 100vw; width: 100vw; }

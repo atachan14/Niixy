@@ -1,0 +1,15 @@
+<template data-account-condition-pane-template>
+  <aside id="account-condition-pane" class="ui-list-pane account-condition-pane" data-account-condition-pane aria-label="Account条件一覧">
+    <header class="ui-pane-header ui-list-pane-header"><h2>Account条件</h2><button id="close-account-condition-pane" class="icon-button" type="button" data-close-account-conditions aria-label="呼び出し元に戻る">×</button></header>
+    <div class="account-condition-controls"><button id="browse-account-conditions" class="button secondary" type="button" data-browse-account-conditions>新しい条件を探す</button><div class="account-condition-group-actions"><button id="add-account-condition-group" class="button primary" type="button" data-add-account-condition-group disabled>追加（0）</button></div></div>
+    <div id="account-condition-list" class="ui-summary-list account-condition-list" data-account-condition-list></div>
+  </aside>
+</template>
+<template data-account-selector-pane-template>
+  <aside id="account-selector-pane" class="ui-list-pane account-selector-pane" data-account-selector-pane aria-label="新しいAccount条件">
+    <header class="ui-pane-header ui-list-pane-header"><h2>新しい条件を探す</h2><button id="close-account-selector" class="icon-button" type="button" data-close-account-selector aria-label="Account条件へ戻る">×</button></header>
+    <div id="account-selector-kind-tabs" class="ui-tabs module-filter account-selector-kind-tabs" role="tablist" aria-label="Account条件の種類"><button class="is-active" type="button" role="tab" aria-selected="true" data-account-condition-kind="default">Default</button><button type="button" role="tab" aria-selected="false" data-account-condition-kind="account">Account</button><button type="button" role="tab" aria-selected="false" data-account-condition-kind="account_interface">AccountIF</button><button type="button" role="tab" aria-selected="false" data-account-condition-kind="field">Field</button><button type="button" role="tab" aria-selected="false" data-account-condition-kind="room">Room</button></div>
+    <div id="account-selector-tabs" class="ui-tabs module-filter account-selector-tabs" role="tablist" data-account-selector-tabs></div>
+    <div id="account-selector-content" class="module-list-content account-selector-content" data-account-selector-content></div>
+  </aside>
+</template>

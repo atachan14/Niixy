@@ -34,7 +34,7 @@ const profileStack = NiixyUI.createWorkspace(accountWorkspace, {
   list: {target: '.account-thread-pane', width: 'fixed'},
   detail: {target: '.account-thread-detail-pane', width: 'remaining'},
   'room-list': {target: '.account-room-list-pane', width: 'fixed'},
-  'room-detail': {target: '.account-room-detail-pane', width: 'remaining'},
+  'room-detail': {target: '.account-room-detail-pane', width: 'full'},
   'account-if-list': {target: '#account-if-list-pane', width: 'fixed'},
   'account-if-detail': {target: '#account-if-detail-pane', width: 'remaining'},
   'people-list': {target: '#people-list-pane', width: 'fixed'},

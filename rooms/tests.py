@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 from decimal import Decimal
 
@@ -370,6 +371,24 @@ class RoomViewTests(TestCase):
         self.assertContains(member_response, 'disabled title="BoardのThread作成条件を満たしていません"')
         self.assertNotContains(member_response, 'data-board-create-window')
         self.assertContains(board_response, 'Boardの削除は取り消せません。')
+        self.assertContains(board_response, 'data-open-account-conditions', count=4)
+        self.assertContains(board_response, 'data-account-condition-groups-input', count=4)
+
+    def test_room_page_includes_shared_account_condition_workspace(self):
+        self.client.force_login(self.owner)
+        self.assertFalse(self.owner.account_conditions.exists())
+
+        response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
+
+        self.assertFalse(self.owner.account_conditions.exists())
+        self.assertContains(response, 'id="account-condition-pane"')
+        self.assertContains(response, 'data-account-condition-pane-template')
+        self.assertContains(response, 'id="account-selector-pane"')
+        self.assertContains(response, 'data-account-selector-pane-template')
+        self.assertContains(response, 'data-account-condition-list-url="/accounts/account-conditions/"')
+        self.assertNotContains(response, 'id="room-account-condition-catalog"')
+        self.assertContains(response, 'accounts/account_conditions.js?v=20261004-8')
+        self.assertContains(response, 'room.js?v=20261004-17')
 
     def test_board_policy_supports_and_groups_and_deny_precedence(self):
         group_key = uuid4()
@@ -452,6 +471,43 @@ class RoomViewTests(TestCase):
         guest_result = self.board.evaluate_policy(AnonymousUser(), 'view')
         self.assertFalse(guest_result.allowed)
         self.assertEqual(guest_result.matched_deny_labels, ('Guest',))
+
+    def test_owner_updates_board_policy_from_account_condition_groups(self):
+        self.client.force_login(self.owner)
+        groups = [[
+            {
+                'kind': 'default',
+                'definition': {'code': 'account'},
+                'label': 'NiixyAccount',
+            },
+            {
+                'kind': 'room',
+                'definition': {'room_id': self.room.pk, 'relation': 'member'},
+                'label': f'{self.room.name}に参加',
+            },
+        ]]
+
+        response = self.client.post(
+            reverse('rooms:board-edit', args=[self.room.pk, self.board.pk]),
+            {
+                'name': self.board.name,
+                'description': self.board.description,
+                'policy_present': 'true',
+                'policy_view_allow_groups': json.dumps(groups),
+                'policy_view_deny_groups': '[]',
+                'policy_create_thread_allow_groups': '[]',
+                'policy_create_thread_deny_groups': '[]',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        conditions = list(self.board.policy_conditions.order_by('position'))
+        self.assertEqual(len(conditions), 2)
+        self.assertEqual(conditions[0].group_key, conditions[1].group_key)
+        self.assertEqual([condition.position for condition in conditions], [0, 1])
+        self.assertEqual([condition.kind for condition in conditions], ['default', 'room'])
+        self.assertFalse(self.board.evaluate_policy(self.outsider, 'view').allowed)
+        self.assertTrue(self.board.evaluate_policy(self.owner, 'view').allowed)
 
     def test_thread_create_post_rechecks_board_policy(self):
         self.client.force_login(self.owner)
@@ -603,6 +659,9 @@ class RoomViewTests(TestCase):
         self.assertContains(response, 'data-room-fragment')
         self.assertContains(response, reverse('rooms:members', args=[self.room.pk]))
         self.assertContains(response, reverse('rooms:boards', args=[self.room.pk]))
+        self.assertContains(response, reverse('accounts:account-condition-list'))
+        self.assertContains(response, 'id="room-pane-field-catalog"')
+        self.assertContains(response, 'id="room-pane-interface-catalog"')
         self.assertContains(response, 'ui-placement-row')
 
     def test_only_room_member_can_reply_to_board_thread(self):

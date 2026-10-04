@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from accounts.services import account_condition_catalog
+from accounts.policies import account_condition_matches
 from interfaces.models import FieldType
 from interfaces.services import (
     expand_field_definition_ids,
@@ -93,8 +93,6 @@ def map_view(request):
         ],
         'thread_field_types': FieldType.choices,
         'thread_search_default_actor': request.user.username if request.user.is_authenticated else 'Guest',
-        'account_condition_catalog': account_condition_catalog(request.user),
-        'available_account_condition_catalog': account_condition_catalog(request.user, include_inactive=True),
         'niimap_search_state': search_state,
     })
 
@@ -216,23 +214,7 @@ def _creator_matches(thread, term):
 
 
 def _account_condition_matches(account, request_user, condition):
-    kind = condition.get('kind')
-    definition = condition.get('definition') or {}
-    if kind == 'account':
-        try:
-            return account is not None and account.pk == int(definition.get('account_id'))
-        except (TypeError, ValueError):
-            return False
-    if kind != 'default':
-        return False
-    code = definition.get('code')
-    if code == 'guest':
-        return account is None
-    if code == 'account':
-        return account is not None
-    if code == 'self':
-        return request_user.is_authenticated and account is not None and account.pk == request_user.pk
-    return False
+    return account_condition_matches(account, condition, actor=request_user)
 
 
 def _account_group_matches(account, request_user, group):

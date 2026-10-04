@@ -1,3 +1,7 @@
+import json
+import uuid
+
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db import transaction
 
@@ -41,8 +45,52 @@ def seed_board_policy(board, room):
         BoardPolicyCondition.objects.bulk_create(default_board_policy_conditions(board, room))
 
 
+def _board_policy_condition_snapshot(condition, room, actor):
+    if not isinstance(condition, dict):
+        raise ValueError('Account条件が正しくありません。')
+    kind = condition.get('kind')
+    definition = condition.get('definition') or {}
+    if kind == 'default':
+        code = definition.get('code')
+        if code == 'self':
+            if not actor.is_authenticated:
+                raise ValueError('自分のNiixyIDはLogin中のみ利用できます。')
+            return 'account', {'account_id': actor.pk}, f'@{actor.username}'
+        if code not in {'guest', 'account'}:
+            raise ValueError('このDefault条件はまだPolicyで利用できません。')
+        return kind, {'code': code}, 'Guest' if code == 'guest' else 'NiixyAccount'
+    if kind == 'account':
+        try:
+            account = get_user_model().objects.select_related('niixy_profile').get(pk=definition.get('account_id'))
+        except (get_user_model().DoesNotExist, TypeError, ValueError) as error:
+            raise ValueError('Accountが見つかりません。') from error
+        return kind, {'account_id': account.pk}, account.niixy_profile.display_label
+    if kind == 'room':
+        try:
+            target = Room.objects.get(pk=definition.get('room_id'))
+        except (Room.DoesNotExist, TypeError, ValueError) as error:
+            raise ValueError('Roomが見つかりません。') from error
+        if definition.get('relation', 'member') != 'member':
+            raise ValueError('Room条件が正しくありません。')
+        return kind, {'room_id': target.pk, 'relation': 'member'}, f'{target.name}に参加'
+    raise ValueError('このAccount条件はまだPolicyで利用できません。')
+
+
+def _policy_groups_from_data(data, capability, decision):
+    raw = data.get(f'policy_{capability}_{decision}_groups')
+    if raw is None:
+        return None
+    try:
+        groups = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise ValueError('Policy条件が正しくありません。') from error
+    if not isinstance(groups, list) or any(not isinstance(group, list) or not group for group in groups):
+        raise ValueError('Policy条件が正しくありません。')
+    return groups
+
+
 @transaction.atomic
-def update_board_policy(board, room, data):
+def update_board_policy(board, room, data, actor):
     candidates = {
         'guest': ('default', {'code': 'guest'}, 'Guest'),
         'account': ('default', {'code': 'account'}, 'NiixyAccount'),
@@ -51,6 +99,23 @@ def update_board_policy(board, room, data):
     conditions = []
     for capability, _ in BoardPolicyCondition.CAPABILITY_CHOICES:
         for decision, _ in BoardPolicyCondition.DECISION_CHOICES:
+            groups = _policy_groups_from_data(data, capability, decision)
+            if groups is not None:
+                for group in groups:
+                    group_key = uuid.uuid4()
+                    for position, condition in enumerate(group):
+                        kind, definition, label = _board_policy_condition_snapshot(condition, room, actor)
+                        conditions.append(BoardPolicyCondition(
+                            board=board,
+                            capability=capability,
+                            decision=decision,
+                            group_key=group_key,
+                            position=position,
+                            kind=kind,
+                            definition=definition,
+                            label=label,
+                        ))
+                continue
             for key, (kind, definition, label) in candidates.items():
                 if data.get(f'policy_{capability}_{decision}_{key}') != 'true':
                     continue
@@ -96,32 +161,30 @@ def board_policy_rows(board):
 
 def board_policy_editor_rows(board, room):
     conditions = list(board.policy_conditions.all())
-    candidate_specs = [
-        ('guest', 'Guest', 'default', {'code': 'guest'}),
-        ('account', 'NiixyAccount', 'default', {'code': 'account'}),
-        ('room_member', f'{room.name}に参加', 'room', {'room_id': room.pk, 'relation': 'member'}),
-    ]
     rows = []
     for capability, label in BoardPolicyCondition.CAPABILITY_CHOICES:
         decisions = []
         for decision, decision_label in BoardPolicyCondition.DECISION_CHOICES:
-            candidates = []
-            for key, candidate_label, kind, definition in candidate_specs:
-                candidates.append({
-                    'key': key,
-                    'label': candidate_label,
-                    'checked': any(
-                        item.capability == capability
-                        and item.decision == decision
-                        and item.kind == kind
-                        and item.definition == definition
-                        for item in conditions
-                    ),
-                })
+            selected = [
+                item for item in conditions
+                if item.capability == capability and item.decision == decision
+            ]
+            groups = [
+                [
+                    {
+                        'kind': item.kind,
+                        'definition': item.definition,
+                        'label': item.label,
+                    }
+                    for item in group
+                ]
+                for group in condition_groups(selected)
+            ]
             decisions.append({
                 'decision': decision,
                 'label': f'{label}{decision_label}',
-                'candidates': candidates,
+                'target': f'board-policy-{board.pk}-{capability}-{decision}',
+                'groups_json': json.dumps(groups, ensure_ascii=False),
             })
         rows.append({'capability': capability, 'label': label, 'decisions': decisions})
     return rows

@@ -37,6 +37,48 @@ class AccountConditionTests(TestCase):
         self.assertEqual(catalog[0]['definition'], {'code': 'guest'})
         self.assertEqual(catalog[0]['label'], 'Guest')
 
+    def test_catalog_api_returns_only_the_current_accounts_history(self):
+        own_condition = save_account_condition(
+            self.owner,
+            kind=AccountCondition.ACCOUNT,
+            definition={'account_id': self.other.pk},
+        )
+        hidden_condition = save_account_condition(
+            self.owner,
+            kind=AccountCondition.DEFAULT,
+            definition={'code': 'guest'},
+        )
+        hidden_condition.active = False
+        hidden_condition.save(update_fields=['active'])
+        other_condition = save_account_condition(
+            self.other,
+            kind=AccountCondition.ACCOUNT,
+            definition={'account_id': self.owner.pk},
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse('accounts:account-condition-list'))
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertIn(own_condition.pk, [item['id'] for item in result['conditions']])
+        self.assertNotIn(hidden_condition.pk, [item['id'] for item in result['conditions']])
+        self.assertIn(hidden_condition.pk, [item['id'] for item in result['available_conditions']])
+        self.assertNotIn(other_condition.pk, [item['id'] for item in result['available_conditions']])
+
+    def test_guest_catalog_api_returns_only_guest(self):
+        response = self.client.get(reverse('accounts:account-condition-list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['conditions'], [{
+            'id': 'default:guest',
+            'kind': 'default',
+            'definition': {'code': 'guest'},
+            'label': 'Guest',
+            'active': True,
+        }])
+        self.assertEqual(response.json()['available_conditions'], response.json()['conditions'])
+
     def test_saving_existing_condition_reactivates_without_duplicate(self):
         condition = save_account_condition(
             self.owner,
@@ -64,6 +106,28 @@ class AccountConditionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['accounts'][0]['label'], '対象者 @condition_target')
+
+    def test_room_condition_can_be_saved_and_searched(self):
+        room = Room.objects.create(owner=self.owner, created_by=self.owner, name='参加先Room')
+        RoomMembership.objects.create(room=room, account=self.owner)
+
+        condition = save_account_condition(
+            self.owner,
+            kind=AccountCondition.ROOM,
+            definition={'room_id': room.pk, 'relation': 'member'},
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse('accounts:account-condition-room-search'),
+            {'q': '参加先', 'joined': 'true'},
+        )
+
+        self.assertEqual(condition.definition, {'room_id': room.pk, 'relation': 'member'})
+        self.assertEqual(condition.label, '参加先Roomに参加')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['rooms'], [
+            {'id': room.pk, 'name': room.name, 'label': '参加先Roomに参加'},
+        ])
 
     def test_field_condition_saves_current_version_and_value(self):
         field, version = publish_field_definition(
@@ -247,13 +311,28 @@ class AccountPageTests(TestCase):
         self.assertContains(response, '>AccountListB</button>')
         self.assertContains(response, '>Love</button>')
         self.assertContains(response, '>Hate</button>')
-        self.assertContains(response, 'account.js?v=20261004-4')
+        self.assertContains(response, 'account.js?v=20261004-5')
         self.assertContains(response, 'class="account-overview-content identity-overview-content"')
         self.assertContains(response, 'class="account-hero identity-overview-hero"')
         self.assertContains(response, '<h2>評価</h2>')
         self.assertContains(response, '<h2>Profile</h2>')
         self.assertNotContains(response, 'id="account-page-context"')
         self.assertNotContains(response, '>Interface</button>')
+
+    def test_account_pane_exposes_reusable_overview_and_workspace_endpoints(self):
+        account = get_user_model().objects.create_user('pane_owner', password='eightchars')
+
+        response = self.client.get(reverse('accounts:pane', args=[account.username]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-account-fragment')
+        self.assertContains(response, 'data-account-title="@pane_owner"')
+        self.assertContains(response, reverse('accounts:thread-pane', args=[account.username]))
+        self.assertContains(response, reverse('accounts:response-pane', args=[account.username]))
+        self.assertContains(response, reverse('accounts:room-pane', args=[account.username]))
+        self.assertContains(response, reverse('accounts:module-pane', args=[account.username]))
+        self.assertContains(response, 'data-open-account-threads')
+        self.assertNotContains(response, '<!doctype html>')
 
     def test_room_pane_separates_owned_and_joined_rooms(self):
         account = get_user_model().objects.create_user('room_account', password='eightchars')

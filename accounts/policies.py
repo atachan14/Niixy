@@ -11,24 +11,45 @@ class PolicyEvaluation:
 
 
 def condition_matches(condition, user):
-    definition = condition.definition
-    if condition.kind == 'default':
+    return account_condition_matches(user, condition, actor=user)
+
+
+def _condition_value(condition, name, default=None):
+    if isinstance(condition, dict):
+        return condition.get(name, default)
+    return getattr(condition, name, default)
+
+
+def account_condition_matches(account, condition, *, actor=None):
+    definition = _condition_value(condition, 'definition', {}) or {}
+    kind = _condition_value(condition, 'kind')
+    is_authenticated = bool(account is not None and getattr(account, 'is_authenticated', True))
+
+    if kind == 'default':
         code = definition.get('code')
         if code == 'guest':
-            return not user.is_authenticated
+            return not is_authenticated
         if code == 'account':
-            return user.is_authenticated
+            return is_authenticated
         if code == 'self':
-            return user.is_authenticated and user.pk == definition.get('account_id')
+            account_id = definition.get('account_id')
+            if account_id is not None:
+                return is_authenticated and account.pk == account_id
+            return bool(
+                actor is not None
+                and getattr(actor, 'is_authenticated', False)
+                and is_authenticated
+                and account.pk == actor.pk
+            )
         return False
 
-    if condition.kind == 'account':
-        return user.is_authenticated and user.pk == definition.get('account_id')
+    if kind == 'account':
+        return is_authenticated and account.pk == definition.get('account_id')
 
-    if condition.kind == 'room':
-        if not user.is_authenticated or definition.get('relation') != 'member':
+    if kind == 'room':
+        if not is_authenticated or definition.get('relation') != 'member':
             return False
-        return user.room_memberships.filter(room_id=definition.get('room_id')).exists()
+        return account.room_memberships.filter(room_id=definition.get('room_id')).exists()
 
     # AccountIF and Field conditions will use this same boundary once their
     # Account-side implementations exist.

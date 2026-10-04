@@ -19,21 +19,20 @@
 
 ## Inbox
 
-- RoomPolicy
-    - 参加制限
-    - 閲覧制限
-        - 不可の場合、SummaryItem:Roomが「閲覧不可」と表示。
-            - クリックでRoomPageへ遷移は可能。RoomPageではThumbやFeedbackやProfileを非表示にして、ボタンをグレーアウトし、Popupで閲覧条件のみを表示。
-    - BoardTemplate
-        - 
+- AND選択ボタン要らないかも？AND選択を選択しなくても、Itemクリックで複数選択、追加ボタンでANDグループとして追加で十分わかりやすそう。複数選択だとわかりやすいよう、追加ボタンに選択件数を表示する。
 
-- BoardPolicy
-    - Thread作成制限
-    - 閲覧制限
-        - 不可の場合、SummaryItem:Boardが「閲覧不可」と表示。
-            - クリックでBoard詳細Paneへ遷移は可能。Board詳細PaneではThreadを全て非表示にし、
+- NiiMap > RoomPage展開時に、右側に謎の余白ができるようになっちゃった！RoomPageは横スクロールで無理やり残りのAreaに押し込められてる状態！これさっきのAccount条件Pane修正の副作用かな？
+
+- NiiMap > Thread > Account > RoomでもRoomが全幅表示になってない！
+
+- Profile > Room > 以降への遷移もWorkSpace遷移にするのはどう？というか、一部の操作（Site-HeaderでのNiiMapやAccountPageやMyPage）以外の遷移は全部WorkSpace遷移ってのは？重くなっちゃったりする？Room > Account > Room > AccountみたいにグルグルとWorkSpace遷移でPaneを付け足し続けるのも、重くならなきゃ全然ありかなって気がして。あんまりにも重いなら、ユーザーが自身の操作でSiteHeaderからPage遷移でリセットしてさ。
+
+- 更新時に現在CurrentPaneから動かないようにしたい！NiiMap > Thread詳細までは、確かその処理入ってたよね？NiiMap > Room > Board一覧...みたいに進んでいくと、更新時に一度Spot一覧くらいまで戻ってから現在Paneまで再走するアニメーションが入っちゃう。
+
+
+
+
 ## now
-
 
 
 
@@ -46,8 +45,8 @@
 ## backlog
 
 - Policy周り
-    - 書き込み不可理由に、Policyに表記のない[RoomAに参加]が表記されてる。
-    - Roomの初期Board
+    - （最新Verで再確認が必要）書き込み不可理由に、Policyに表記のない[RoomAに参加]が表記されてる。
+    - Room作成時の初期Board
         - お知らせ（Thread作成権限がOwnerのみ）
         - 掲示板（権限がフリー）
 

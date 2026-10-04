@@ -5,12 +5,15 @@ from . import views
 app_name = 'accounts'
 
 urlpatterns = [
+    path('account-conditions/', views.account_condition_list, name='account-condition-list'),
     path('account-conditions/accounts/', views.account_condition_search, name='account-condition-search'),
+    path('account-conditions/rooms/', views.account_condition_room_search, name='account-condition-room-search'),
     path('account-conditions/save/', views.account_condition_save, name='account-condition-save'),
     path('account-conditions/<int:condition_id>/delete/', views.account_condition_delete, name='account-condition-delete'),
     path('signup/', views.signup, name='signup'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('<str:username>/pane/', views.account_pane, name='pane'),
     path('<str:username>/threads/', views.account_thread_pane, name='thread-pane'),
     path('<str:username>/threads/<int:thread_id>/', views.account_thread_detail, name='thread-detail'),
     path('<str:username>/responses/', views.account_response_pane, name='response-pane'),

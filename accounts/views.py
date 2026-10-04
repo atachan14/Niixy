@@ -16,13 +16,21 @@ from events.services import prepare_thread_for_view, thread_queryset
 
 from .forms import DisplayNameForm, LoginForm, SignUpForm
 from .models import AccountCondition, AccountProfile
-from .services import condition_payload, save_account_condition
+from .services import account_condition_catalog, condition_payload, save_account_condition
 from interfaces.models import FieldDefinition, Interface
 from interfaces.views import mark_interface_update_status, module_list_context, profile_module_list_context
 from rooms.models import Room
 
 
 User = get_user_model()
+
+
+def account_condition_list(request):
+    available_conditions = account_condition_catalog(request.user, include_inactive=True)
+    return JsonResponse({
+        'conditions': [condition for condition in available_conditions if condition['active']],
+        'available_conditions': available_conditions,
+    })
 
 
 def account_condition_search(request):
@@ -42,6 +50,23 @@ def account_condition_search(request):
             'label': account.niixy_profile.display_label,
         }
         for account in accounts
+    ]})
+
+
+def account_condition_room_search(request):
+    query = request.GET.get('q', '').strip()
+    rooms = Room.objects.all()
+    if query:
+        rooms = rooms.filter(Q(name__icontains=query) | Q(owner__username__icontains=query))
+    if request.GET.get('joined') == 'true':
+        if not request.user.is_authenticated:
+            rooms = rooms.none()
+        else:
+            rooms = rooms.filter(memberships__account=request.user)
+    rooms = rooms.select_related('owner').order_by('name', 'pk').distinct()[:20]
+    return JsonResponse({'rooms': [
+        {'id': room.pk, 'name': room.name, 'label': f'{room.name}に参加'}
+        for room in rooms
     ]})
 
 
@@ -131,6 +156,13 @@ def prepare_threads(queryset, viewer):
 def account_page(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     return render(request, 'accounts/account_page.html', {
+        'account': account,
+    })
+
+
+def account_pane(request, username):
+    account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    return render(request, 'accounts/partials/account_pane.html', {
         'account': account,
     })
 

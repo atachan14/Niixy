@@ -22,7 +22,34 @@ const roomStack = NiixyUI.createWorkspace(roomWorkspace, {
   'interface-detail': {target: '.thread-create-module-detail-pane:not(.thread-field-detail-pane)'},
   'field-list': {target: '.thread-create-module-list-pane.thread-field-list-pane'},
   'field-detail': {target: '.thread-create-module-detail-pane.thread-field-detail-pane'},
+  'account-conditions': {target: '.account-condition-pane', width: 'fixed'},
+  'account-selector': {target: '.account-selector-pane', width: 'fixed'},
+  'account-condition-detail': {target: '.account-condition-detail-pane', width: 'remaining'},
+  'account-condition-history-edit': {target: '.account-condition-detail-pane', width: 'remaining'},
 }, {track: roomTrack});
+const roomAccountConditions = NiixyAccountConditions.create({
+  root: roomPage,
+  track: roomTrack,
+  setStage: (stage) => roomStack.set(stage),
+  historyStage: 'account-conditions',
+  selectorStage: 'account-selector',
+  detailStage: 'account-condition-detail',
+  historyEditStage: 'account-condition-history-edit',
+  defaultReturnStage: 'thread-list',
+  getReturnStage: () => roomStack.stage,
+  fieldCatalog: roomFieldCatalog,
+  authenticated: roomPage.dataset.authenticated === 'true',
+  currentAccount: roomPage.dataset.currentAccount,
+  listUrl: roomPage.dataset.accountConditionListUrl,
+  saveUrl: roomPage.dataset.accountConditionSaveUrl,
+  deleteUrl: roomPage.dataset.accountConditionDeleteUrl,
+  accountSearchUrl: roomPage.dataset.accountSearchUrl,
+  roomSearchUrl: roomPage.dataset.accountConditionRoomSearchUrl,
+  csrfToken: () => roomPage.querySelector('[name="csrfmiddlewaretoken"]').value,
+  conditionKindAllowed: (kind) => ['default', 'account', 'room'].includes(kind),
+  conditionAllowed: (condition) => condition.kind !== 'default'
+    || ['guest', 'account', 'self'].includes(condition.definition.code),
+});
 let activeBoardId = null;
 let activeCollectionId = null;
 const requests = {list: 0, threads: 0, detail: 0};
@@ -302,18 +329,22 @@ window.addEventListener('popstate', () => location.reload());
 
 const initial = new URLSearchParams(location.search);
 const initialBoard = initial.get('board');
-if (initialBoard) {
-  openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false).then(() => {
+async function restoreInitialRoomWorkspace() {
+  if (initialBoard) {
+    await openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false);
     const board = roomListContent.querySelector(`[data-open-board="${initialBoard}"]`);
     if (!board) return;
     activateCollection(board.dataset.boardCollection);
-    openBoard(initialBoard, board.dataset.boardTitle, board.dataset.boardUrl, board.dataset.boardCollection, false).then(() => {
-      const thread = initial.get('thread');
-      if (thread) openThread(thread, false);
-    });
-  });
-} else if (initial.has('boards')) {
-  openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false);
-} else if (initial.has('members')) {
-  openRoomList('参加者一覧', roomPage.dataset.membersUrl, 'members', false);
+    await openBoard(initialBoard, board.dataset.boardTitle, board.dataset.boardUrl, board.dataset.boardCollection, false);
+    const thread = initial.get('thread');
+    if (thread) await openThread(thread, false);
+  } else if (initial.has('boards')) {
+    await openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false);
+  } else if (initial.has('members')) {
+    await openRoomList('参加者一覧', roomPage.dataset.membersUrl, 'members', false);
+  }
 }
+
+restoreInitialRoomWorkspace().finally(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+  document.documentElement.classList.remove('has-restored-room-workspace');
+})));

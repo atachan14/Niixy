@@ -101,7 +101,11 @@ def room_detail(request, room_id):
 
 
 def room_pane(request, room_id):
-    return render(request, 'rooms/partials/room_pane.html', {'room': _room(request, room_id)})
+    return render(request, 'rooms/partials/room_pane.html', {
+        'room': _room(request, room_id),
+        'room_thread_field_catalog': thread_field_catalog(),
+        'room_thread_interface_catalog': thread_interface_catalog(),
+    })
 
 
 @require_POST
@@ -257,11 +261,15 @@ def board_edit(request, room_id, board_id):
     form = BoardForm(request.POST)
     if not form.is_valid():
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
-    board.name = form.cleaned_data['name']
-    board.description = form.cleaned_data['description']
-    board.save(update_fields=['name', 'description', 'updated_at'])
-    if request.POST.get('policy_present') == 'true':
-        update_board_policy(board, room, request.POST)
+    try:
+        with transaction.atomic():
+            board.name = form.cleaned_data['name']
+            board.description = form.cleaned_data['description']
+            board.save(update_fields=['name', 'description', 'updated_at'])
+            if request.POST.get('policy_present') == 'true':
+                update_board_policy(board, room, request.POST, request.user)
+    except ValueError as error:
+        return JsonResponse({'error': str(error)}, status=400)
     return JsonResponse({
         'board_id': board.pk,
         'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&board={board.pk}',

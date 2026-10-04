@@ -205,11 +205,16 @@
 }
 
 .account-thread-detail-pane,
-.account-room-detail-pane,
 .account-static-detail-pane {
   flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width));
   padding: 0 20px 24px;
   width: calc(100vw - var(--ui-workspace-fixed-width));
+}
+
+.account-room-detail-pane {
+  flex: 0 0 100vw;
+  padding: 0 20px 24px;
+  width: 100vw;
 }
 
 .account-thread-detail-header,

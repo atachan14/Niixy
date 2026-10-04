@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from interfaces.models import FieldDefinition
+from rooms.models import Room
 
 from .models import AccountCondition
 
@@ -124,6 +125,16 @@ def save_account_condition(user, *, kind, definition, condition_id=None):
         }
         identity = f'{field.name}@{field.creator.username}'
         label = f'{identity}を実装' if not value else f'{identity}: {value}'
+    elif kind == AccountCondition.ROOM:
+        try:
+            room = Room.objects.get(pk=definition.get('room_id'))
+        except (Room.DoesNotExist, TypeError, ValueError) as error:
+            raise ValueError('Roomが見つかりません。') from error
+        relation = definition.get('relation', 'member')
+        if relation != 'member':
+            raise ValueError('Room条件が正しくありません。')
+        definition = {'room_id': room.pk, 'relation': relation}
+        label = f'{room.name}に参加'
     else:
         raise ValueError('このAccount条件はまだ利用できません。')
 

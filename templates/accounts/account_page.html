@@ -3,7 +3,7 @@
 
 {% block title %}{{ account.niixy_profile.display_label }} | Niixy{% endblock %}
 {% block main_class %}account-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261004-4"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-12">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261004-5"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-19">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
@@ -14,19 +14,7 @@
   <div class="account-workspace">
     <div class="account-track ui-workspace-track">
       <section class="account-overview-pane" aria-label="Account概要">
-        <div class="account-overview-content identity-overview-content">
-          <section class="account-hero identity-overview-hero">
-            <div class="account-thumbnail-placeholder identity-thumbnail-placeholder" aria-label="サムネイルは未実装です">未実装</div>
-            <div class="account-actions-grid" aria-label="Account機能">
-              <button class="is-active" type="button" data-open-account-account-if>AccountIF</button><button class="is-active" type="button" data-open-account-people>People</button>
-              <button class="is-active" type="button" data-open-account-threads>Thread</button><button class="is-active" type="button" data-open-account-responses>Response</button>
-              <button class="is-active" type="button" data-open-account-rooms>Room</button><button type="button" disabled>Board</button>
-              <button type="button" disabled>Timeline</button><button class="is-active" type="button" data-open-account-modules>Module</button>
-            </div>
-          </section>
-          <section class="account-placeholder-section identity-overview-section"><h2>評価</h2><p>未実装</p></section>
-          <section class="account-placeholder-section account-profile-placeholder identity-overview-section identity-profile-placeholder"><h2>Profile</h2><p>未実装</p></section>
-        </div>
+        {% include 'accounts/partials/account_overview.html' with account=account %}
       </section>
 
       <section class="account-thread-workspace ui-feature-workspace" aria-label="Thread / Response" data-ui-feature-workspace="conversation" data-thread-pane-url="{% url 'accounts:thread-pane' account.username %}" data-response-pane-url="{% url 'accounts:response-pane' account.username %}" data-thread-detail-url-template="{% url 'accounts:thread-detail' account.username 0 %}" hidden>
@@ -81,4 +69,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261004-4"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261004-5"></script>{% endblock %}
