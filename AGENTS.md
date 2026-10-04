@@ -12,3 +12,11 @@
 8. After starting the server, verify that exactly one Niixy `runserver` parent-child pair exists and exactly one process is listening on `127.0.0.1:8000`. Request a representative page and confirm that the response contains the expected updated asset version or markup.
 
 Never stop an unverified process merely because it uses port 8000. Check its PID, executable path, and start time first. The absence of an available browser automation surface is unrelated to server availability and is not a reason to start another `runserver` process.
+
+## Browser verification
+
+1. Install development-only dependencies with `.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt`. The smoke test uses the locally installed Microsoft Edge channel and does not require a separate Playwright browser download.
+2. After changing Workspace navigation, client-side interaction, shared Pane behavior, or responsive layout, run `.\.venv\Scripts\python.exe scripts\browser_smoke.py` against the verified development server.
+3. Treat a JavaScript page error, console error, failed Workspace assertion, or missing desktop/mobile render as a failed verification. Do not report the UI task complete until the failure is fixed or explicitly documented.
+4. Review `.artifacts/browser-smoke/desktop-workspace.png` and `.artifacts/browser-smoke/mobile-workspace.png` when the change can affect Workspace layout. The accompanying `desktop.png` and `mobile.png` capture the final Account Page state. These generated artifacts stay untracked.
+5. Use `--headed` only when an interactive browser is useful. Headless mode is the default and must remain sufficient for repeatable smoke checks.

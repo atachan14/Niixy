@@ -33,6 +33,23 @@ Niixyは、以下の2点を主要機能として想定して開発しているSN
 - Map: Geolonia Maps (Embed API / MapLibre GL JS)
 - Deployment: Vercel
 
+## Browser smoke test
+
+Install the development dependencies once:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+```
+
+Start the verified development server, then run the desktop and mobile checks:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\browser_smoke.py
+```
+
+The test uses the locally installed Microsoft Edge. Screenshots are written to
+`.artifacts/browser-smoke/` and are excluded from Git.
+
 ## 構想と設計方針
 
 構想の軸としたのは以下の2点です。
