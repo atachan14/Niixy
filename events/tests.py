@@ -137,6 +137,10 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, 'Guest')
         self.assertContains(response, '許可なし')
         self.assertNotContains(response, 'Response情報')
+        self.assertContains(response, 'class="thread-reply-unavailable"')
+        self.assertContains(response, '「Policy Thread」には書き込めません。')
+        self.assertContains(response, '現在、書き込み可能な条件が設定されていません。')
+        self.assertContains(response, 'data-open-thread-policy')
 
     def test_thread_detail_links_niimap_placement_coordinates(self):
         thread = Thread.objects.create(title='配置付きThread')

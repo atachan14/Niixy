@@ -176,6 +176,30 @@ class RoomViewTests(TestCase):
         self.assertEqual(owner_response.status_code, 400)
         self.assertTrue(self.room.has_member(self.owner))
 
+    def test_room_participation_controls_match_account_state(self):
+        guest_response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
+
+        self.client.force_login(self.owner)
+        owner_response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
+
+        RoomMembership.objects.create(room=self.room, account=self.member)
+        self.client.force_login(self.member)
+        member_response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
+
+        self.client.force_login(self.outsider)
+        outsider_response = self.client.get(reverse('rooms:detail', args=[self.room.pk]))
+
+        self.assertContains(guest_response, '>参加不可<')
+        self.assertContains(guest_response, 'data-explanation-target="[data-room-participation-dialog]"')
+        self.assertContains(guest_response, 'class="ui-dialog room-participation-dialog"')
+        self.assertContains(guest_response, 'GuestはRoomに参加できません。参加状況を保持するAccountがないためです。')
+        self.assertContains(guest_response, f'<h3>{self.room.name}のPolicy</h3>')
+        self.assertContains(guest_response, 'Room独自の参加条件はありません。')
+        self.assertContains(owner_response, 'disabled>Owner</button>')
+        self.assertNotContains(owner_response, '>参加中<')
+        self.assertContains(member_response, 'data-pending-label="退会中...">退会</button>')
+        self.assertContains(outsider_response, 'data-pending-label="参加中...">参加</button>')
+
     def test_only_owner_can_edit_room(self):
         self.client.force_login(self.outsider)
         denied = self.client.post(reverse('rooms:edit', args=[self.room.pk]), {'name': 'Denied', 'description': ''})
@@ -403,6 +427,10 @@ class RoomViewTests(TestCase):
         self.assertContains(outsider_response, 'class="thread-detail"')
         self.assertContains(outsider_response, f'{self.room.name} / {self.board.name}')
         self.assertNotContains(outsider_response, 'class="thread-reply-form"')
+        self.assertContains(outsider_response, 'class="thread-reply-unavailable"')
+        self.assertContains(outsider_response, '以下の必要条件を満たしていません。')
+        self.assertContains(outsider_response, f'<span class="thread-write-condition">{self.room.name}に参加</span>')
+        self.assertContains(outsider_response, 'data-open-thread-policy')
 
         RoomMembership.objects.create(room=self.room, account=self.member)
         self.client.force_login(self.member)
@@ -411,6 +439,8 @@ class RoomViewTests(TestCase):
 
         self.assertContains(account_response, 'class="thread-reply-form"')
         self.assertContains(room_response, 'class="thread-reply-form"')
+        self.assertNotContains(account_response, 'class="thread-reply-unavailable"')
+        self.assertNotContains(room_response, 'class="thread-reply-unavailable"')
         self.assertContains(account_response, 'data-thread-id=', count=1)
         self.assertContains(room_response, 'data-thread-id=', count=1)
 

@@ -19,12 +19,15 @@
 
 ## Inbox
 
+- Policy周り
+    - 書き込み不可理由に、Policyに表記のない[RoomAに参加]が表記されてる。
+
 - Account > Room
     - tab
         - OwnerTab
         - 参加中Tab（Owner含む）
-        - RoomListA
-        - RoomListB
+        - RoomListA（ユーザーが追加するやつ）
+        - RoomListB（ユーザーが追加するやつ）
         - love
         - hate
     - SummaryList
@@ -32,9 +35,16 @@
         - RoomB
         - RoomC
 
-- Ownerの場合、RoomPageでグレーアウトしてる[参加中]のボタンは[Owner]にしようかな。
-- Owner以外のメンバーの場合、[退出]は[退会]のほうがニュアンスに合うかな？[退団]でも面白そう。
-
+- Account > Board
+    - tab
+        - Main（デフォルトCollection。削除可。）
+        - CollectionA（ユーザーが追加するやつ）
+        - fav
+        - bad
+    - SummaryList
+        - BoardA
+        - BoardB
+        - BoardC
 ## now
 
 
@@ -44,15 +54,15 @@
 - Roomの初期Board
     - お知らせ（Thread作成権限がOwnerのみ）
     - 掲示板（権限がフリー）
-- Roomの[メンバーX]の表記を[メンバー(X)]に変更。
+- Roomの[メンバーX]の表記を[Member(X)]に変更。
 - Board一覧のSummaryItemをBoard名([Thread数])表記にする。
 - SummaryItemの色について、カード的な表現は保留としても、Spot以外のSummaryListにも色を反映させるとこまでは確定として共通化したい。
 
-- Threadの座標行をfixed化。
+- Threadの座標行をfixed化。かつ、NiiMap座標のときに初見で何の数字だかわかりづらいから表記も工夫したい。座標:X=xxxxxxx,Y=xxxxxxxとか？緯度や軽度ってXとかYとかって書き方はしないのかな？
 
 - RoomPageやAccountPageのスマホレイアウトについて
     - [Thumb左上配置について]Thumbを左上にするレイアウトで統一するって話だったけどRoomPageでしかその仕様になってない。AccountPageではThumbの下に機能ボタン群を配置する以前の仕様のままになってる。
-    - [文字サイズについて]Thumb左上配置を適応すると、すごくぎゅうぎゅう詰めになるけど、そもそもスマホ用として文字やボタンが大きすぎる。もっと小さくして～～で、Thumbの高さは機能ボタン群の高さに合わせて～～。
+    - [文字サイズについて]Thumb左上配置を適応すると、すごくぎゅうぎゅう詰めになるけど、そもそもスマホ用として文字やボタンが大きすぎる。もっと小さくして～～で、Thumbの高さは機能ボタン群の高さに合わせて～～。更に、Thumbはもっと細くてもいいかも？現状はThumbと機能ボタン群が1:1かな？35:65とかでもいいかもしれない～～要調整！
 
 - Profileの機能ボタン上に予定していたボタン群を廃止して、Feedbackに移す。
 

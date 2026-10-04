@@ -32,9 +32,31 @@ def prepare_thread_for_view(thread, viewer):
 
     thread.can_view = thread.allows(viewer, ThreadAccessRule.VIEW)
     room = room_for_thread(thread)
-    thread.can_write = thread.allows(viewer, ThreadAccessRule.WRITE) and (
-        room is None or room.has_member(viewer)
-    )
+    policy_allows_write = thread.allows(viewer, ThreadAccessRule.WRITE)
+    room_allows_write = room is None or room.has_member(viewer)
+    thread.can_write = policy_allows_write and room_allows_write
+
+    unmet_requirements = []
+    if not policy_allows_write:
+        rules = thread._prefetched_objects_cache.get('access_rules')
+        if rules is None:
+            rules = list(thread.access_rules.all())
+        enabled_audiences = {
+            rule.audience
+            for rule in rules
+            if rule.capability == ThreadAccessRule.WRITE
+        }
+        unmet_requirements.extend(
+            label
+            for audience, label in ThreadAccessRule.AUDIENCE_CHOICES
+            if audience in enabled_audiences
+        )
+    if room is not None and not room_allows_write:
+        unmet_requirements.append(f'{room.name}に参加')
+
+    thread.unmet_write_requirements = unmet_requirements
+    # Deny rules are a future Policy feature. Keep the view contract ready now.
+    thread.matched_write_denials = []
     return thread
 
 

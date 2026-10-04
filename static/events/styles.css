@@ -1013,6 +1013,12 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-reply-form { display: grid; gap: 10px; min-width: 0; }
 .thread-reply-form textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; max-width: 100%; min-height: 110px; min-width: 0; padding: 10px; resize: vertical; width: 100%; }
 .thread-reply-form .button { justify-self: end; }
+.thread-reply-unavailable { background: #f7f7f6; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 12px; min-width: 0; padding: 14px; }
+.thread-reply-unavailable p { line-height: 1.6; margin: 0; }
+.thread-write-reasons { display: grid; gap: 7px; }
+.thread-write-condition-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.thread-write-condition { background: #eef6f4; border: 1px solid #b8ddd6; border-radius: 4px; color: var(--accent-dark); font-size: 13px; padding: 4px 7px; }
+.thread-policy-link { background: transparent; border: 0; color: var(--accent-dark); cursor: pointer; font: inherit; justify-self: start; padding: 0; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
 .thread-rules { display: grid; gap: 10px; padding: 12px 0; }
 .thread-rule { display: grid; gap: 8px; }
 .thread-rule-list { display: grid; gap: 6px; }
@@ -1084,6 +1090,15 @@ html.has-restored-thread-detail .thread-track { transform: translateX(calc(-100v
 .thread-rule-dialog form { display: grid; gap: 16px; }
 .thread-rule-dialog-header { align-items: center; display: flex; justify-content: space-between; }
 .thread-rule-dialog-header h2 { font-size: 18px; margin: 0; }
+.ui-dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 18px; width: min(440px, calc(100vw - 32px)); }
+.ui-dialog::backdrop { background: rgba(36, 33, 29, 0.42); }
+.ui-dialog form { display: grid; gap: 16px; }
+.ui-dialog header { align-items: center; display: flex; justify-content: space-between; }
+.ui-dialog h2, .ui-dialog h3, .ui-dialog p { margin: 0; }
+.ui-dialog h2 { font-size: 18px; }
+.ui-dialog h3 { font-size: 14px; }
+.ui-dialog section { display: grid; gap: 6px; }
+.ui-dialog p { line-height: 1.6; }
 .thread-rule-candidates { display: grid; gap: 8px; }
 .thread-rule-candidates button { text-align: left; }
 @media (max-width: 780px) {

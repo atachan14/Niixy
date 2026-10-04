@@ -405,6 +405,21 @@ window.NiixyUI = (() => {
   }
 
   bindAccordions();
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-explanation-target]');
+    if (!trigger) return;
+    const scope = trigger.closest('[data-explanation-scope]') || document;
+    const dialog = scope.querySelector(trigger.dataset.explanationTarget);
+    if (dialog?.showModal) dialog.showModal();
+  });
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-open-thread-policy]');
+    if (!trigger) return;
+    const policy = trigger.closest('.thread-detail')?.querySelector('.thread-policy-entry');
+    if (!policy) return;
+    setAccordionExpanded(policy, true);
+    window.setTimeout(() => policy.scrollIntoView({behavior: 'smooth', block: 'nearest'}), 0);
+  });
   new MutationObserver((mutations) => mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
     if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
   }))).observe(document.body, {childList: true, subtree: true});
