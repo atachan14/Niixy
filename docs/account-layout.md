@@ -2,7 +2,7 @@
 
 Version: v0.16
 Base: `28e9de67bf6d65149467fc9345fd183a18c34871`（v0.14版更新基盤 / v0.15 UI・NiiMap）
-Status: 実装・隔離SQLite / Edge検証完了。v0.16公開・共有Neon migration・通常runserver切替はユーザー承認済み。以下に公開前の記録と公開工程を残す。
+Status: Complete（実装・隔離SQLite / Edge検証・公開・共有Neon 0009反映・通常runserver切替・公開/ローカルread-only PC/mobile確認）。以下に公開前の記録と公開工程を残す。
 
 ## 今回の終点
 
@@ -43,7 +43,7 @@ IFの自動復帰はv0.14基盤の無変更・追加入力不要条件をその�
 
 ## migration・公開順
 
-`interfaces/0009_account_layout.py` は0008を前提とし、AccountLayout / Draft / Version / RequireField / RequireIF / Item / Applicationの7テーブルとFK・一意制約を追加する。既存AccountFieldBinding、Value、IF適用、Threadの構造・値・timestamp・版参照を変えず、Layoutを自動適用しない。Djangoの通常post_migrateによる7モデル分のcontent type・既定permission追加も想定する。共有Neonへの適用は下記の公開工程で確認する。
+`interfaces/0009_account_layout.py` は0008を前提とし、AccountLayout / Draft / Version / RequireField / RequireIF / Item / Applicationの7テーブルとFK・一意制約を追加する。既存AccountFieldBinding、Value、IF適用、Threadの構造・値・timestamp・版参照を変えず、Layoutを自動適用しない。Djangoの通常post_migrateによる7モデル分のcontent type・既定permission追加も想定する。共有Neonへの適用は2026-10-05の公開工程で確認済み。
 
 1. ユーザーがv0.16として今回のコード・テスト・docs・migrationを公開GitHub `atachan14/Niixy` の既存masterへcommit・pushし、DB反映と通常runserver再起動まで進めることを承認した。既存checkpoint `e9f12eb` / `4634d5f`を保持し、通常commit・pushだけを使う。inbox / root README / secret / backup / private artifactsはstageしない。
 2. 共有Neonの0008適用状況と対象を確認し、必要な既存データのbackupをprivate / gitignore内に保持する。旧コードと共存できる追加migrationとして扱う。
@@ -65,6 +65,18 @@ Edgeの隔離LiveServerでPC1280px / mobile390pxの最小一周と、長文末�
 
 公開前の通常serverはread-onlyにPID/親PID/path/command/starttimeを確認し、venv launcher30324 → base Python37964の1組、127.0.0.1:8000 listener owning37964を確認した。隔離実装工程では停止・追加起動・restartを行わず、0009も共有Neon未適用のまま維持した。公開工程では再度process・listenerを確認して上記手順で切り替える。inboxは未読・未編集・stage除外、root READMEも不変更。
 
+### v0.16公開後の確認（2026-10-05）
+
+実装・安全追補・公開計画の3commitを既存masterへ通常pushし、公開実装SHA `e1df76a53b9c56a798d770c2d57534d2785f734c`に対するVercel成功と公開URLのHTTP200 / `20261005-account-layout` markerを確認した。`0009`はVercel production buildだけで適用し、手動migrationを重ねていない。
+
+移行前は0009だけ未適用だった。schemaと旧Interface / Field / Value / Binding / Thread行の限定backupをgitignore内private領域へ保存し、移行後の全旧table schemaと限定対象の全行・日時・版参照が一致することをread-only transactionで確認した。追加tableは予定の7個だけで全0件、Accountの既存適用5tableも0件を保持した。標準metadataはcontent type +7 / permission +28、既存metadata行は不変だった。
+
+検証済み旧pair 30324 / 37964だけを停止し、runserver processと8000 listenerがともに0であることを確認してからHiddenで通常起動した。新pairは37132 → 34712、127.0.0.1:8000 listener owning34712の一組。ローカルGETもHTTP200と新markerを確認した。
+
+公開・通常server両方で既存 `browser_smoke.py` のPC/mobileが成功し、console / page errorはなかった。local初回のscroll assertionはfixtureの記録タイミングだった。記録時0に対して実pointerdown / mousedown / click直前は250、復元後も250とprobeで確認したため、リンクを表示可能にしてから実scroll位置を記録する最小test修正を行い再試験した。UI動作は変更していない。選択したBoardにThreadがなくstandalone Room Threadの確認はスキップしたが、Account Thread・nested Thread・Workspaceの確認は成功した。
+
+追加のGuest Profile / Module Layout-Account確認もpublic/local双方のPC/mobileで成功し、未適用Profileの従来表示・閲覧専用・横幅・新scriptを確認した。この小確認はAccountへの直接GETに限定し、全requestがGET・console / page errorなしだった。共有DBへの試験投稿・Mod/Layout適用はしていない。既存NiiMap smokeが使う検索POSTもデータを保存しない読取APIである。Workspace・最終Account・Module画像は確認済みでprivate / untrackedのまま保持する。
+
 RoomLayout、AccountIFItem、自由参照パーツ、Timeline / Boardパーツ、defaultLayout再構築、ThreadPost表示名・値Snapshot、Threadの適用済み版編集、保存ライブラリ、Layout削除 / copy、高度検索は対象外。今回はAccountLayoutの最小一周で区切り、便利機能や装飾を拡充しない。既存Profile幅を維持する。将来、PC最大幅を使う紹介文・Timeline・Boardの3列案はページ構造の改善時に別途検討する。
 
-公開前の隔離QAには共有Neon / production / 通常serverを含めず、それらは承認された公開工程で確認する。実PostgreSQLの並行publish・apply、Edge以外のbrowser、JS無効時の完成表示、実際の大量定義は未検証。全領域の広域反復は今回後回しとする。
+公開前の隔離QAには共有Neon / production / 通常serverを含めず、それらのmigration・旧行保持・GET / Guest読取表示は上記公開工程で確認した。実PostgreSQLの並行publish・apply、共有DB上の実Layout作成/適用、Edge以外のbrowser、JS無効時の完成表示、実際の大量定義は未検証。全領域の広域反復は今回後回しとする。

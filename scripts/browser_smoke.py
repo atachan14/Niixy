@@ -88,8 +88,10 @@ def exercise_room_trail(page: Page, result: SmokeResult, screenshot_path: Path) 
         return
 
     list_pane = page.locator(".thread-list-pane")
-    original_scroll = min(80, list_pane.evaluate("el => Math.max(0, el.scrollHeight - el.clientHeight)"))
-    list_pane.evaluate("(el, top) => { el.scrollTop = top; }", original_scroll)
+    # Click scrolls its target into view before the app snapshots the root.
+    # Record that actionable position, including lists populated after DOM load.
+    room_link.scroll_into_view_if_needed()
+    original_scroll = list_pane.evaluate("el => el.scrollTop")
     room_link.click()
     page.wait_for_selector(".ui-workspace-trail-pane [data-room-fragment]")
     wait_for_trail_count(page, 1)
