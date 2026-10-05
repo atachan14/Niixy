@@ -21,11 +21,6 @@
 
 - AND選択ボタン要らないかも？AND選択を選択しなくても、Itemクリックで複数選択、追加ボタンでANDグループとして追加で十分わかりやすそう。複数選択だとわかりやすいよう、追加ボタンに選択件数を表示する。
 
-- NiiMap > RoomPage展開時に、右側に謎の余白ができるようになっちゃった！RoomPageは横スクロールで無理やり残りのAreaに押し込められてる状態！これさっきのAccount条件Pane修正の副作用かな？
-
-- NiiMap > Thread > Account > RoomでもRoomが全幅表示になってない！
-
-- Profile > Room > 以降への遷移もWorkSpace遷移にするのはどう？というか、一部の操作（Site-HeaderでのNiiMapやAccountPageやMyPage）以外の遷移は全部WorkSpace遷移ってのは？重くなっちゃったりする？Room > Account > Room > AccountみたいにグルグルとWorkSpace遷移でPaneを付け足し続けるのも、重くならなきゃ全然ありかなって気がして。あんまりにも重いなら、ユーザーが自身の操作でSiteHeaderからPage遷移でリセットしてさ。
 
 - 更新時に現在CurrentPaneから動かないようにしたい！NiiMap > Thread詳細までは、確かその処理入ってたよね？NiiMap > Room > Board一覧...みたいに進んでいくと、更新時に一度Spot一覧くらいまで戻ってから現在Paneまで再走するアニメーションが入っちゃう。
 

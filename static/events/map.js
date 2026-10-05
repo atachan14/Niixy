@@ -105,6 +105,19 @@ const accountConditions = NiixyAccountConditions.create({
     || condition.kind !== 'default'
     || ['guest', 'account', 'self'].includes(condition.definition.code),
 });
+threadMotion.onRetain = (stage) => {
+  accountConditions.close();
+  if (stage === 'list') {
+    closeDetail(false);
+    updateRoomUrl(null, {}, true);
+  } else {
+    roomRequestId += 1;
+    const panes = ['.niimap-room-list-pane', '.niimap-room-thread-list-pane', '.niimap-room-thread-detail-pane'];
+    const keep = {room: 0, 'room-list': 1, 'room-board': 2, 'room-thread': 3}[stage] || 0;
+    panes.slice(keep).forEach((selector) => document.querySelector(selector)?.remove());
+    threadStack.set(stage);
+  }
+};
 
 function resetDraftPlacement() {
   draftMarker?.remove();
@@ -909,6 +922,7 @@ async function openEmbeddedBoard(boardId, title, url, shouldUpdateUrl = true) {
       currentAccount: workspace.dataset.currentActor,
       policyDialog: ruleDialog,
       beforeSelectorOpen: () => {
+        NiixyWorkspaceTrail.prepare(ui.content);
         document.getElementById('thread-interface-selector')?.remove();
         document.getElementById('thread-field-selector')?.remove();
         document.querySelector('.thread-interface-detail-pane:not(.thread-create-module-detail-pane):not(.thread-field-detail-pane)')?.remove();

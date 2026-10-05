@@ -43,6 +43,21 @@ const profileStack = NiixyUI.createWorkspace(accountWorkspace, {
 }, {track: document.querySelector('.account-track')});
 const profileFeatures = NiixyUI.createFeatureWorkspaceController(document.querySelector('.account-track'));
 let activeModuleState = {type: 'element', subtype: 'field', collection: 'self'};
+profileStack.onRetain = (stage) => {
+  if (stage === 'overview') {
+    requestedPaneKey = null;
+    resetThreadDetail();
+    resetAccountRoomDetail();
+    removeProfileModule();
+    profileFeatures.clear();
+  } else if (stage === 'list') resetThreadDetail();
+  else if (stage === 'room-list') resetAccountRoomDetail();
+  else if (stage === 'module-list') document.querySelector('.profile-module-detail-pane')?.remove();
+  const url = new URL(location.href);
+  if (stage === 'overview') url.search = '';
+  else ['thread', 'post', 'room', 'field', 'interface'].forEach((key) => url.searchParams.delete(key));
+  history.replaceState(history.state, '', url);
+};
 
 function updateAccountNavigation() {
   const isPaneOpen = !profileStack.is('overview');
@@ -190,6 +205,7 @@ async function openProfileModule(initialState = moduleStateFromParams(), shouldU
     NiixyUI.showPaneError(loading);
     return false;
   }
+  if (!loading.isConnected) return false;
   loading.replaceWith(list);
   bindProfileModuleList(list, initialState);
   return true;
@@ -236,6 +252,7 @@ async function openProfileModuleDetail(type, url, id, shouldUpdateUrl = true) {
     NiixyUI.showPaneError(loading);
     return false;
   }
+  if (!loading.isConnected) return false;
   detail.classList.add('profile-module-detail-pane');
   loading.replaceWith(detail);
   profileStack.align();
@@ -509,7 +526,7 @@ threadDetailContainer.addEventListener('submit', async (event) => {
 });
 
 function applyStateFromUrl() {
-  NiixyWorkspaceTrail.clear();
+  NiixyWorkspaceTrail.clear({preserveUrl: true});
   const params = new URLSearchParams(window.location.search);
   const pane = params.get('pane');
   isApplyingHistory = true;
@@ -529,7 +546,8 @@ function applyStateFromUrl() {
     roomQuery.delete('pane');
     roomQuery.delete('room');
     const query = roomQuery.toString() ? `?${roomQuery}` : '';
-    openAccountRooms(query, false).then(() => {
+    openAccountRooms(query, false).then((loaded) => {
+      if (!loaded || activePane !== 'room' || !profileStack.is('room-list')) return;
       const roomId = params.get('room');
       if (roomId) openAccountRoomDetail(roomId, false);
     });
@@ -539,7 +557,8 @@ function applyStateFromUrl() {
     openStaticFeature('people', 'people-list', false);
   } else if (pane === 'module') {
     const state = moduleStateFromParams(params);
-    openProfileModule(state, false).then(() => {
+    openProfileModule(state, false).then((loaded) => {
+      if (!loaded || activePane !== 'module' || !profileStack.is('module-list')) return;
       const fieldId = params.get('field');
       const interfaceId = params.get('interface');
       if (fieldId) openProfileModuleDetail('field', replaceTemplateId(moduleFieldDetailTemplate, fieldId), fieldId, false);
@@ -569,7 +588,8 @@ if (['thread', 'response'].includes(initialParams.get('pane'))) {
   roomQuery.delete('pane');
   roomQuery.delete('room');
   const query = roomQuery.toString() ? `?${roomQuery}` : '';
-  openAccountRooms(query, false).then(() => {
+  openAccountRooms(query, false).then((loaded) => {
+    if (!loaded || activePane !== 'room' || !profileStack.is('room-list')) return;
     const roomId = initialParams.get('room');
     if (roomId) openAccountRoomDetail(roomId, false);
   });
@@ -579,7 +599,8 @@ if (['thread', 'response'].includes(initialParams.get('pane'))) {
   openStaticFeature('people', 'people-list', false);
 } else if (initialParams.get('pane') === 'module') {
   const state = moduleStateFromParams(initialParams);
-  openProfileModule(state, false).then(() => {
+  openProfileModule(state, false).then((loaded) => {
+    if (!loaded || activePane !== 'module' || !profileStack.is('module-list')) return;
     const fieldId = initialParams.get('field');
     const interfaceId = initialParams.get('interface');
     if (fieldId) openProfileModuleDetail('field', replaceTemplateId(moduleFieldDetailTemplate, fieldId), fieldId, false);

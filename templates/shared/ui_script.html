@@ -132,6 +132,7 @@ window.NiixyUI = (() => {
     let resizeFrame = null;
 
     const align = () => {
+      if (track.querySelector(':scope > .ui-workspace-trail-pane')) return;
       // Workspace positioning is controlled only by the track transform.
       // Native horizontal scrolling can be introduced by scrollIntoView().
       viewport.scrollLeft = 0;
@@ -159,17 +160,32 @@ window.NiixyUI = (() => {
     };
     window.addEventListener('resize', handleResize);
 
-    return {
+    const controller = {
       get stage() { return currentStage; },
       is(stage) { return currentStage === stage; },
       align,
+      retain(source) {
+        if (!source || !track.contains(source)) return;
+        const matches = Object.entries(stages).filter(([, definition]) => {
+          const target = typeof definition.target === 'string' ? track.querySelector(definition.target) : definition.target;
+          return target?.contains(source);
+        });
+        const stage = matches.find(([name]) => name === currentStage)?.[0]
+          || matches.at(-1)?.[0] || Object.keys(stages).find((name) => stages[name].root);
+        if (!stage || stage === currentStage) return;
+        controller.onRetain?.(stage);
+        controller.set(stage);
+      },
       set(stage) {
         if (!(stage in stages)) throw new Error(`Unknown workspace stage: ${stage}`);
+        window.NiixyWorkspaceTrail?.clear();
         track.dataset.uiWorkspaceStage = stage;
         currentStage = stage;
         align();
       },
     };
+    track.niixyWorkspace = controller;
+    return controller;
   }
 
   function createFeatureWorkspaceController(track) {

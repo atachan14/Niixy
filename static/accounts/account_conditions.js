@@ -72,6 +72,7 @@ window.NiixyAccountConditions = (() => {
       || document.querySelector('[data-account-selector-pane-template]');
     let historyPane = null;
     let selectorPane = null;
+    let detailPane = null;
     let historyList = null;
     let selectorTabs = null;
     let selectorContent = null;
@@ -93,7 +94,8 @@ window.NiixyAccountConditions = (() => {
     }
 
     function removeDetailPane() {
-      Array.from(track.querySelectorAll('.account-condition-detail-pane')).at(-1)?.remove();
+      detailPane?.remove();
+      detailPane = null;
     }
 
     function removeSelectorPane() {
@@ -160,12 +162,14 @@ window.NiixyAccountConditions = (() => {
     const csrfToken = () => options.csrfToken();
 
     async function loadCatalog() {
+      const revision = catalogRequestId;
       const response = await fetch(options.listUrl, {
         cache: 'no-store',
         headers: {'X-Requested-With': 'XMLHttpRequest'},
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Account条件を読み込めませんでした。');
+      if (revision !== catalogRequestId) return;
       catalog = copyGroups([result.conditions || []])[0];
       availableCatalog = copyGroups([result.available_conditions || []])[0];
     }
@@ -292,13 +296,15 @@ window.NiixyAccountConditions = (() => {
     }
 
     async function useCondition(condition) {
+      const revision = catalogRequestId;
       try {
         const saved = await saveCondition(condition);
+        if (revision !== catalogRequestId || !historyPane?.isConnected) return;
         const key = conditionKey(saved);
         if (selectedKeys.has(key)) selectedKeys.delete(key); else selectedKeys.add(key);
         renderHistory();
       } catch (error) {
-        historyList.replaceChildren(emptyMessage(error.message, true));
+        if (revision === catalogRequestId) historyList?.replaceChildren(emptyMessage(error.message, true));
       }
     }
 
@@ -346,7 +352,7 @@ window.NiixyAccountConditions = (() => {
       conditions.filter(allowed).forEach((condition) => {
         const summaryKind = {account: 'account', account_interface: 'interface', field: 'field', room: 'room'}[condition.kind] || 'account-condition';
         container.append(summaryButton(condition.label, kindLabel(condition), async () => {
-          try { await saveCondition(condition); showHistory(); }
+          try { await saveCondition(condition); if (container.isConnected) showHistory(); }
           catch (error) { renderResults(container, [], error.message); }
         }, summaryKind));
       });
@@ -354,7 +360,7 @@ window.NiixyAccountConditions = (() => {
     }
 
     function configureTabs(tabs) {
-      Array.from(track.querySelectorAll('.account-condition-detail-pane')).at(-1)?.remove();
+      removeDetailPane();
       selectorTabs.replaceChildren(); selectorContent.replaceChildren(); selectorTabs.hidden = tabs.length === 0;
       selectorTabs.setAttribute('aria-label', `${kindLabel({kind: browserKind})}の分類`);
       tabs.forEach((tab, index) => {
@@ -405,15 +411,16 @@ window.NiixyAccountConditions = (() => {
       form.addEventListener('submit', async (event) => {
         event.preventDefault(); const data = new FormData(form); let operator = data.get('operator');
         const value = data.get('value') || (field.type === 'boolean' ? operator : ''); if (!value) operator = '';
-        try { await saveCondition({kind: 'field', definition: {field_id: field.id, operator, value}, label: `${field.name}@${field.creator}`}, existing); showHistory(); }
+        try { await saveCondition({kind: 'field', definition: {field_id: field.id, operator, value}, label: `${field.name}@${field.creator}`}, existing); if (form.isConnected) showHistory(); }
         catch (exception) { error.textContent = exception.message; error.hidden = false; }
       });
       body.append(form);
     }
 
     function openFieldDetail(field, mode = 'detail', existing = null) {
-      Array.from(track.querySelectorAll('.account-condition-detail-pane')).at(-1)?.remove();
+      removeDetailPane();
       const pane = document.createElement('aside'); pane.className = 'ui-detail-pane account-condition-detail-pane';
+      detailPane = pane;
       const header = document.createElement('header'); header.className = 'ui-pane-header ui-detail-pane-header';
       const title = document.createElement('h2'); title.textContent = `${field.name}@${field.creator} v${field.version}/Field`;
       const close = document.createElement('button'); close.className = 'icon-button'; close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Field一覧に戻る');
@@ -492,6 +499,8 @@ window.NiixyAccountConditions = (() => {
     const handleRootClick = (event) => {
       const trigger = event.target.closest('[data-open-account-conditions]');
       if (trigger && root.contains(trigger)) {
+        event.stopPropagation();
+        window.NiixyWorkspaceTrail?.prepare(trigger);
         const stage = trigger.dataset.accountConditionReturnStage
           || options.getReturnStage?.(trigger)
           || options.defaultReturnStage;
@@ -516,6 +525,11 @@ window.NiixyAccountConditions = (() => {
 
     return {
       open,
+      close() {
+        catalogRequestId += 1;
+        activeTarget = null;
+        removeConditionPanes();
+      },
       setGroups,
       initialize: initializeTargets,
       getGroups: (target) => copyGroups(groupsByTarget.get(target) || []),

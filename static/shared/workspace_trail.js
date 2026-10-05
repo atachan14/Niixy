@@ -51,7 +51,8 @@ window.NiixyWorkspaceTrail = (() => {
   function create(host) {
     const {root, viewport, track} = host;
     const entries = [];
-    let baseState = null;
+    let alignment = 0;
+    let focusedPane = null;
 
     function state() {
       return {
@@ -63,8 +64,10 @@ window.NiixyWorkspaceTrail = (() => {
 
     function align(entry, instant = false) {
       if (!entry?.pane?.isConnected) return;
+      focusedPane = entry;
+      const revision = ++alignment;
       const apply = () => {
-        if (!entry.pane.isConnected) return;
+        if (!entry.pane.isConnected || revision !== alignment) return;
         const trackRect = track.getBoundingClientRect();
         const paneRect = entry.pane.getBoundingClientRect();
         const width = entry.width;
@@ -82,6 +85,7 @@ window.NiixyWorkspaceTrail = (() => {
     }
 
     function restore(snapshot) {
+      alignment += 1;
       if (snapshot.width) viewport.dataset.uiWorkspaceWidth = snapshot.width;
       else delete viewport.dataset.uiWorkspaceWidth;
       track.style.setProperty('--ui-workspace-offset', snapshot.offset || '0px');
@@ -89,19 +93,10 @@ window.NiixyWorkspaceTrail = (() => {
     }
 
     function pop(entry = entries.at(-1)) {
-      if (!entry || entries.at(-1) !== entry) return false;
-      entry.abort?.abort();
-      entry.dispose?.();
-      entry.pane.remove();
-      entries.pop();
-      if (entries.length) {
-        restore(entry.previous);
-        align(entries.at(-1));
-      } else {
-        root.classList.remove('is-workspace-trail-open');
-        restore(baseState || entry.previous);
-        baseState = null;
-      }
+      const index = entries.indexOf(entry);
+      if (index < 0) return false;
+      discardAfter(entries[index - 1] || null);
+      if (entries.length) align(entries.at(-1));
       return true;
     }
 
@@ -110,22 +105,34 @@ window.NiixyWorkspaceTrail = (() => {
       if (anchor && index < 0) return false;
       const removed = entries.splice(index + 1);
       if (!removed.length) return false;
-      removed.forEach((entry) => {
+      removed.slice().reverse().forEach((entry) => {
         entry.abort?.abort();
+        entry.request?.abort();
         entry.dispose?.();
         entry.pane.remove();
       });
       restore(removed[0].previous);
       if (!entries.length) {
         root.classList.remove('is-workspace-trail-open');
-        baseState = null;
       }
       return true;
     }
 
+    function prepare(source) {
+      const origin = source?.pane ? source : entries.find((entry) => entry.pane.contains(source));
+      if (origin) {
+        if (!entries.includes(origin)) throw new DOMException('Pane was closed', 'AbortError');
+        discardAfter(origin);
+        origin.pane.dispatchEvent(new Event('ui-workspace-retain'));
+      } else {
+        discardAfter();
+        track.niixyWorkspace?.retain(source);
+      }
+      return origin || null;
+    }
+
     function push({title, width = 'full', url = location.href, after = undefined}) {
-      const replaced = after !== undefined && discardAfter(after);
-      if (!entries.length) baseState = state();
+      if (after !== undefined) prepare(after);
       const previous = state();
       const ui = createPane(title, width);
       const entry = {...ui, width, previous, url: String(url), abort: new AbortController()};
@@ -134,16 +141,29 @@ window.NiixyWorkspaceTrail = (() => {
       entries.push(entry);
       ui.close.addEventListener('click', () => pop(entry));
       history.replaceState(history.state, '', entry.url);
-      align(entry, replaced);
+      // Source retention/replacement must not suppress the opening transition.
+      align(entry);
       return entry;
     }
 
-    window.addEventListener('resize', () => align(entries.at(-1), true));
+    window.addEventListener('resize', () => align(focusedPane?.pane.isConnected ? focusedPane : entries.at(-1), true));
     function focus(element, width = 'remaining') {
-      align({pane: element, width});
+      let entry = entries.find((candidate) => candidate.pane === element);
+      if (entry) discardAfter(entry);
+      else {
+        entry = {pane: element, width, previous: state(), url: location.href, abort: new AbortController()};
+        entries.push(entry);
+      }
+      element.classList.add('ui-workspace-trail-auxiliary');
+      element.dataset.workspaceTrailWidth = width;
+      element.hidden = false;
+      for (let next = element.nextElementSibling; next; next = next.nextElementSibling) {
+        if (next.classList.contains('ui-workspace-trail-auxiliary')) next.hidden = true;
+      }
+      align(entry);
     }
 
-    return {align, discardAfter, entries, focus, pop, push, track};
+    return {align, discardAfter, entries, focus, pop, prepare, push, track};
   }
 
   function paneUrl(template, id) {
@@ -151,9 +171,20 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   async function fetchInto(entry, url, selector = null) {
-    const response = await fetch(url, {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}, signal: entry.abort.signal});
+    entry.request?.abort();
+    const request = new AbortController();
+    entry.request = request;
+    const assertCurrent = () => {
+      if (!entry.pane.isConnected || entry.abort.signal.aborted || request.signal.aborted || entry.request !== request) {
+        throw new DOMException('Pane request was superseded', 'AbortError');
+      }
+    };
+    assertCurrent();
+    const response = await fetch(url, {cache: 'no-store', headers: {'X-Requested-With': 'fetch'}, signal: request.signal});
+    assertCurrent();
     if (!response.ok) throw new Error('Paneを読み込めませんでした。');
     const text = await response.text();
+    assertCurrent();
     if (!selector) {
       entry.body.innerHTML = text;
       return entry.body;
@@ -192,16 +223,19 @@ window.NiixyWorkspaceTrail = (() => {
     });
   }
 
-  function openThreadDetail(trail, source, threadId, postNumber = null) {
+  function openThreadDetail(trail, source, threadId, postNumber = null, origin) {
     const detailUrl = paneUrl(source.dataset.threadDetailTemplate, threadId);
-    const url = childUrl(source.dataset.accountPageUrl || source.dataset.roomPageUrl, {pane: source.dataset.accountPageUrl ? (postNumber ? 'response' : 'thread') : null, thread: threadId, post: postNumber});
-    const entry = trail.push({title: '読み込み中...', width: 'remaining', url});
+    const url = new URL(origin?.url || source.dataset.accountPageUrl || source.dataset.roomPageUrl, location.origin);
+    url.searchParams.set('thread', threadId);
+    if (postNumber) url.searchParams.set('post', postNumber);
+    else url.searchParams.delete('post');
+    const entry = trail.push({title: '読み込み中...', width: 'remaining', url, after: origin});
     fetchInto(entry, detailUrl).then(() => {
       const detail = entry.body.querySelector('[data-thread-title], [data-thread-detail-pane]');
       entry.heading.textContent = detail?.dataset.threadTitle || '';
       if (postNumber) {
         const target = entry.body.querySelector(`[data-thread-post-number="${postNumber}"]`);
-        target?.scrollIntoView({block: 'center'});
+        if (target) entry.body.scrollTop += target.getBoundingClientRect().top - entry.body.getBoundingClientRect().top - entry.body.clientHeight / 2;
       }
       bindThreadDetail(entry, detailUrl);
     }).catch((error) => showError(entry, error));
@@ -230,13 +264,13 @@ window.NiixyWorkspaceTrail = (() => {
         return;
       }
       const detail = event.target.closest('[data-thread-detail]');
-      if (detail) openThreadDetail(trail, account, detail.dataset.threadDetail);
+      if (detail) openThreadDetail(trail, account, detail.dataset.threadDetail, null, entry);
       const response = event.target.closest('[data-response-thread]');
-      if (response) openThreadDetail(trail, account, response.dataset.responseThread, response.dataset.responsePost);
+      if (response) openThreadDetail(trail, account, response.dataset.responseThread, response.dataset.responsePost, entry);
       const module = event.target.closest('[data-detail-url]');
       if (module) {
         event.preventDefault();
-        const moduleEntry = trail.push({title: '読み込み中...', width: 'remaining', url: module.href});
+        const moduleEntry = trail.push({title: '読み込み中...', width: 'remaining', url: module.href, after: entry});
         fetchInto(moduleEntry, module.dataset.detailUrl).then(() => {
           moduleEntry.heading.textContent = moduleEntry.body.querySelector('.ui-detail-pane h2, h2')?.textContent || 'Module詳細';
         }).catch((error) => showError(moduleEntry, error));
@@ -312,12 +346,13 @@ window.NiixyWorkspaceTrail = (() => {
     });
   }
 
-  function openRoomList(trail, room, kind) {
+  function openRoomList(trail, room, kind, origin) {
     const boards = kind === 'boards';
     const entry = trail.push({
       title: boards ? 'Board一覧' : '参加者一覧',
       width: 'fixed',
       url: childUrl(room.dataset.roomPageUrl, {[kind]: 1}),
+      after: origin,
     });
     const listUrl = boards ? room.dataset.boardsUrl : room.dataset.membersUrl;
     const fields = JSON.parse(room.querySelector('#room-pane-field-catalog')?.textContent || '[]');
@@ -334,10 +369,15 @@ window.NiixyWorkspaceTrail = (() => {
         title: board.dataset.boardTitle,
         width: 'fixed',
         url: childUrl(room.dataset.roomPageUrl, {boards: 1, collection: board.dataset.boardCollection, board: board.dataset.openBoard}),
+        after: entry,
       });
       const boardUrl = board.dataset.boardUrl;
       let accountConditions = null;
-      boardEntry.dispose = () => accountConditions?.destroy();
+      const removeSelectors = () => trail.track.querySelectorAll('.thread-create-module-selector-pane').forEach((pane) => {
+        if (pane.workspaceOwner === boardEntry.pane) pane.remove();
+      });
+      boardEntry.dispose = () => { accountConditions?.destroy(); removeSelectors(); };
+      boardEntry.pane.addEventListener('ui-workspace-retain', () => { accountConditions?.close(); removeSelectors(); });
 
       const loadBoard = async () => {
         accountConditions?.destroy();
@@ -346,6 +386,7 @@ window.NiixyWorkspaceTrail = (() => {
         boardEntry.heading.textContent = boardEntry.body.querySelector('[data-board-name]')?.dataset.boardName || board.dataset.boardTitle;
           const focusStage = (stage) => {
             if (stage === 'thread-list') {
+              trail.discardAfter(boardEntry);
               trail.align(boardEntry);
               return;
             }
@@ -375,6 +416,8 @@ window.NiixyWorkspaceTrail = (() => {
               returnStage: 'thread-list',
               currentAccount: room.dataset.currentAccount,
               setStage: focusStage,
+              owner: boardEntry.pane,
+              beforeSelectorOpen: () => trail.prepare(boardEntry),
             });
           }
           if (window.NiixyAccountConditions) {
@@ -406,7 +449,7 @@ window.NiixyWorkspaceTrail = (() => {
 
       boardEntry.body.addEventListener('click', (event) => {
         const thread = event.target.closest('[data-room-thread]');
-        if (thread) openThreadDetail(trail, room, thread.dataset.roomThread);
+        if (thread) openThreadDetail(trail, room, thread.dataset.roomThread, null, boardEntry);
       });
       boardEntry.body.addEventListener('submit', async (event) => {
         const form = event.target.closest('[data-board-action], [data-board-thread-create]');
@@ -414,15 +457,17 @@ window.NiixyWorkspaceTrail = (() => {
         event.preventDefault();
         event.stopImmediatePropagation();
         const result = await submitJsonForm(form, event.submitter);
-        if (!result) return;
+        if (!result || !boardEntry.pane.isConnected || !form.isConnected) return;
         if (form.dataset.boardActionKind === 'delete') {
           accountConditions?.destroy();
           trail.pop(boardEntry);
-          await loadList();
+          await loadList().catch((error) => showError(entry, error));
           return;
         }
-        await loadBoard();
-        if (result.thread_id) openThreadDetail(trail, room, result.thread_id);
+        try {
+          await loadBoard();
+          if (result.thread_id) openThreadDetail(trail, room, result.thread_id, null, boardEntry);
+        } catch (error) { showError(boardEntry, error); }
       }, true);
       loadBoard().catch((error) => showError(boardEntry, error));
     };
@@ -437,29 +482,33 @@ window.NiixyWorkspaceTrail = (() => {
       event.preventDefault();
       event.stopImmediatePropagation();
       const result = await submitJsonForm(form, event.submitter);
-      if (!result) return;
-      await loadList();
-      if (result.board_id) {
-        const board = entry.body.querySelector(`[data-open-board="${result.board_id}"]`);
-        if (board) openBoard(board);
-      }
+      if (!result || !entry.pane.isConnected || !form.isConnected) return;
+      try {
+        await loadList();
+        if (result.board_id) {
+          const board = entry.body.querySelector(`[data-open-board="${result.board_id}"]`);
+          if (board) openBoard(board);
+        }
+      } catch (error) { showError(entry, error); }
     }, true);
     loadList().catch((error) => showError(entry, error));
   }
 
   function bindRoom(trail, entry, room) {
-    room.querySelector('[data-open-room-members]')?.addEventListener('click', () => openRoomList(trail, room, 'members'));
-    room.querySelector('[data-open-room-boards]')?.addEventListener('click', () => openRoomList(trail, room, 'boards'));
+    room.querySelector('[data-open-room-members]')?.addEventListener('click', () => openRoomList(trail, room, 'members', entry));
+    room.querySelector('[data-open-room-boards]')?.addEventListener('click', () => openRoomList(trail, room, 'boards', entry));
     room.addEventListener('submit', async (event) => {
       const form = event.target.closest('[data-room-action]');
       if (!form) return;
       event.preventDefault();
+      event.stopPropagation();
       const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type="submit"]'));
       if (!pending) return;
       try {
         const response = await fetch(form.action, {method: 'POST', body: new FormData(form)});
         if (!response.ok) throw new Error('処理に失敗しました。');
         const fresh = await NiixyUI.fetchFragment(`${room.dataset.roomPageUrl}pane/`);
+        if (!entry.pane.isConnected || !room.isConnected) return;
         room.replaceWith(fresh);
         bindRoom(trail, entry, fresh);
       } catch (error) {
@@ -468,8 +517,8 @@ window.NiixyWorkspaceTrail = (() => {
     });
   }
 
-  async function openEntity(trail, entity) {
-    const entry = trail.push({title: '読み込み中...', width: 'full', url: entity.pageUrl});
+  async function openEntity(trail, entity, origin) {
+    const entry = trail.push({title: '読み込み中...', width: 'full', url: entity.pageUrl, after: origin});
     try {
       const selector = entity.kind === 'account' ? '[data-account-fragment]' : '[data-room-fragment]';
       const fragment = await fetchInto(entry, entity.paneUrl, selector);
@@ -482,8 +531,18 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   const host = workspaceHost();
-  if (!host) return {clear() {}, open() {}};
+  if (!host) return {clear() {}, open() {}, prepare() {}};
   const trail = create(host);
+  const initialPath = location.pathname;
+  window.addEventListener('popstate', (event) => {
+    const url = location.href;
+    trail.discardAfter();
+    history.replaceState(history.state, '', url);
+    if (location.pathname !== initialPath) {
+      event.stopImmediatePropagation();
+      location.reload();
+    }
+  }, true);
   document.addEventListener('click', (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const anchor = event.target.closest('a[href]');
@@ -492,16 +551,16 @@ window.NiixyWorkspaceTrail = (() => {
     if (!entity) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    openEntity(trail, entity);
+    openEntity(trail, entity, anchor);
   }, true);
-  return {clear: () => {
+  return {prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
-    history.replaceState(history.state, '', url);
-  }, open: (url) => {
+    if (preserveUrl) history.replaceState(history.state, '', url);
+  }, open: (url, source) => {
     const anchor = document.createElement('a');
     anchor.href = url;
     const entity = entityLink(anchor);
-    if (entity) openEntity(trail, entity);
+    if (entity) openEntity(trail, entity, source);
   }};
 })();

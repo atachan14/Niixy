@@ -247,11 +247,14 @@ window.NiixyRoomForms = (() => {
     const host = options.selectorHost;
     host.querySelectorAll('.thread-create-module-selector-pane').forEach((pane) => pane.remove());
     options.beforeSelectorOpen?.(kind);
+    if (!options.beforeSelectorOpen) window.NiixyWorkspaceTrail?.prepare(form);
 
     const listPane = document.createElement('section');
     listPane.className = `ui-list-pane thread-interface-list-pane thread-create-module-list-pane thread-create-module-selector-pane${kind === 'field' ? ' thread-field-list-pane' : ''}`;
     const detailPane = document.createElement('section');
     detailPane.className = `ui-detail-pane thread-interface-detail-pane thread-create-module-detail-pane thread-create-module-selector-pane${kind === 'field' ? ' thread-field-detail-pane' : ''}`;
+    listPane.workspaceOwner = detailPane.workspaceOwner = options.owner || form;
+    let detailRequest = 0;
     const close = () => {
       listPane.remove();
       detailPane.remove();
@@ -284,16 +287,23 @@ window.NiixyRoomForms = (() => {
 
     const detailContent = document.createElement('div');
     detailContent.className = 'thread-interface-selector-detail';
-    const showList = () => options.setStage(`${kind}-list`);
+    const showList = () => {
+      detailRequest += 1;
+      options.setStage(`${kind}-list`);
+    };
     detailPane.append(selectorHeader(`${kind === 'field' ? 'Field' : 'ThreadIF'}詳細`, '一覧に戻る', showList), detailContent);
 
     const openDetail = async (item) => {
+      const revision = ++detailRequest;
+      if (!detailPane.isConnected) host.append(detailPane);
       detailContent.innerHTML = '<p class="ui-pane-loading">読み込み中...</p>';
       options.setStage(`${kind}-detail`);
       try {
         const fragment = await NiixyUI.fetchFragment(item.detail_url);
+        if (!detailPane.isConnected || revision !== detailRequest) return;
         detailContent.replaceChildren(fragment.querySelector('.field-definition-detail') || fragment);
       } catch {
+        if (!detailPane.isConnected || revision !== detailRequest) return;
         detailContent.innerHTML = `<p class="ui-pane-error">${kind === 'field' ? 'Field' : 'ThreadIF'}の詳細を読み込めませんでした。</p>`;
         return;
       }

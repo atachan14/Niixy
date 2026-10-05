@@ -936,6 +936,9 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .ui-workspace-trail-pane[data-workspace-trail-width="full"] { flex: 0 0 100vw; width: 100vw; }
 .ui-workspace-trail-pane[data-workspace-trail-width="fixed"] { flex: 0 0 var(--ui-workspace-fixed-width, 360px); width: var(--ui-workspace-fixed-width, 360px); }
 .ui-workspace-trail-pane[data-workspace-trail-width="remaining"] { flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width, 360px)); width: calc(100vw - var(--ui-workspace-fixed-width, 360px)); }
+.ui-workspace-trail-auxiliary:not([hidden]) { display: block; box-sizing: border-box; height: 100%; }
+.ui-workspace-trail-auxiliary[data-workspace-trail-width="fixed"] { flex: 0 0 var(--ui-workspace-fixed-width, 360px); width: var(--ui-workspace-fixed-width, 360px); }
+.ui-workspace-trail-auxiliary[data-workspace-trail-width="remaining"] { flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width, 360px)); width: calc(100vw - var(--ui-workspace-fixed-width, 360px)); }
 .ui-workspace-trail-header { align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; flex: 0 0 42px; justify-content: space-between; min-height: 42px; padding: 0 20px; }
 .ui-workspace-trail-header h2 { font-size: 15px; margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-workspace-trail-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
@@ -953,11 +956,12 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .ui-accordion-content.is-open { grid-template-rows: 1fr; opacity: 1; }
 .ui-accordion-content-inner { min-height: 0; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
-  .ui-accordion-content { transition: none; }
+  .ui-accordion-content, .ui-workspace-track { transition: none; }
 }
 @media (max-width: 780px) {
   .ui-workspace-trail-pane[data-workspace-trail-width="fixed"],
-  .ui-workspace-trail-pane[data-workspace-trail-width="remaining"] { flex-basis: 100vw; width: 100vw; }
+  .ui-workspace-trail-pane[data-workspace-trail-width="remaining"],
+  .ui-workspace-trail-auxiliary[data-workspace-trail-width] { flex-basis: 100vw; width: 100vw; }
   .ui-workspace-trail-header { padding: 0 16px; }
   .ui-workspace-trail-body > .thread-detail { padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
   .account-detail-fragment .account-actions-grid { gap: 6px; }

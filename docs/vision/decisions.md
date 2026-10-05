@@ -363,3 +363,11 @@ Workspace遷移では、画面外へ押し出されたPaneをDOMから外さな�
 Pane数の上限、画面外Paneの仮想化、状態だけを保存してDOMを破棄する最適化は、実測上の性能問題が確認されるまで導入しない。通常利用では利用者自身がSiteHeaderからPage遷移することでWorkspaceをリセットできる。
 
 ブラウザの再読み込みでは既存DOMを保持できないため、URLから最終的なCurrentPaneまでをアニメーションなしで再構築する。再読み込みをまたいで中間Paneのスクロール位置や入力途中状態まで復元する機能は、必要になった段階で`history.state`または`sessionStorage`を用いる別機能として扱う。
+
+## 2026-10-05 - Workspace遷移は起点Pane以降を置き換える
+
+状態: 採用
+
+AccountPage専用ではなく、Account・Room・Board・ThreadなどのWorkspace遷移に共通適用する。Pane内から別のPaneを開くときは、操作の起点Paneとそれ以前を保持し、その後ろのPaneを閉じて新しい遷移先へ置き換える。末尾Paneからの操作は追加になる。専用のAccountNextPaneは設けない。
+
+保持するPaneは再取得せず、スクロール・入力・Tabなどの状態を維持する。閉じたPaneの通信応答や遅延処理は新しい枝に反映しない。Account条件やField選択などの補助Paneも呼び出し元と同じ枝として扱う。末尾PaneのCloseは従来どおり直前へ戻り、途中PaneのCloseではその後続も閉じる。Page遷移・ブラウザ履歴・URLからの復元との区別は維持する。

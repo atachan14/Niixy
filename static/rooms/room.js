@@ -53,6 +53,20 @@ const roomAccountConditions = NiixyAccountConditions.create({
 let activeBoardId = null;
 let activeCollectionId = null;
 const requests = {list: 0, threads: 0, detail: 0};
+roomStack.onRetain = (stage) => {
+  if (stage === 'overview') requests.list += 1;
+  if (stage === 'overview' || stage === 'list') clearThreadPanes();
+  else requests.detail += 1;
+  roomAccountConditions.close();
+  roomTrack.querySelectorAll('.thread-create-module-selector-pane').forEach((pane) => pane.remove());
+  const url = new URL(location.href);
+  if (stage === 'overview') url.search = '';
+  else {
+    url.searchParams.delete('thread');
+    if (stage === 'list') url.searchParams.delete('board');
+  }
+  history.replaceState(history.state, '', url);
+};
 
 function roomUrl(template, id) {
   return template.replace('/0/', `/${id}/`);
@@ -171,6 +185,7 @@ async function openRoomList(title, url, listKind = 'members', updateHistory = tr
     const params = new URLSearchParams(location.search);
     if (params.has('manage')) activateCollectionManagement();
     else activateCollection(params.get('collection'));
+    return true;
   } catch {
     if (current === requests.list) roomListContent.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
   }
@@ -199,6 +214,7 @@ async function openBoard(boardId, title, url, collectionId = null, updateHistory
       returnStage: 'thread-list',
       currentAccount: roomPage.dataset.currentAccount,
     });
+    return true;
   } catch {
     if (current === requests.threads) roomThreadListContent.innerHTML = '<p class="empty">読み込みに失敗しました。</p>';
   }
@@ -331,11 +347,11 @@ const initial = new URLSearchParams(location.search);
 const initialBoard = initial.get('board');
 async function restoreInitialRoomWorkspace() {
   if (initialBoard) {
-    await openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false);
+    if (!await openRoomList('Board一覧', roomPage.dataset.boardsUrl, 'boards', false)) return;
     const board = roomListContent.querySelector(`[data-open-board="${initialBoard}"]`);
     if (!board) return;
     activateCollection(board.dataset.boardCollection);
-    await openBoard(initialBoard, board.dataset.boardTitle, board.dataset.boardUrl, board.dataset.boardCollection, false);
+    if (!await openBoard(initialBoard, board.dataset.boardTitle, board.dataset.boardUrl, board.dataset.boardCollection, false)) return;
     const thread = initial.get('thread');
     if (thread) await openThread(thread, false);
   } else if (initial.has('boards')) {
