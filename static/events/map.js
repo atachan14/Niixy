@@ -325,7 +325,7 @@ function writeThreadFieldValues(wrapper, values) {
 }
 function synchronizeThreadFieldControls(source = null) {
   const selectedWrappers = Array.from(
-    document.querySelectorAll('#selected-direct-fields .thread-field-control, #selected-thread-interfaces .thread-field-control'),
+    document.querySelectorAll('#selected-direct-fields .thread-field-control[data-definition-id], #selected-thread-interfaces .thread-field-control[data-definition-id]'),
   );
   const previewSelector = threadStack.is('interface-detail')
     ? '#thread-interface-selector-detail .thread-field-control'

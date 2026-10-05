@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
@@ -405,6 +406,16 @@ def draft_update(request, draft_id):
         pk=draft_id,
         creator=request.user,
     )
+    list_url = f'/mypage/?section=module&type=interface&subtype={draft.kind}'
+    editor_url = f'{list_url}&collection=editing&draft={draft.pk}'
+    ajax = request.headers.get('Accept') == 'application/json'
+
+    def result(message, url, *, failed=False):
+        if ajax:
+            return JsonResponse({'message': message, 'url': url}, status=400 if failed else 200)
+        (messages.error if failed else messages.success)(request, message)
+        return redirect(url)
+
     draft_form = InterfaceDraftForm(request.POST)
     field_formset = InterfaceDraftFieldFormSet(request.POST, prefix='fields')
     if not draft_form.is_valid() or not field_formset.is_valid():
@@ -415,21 +426,17 @@ def draft_update(request, draft_id):
             for field_errors in form.errors.values():
                 errors.extend(str(error) for error in field_errors)
         errors.extend(str(error) for error in field_formset.non_form_errors())
-        messages.error(request, ' '.join(errors) or '入力内容を確認してください。')
-        return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
+        return result(' '.join(errors) or '入力内容を確認してください。', editor_url, failed=True)
 
     try:
         save_draft_forms(draft, draft_form, field_formset)
         if request.POST.get('action') == 'publish':
             interface, version = publish_draft(draft.pk)
-            messages.success(request, f'{interface.name} v{version.version_number}を公開しました。')
-            return redirect(f'/mypage/?section=module&type=interface&subtype={interface.kind}')
+            return result(f'{interface.name} v{version.version_number}を公開しました。', list_url)
     except ValidationError as error:
-        messages.error(request, ' '.join(error.messages))
-        return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
+        return result(' '.join(error.messages), editor_url, failed=True)
 
-    messages.success(request, 'Draftを保存しました。')
-    return redirect(f'/mypage/?section=module&type=interface&subtype={draft.kind}&collection=editing&draft={draft.pk}')
+    return result('Draftを保存しました。', f'{list_url}&collection=editing')
 
 
 @login_required

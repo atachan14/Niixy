@@ -246,8 +246,8 @@ window.NiixyRoomForms = (() => {
   function moduleSelector(form, kind, catalog, options) {
     const host = options.selectorHost;
     host.querySelectorAll('.thread-create-module-selector-pane').forEach((pane) => pane.remove());
+    window.NiixyWorkspaceTrail?.prepare(form);
     options.beforeSelectorOpen?.(kind);
-    if (!options.beforeSelectorOpen) window.NiixyWorkspaceTrail?.prepare(form);
 
     const listPane = document.createElement('section');
     listPane.className = `ui-list-pane thread-interface-list-pane thread-create-module-list-pane thread-create-module-selector-pane${kind === 'field' ? ' thread-field-list-pane' : ''}`;
@@ -287,8 +287,14 @@ window.NiixyRoomForms = (() => {
 
     const detailContent = document.createElement('div');
     detailContent.className = 'thread-interface-selector-detail';
+    detailContent.addEventListener('focusin', () => requestAnimationFrame(() => {
+      if (detailPane.isConnected && detailPane.contains(document.activeElement)) {
+        options.setStage(`${kind}-detail`);
+      }
+    }));
     const showList = () => {
       detailRequest += 1;
+      detailPane.remove();
       options.setStage(`${kind}-list`);
     };
     detailPane.append(selectorHeader(`${kind === 'field' ? 'Field' : 'ThreadIF'}詳細`, '一覧に戻る', showList), detailContent);
@@ -383,7 +389,7 @@ window.NiixyRoomForms = (() => {
     renderCatalog(panels.self, catalog.filter((item) => item.creator === options.currentAccount), kind, openDetail);
     panels.saved.innerHTML = `<p class="empty">保存した${kind === 'field' ? 'Field' : 'ThreadIF'}はありません。</p>`;
 
-    host.append(listPane, detailPane);
+    host.append(listPane);
     NiixyUI.bindTabs(listPane);
     showList();
   }

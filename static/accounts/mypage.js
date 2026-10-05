@@ -17,7 +17,10 @@ function updateHeaderNavigation(feature = null) {
   identity.disabled = !feature;
 }
 
+let moduleNavigationGeneration = 0;
+
 function showOverview() {
+  moduleNavigationGeneration += 1;
   pageStack.set('overview');
   updateHeaderNavigation();
   history.pushState({}, '', myPage.dataset.paneUrl);
@@ -54,6 +57,7 @@ function removeModuleDetailPanes() {
 }
 
 async function openBasic(updateHistory = true) {
+  moduleNavigationGeneration += 1;
   const url = new URL(myPage.dataset.paneUrl, location.origin);
   url.searchParams.set('_panes', '1');
   workspace.querySelector('.basic-info-pane, .module-management, .interface-management')?.remove();
@@ -69,8 +73,8 @@ async function openBasic(updateHistory = true) {
   setTimeout(() => pane.querySelector('#id_display_name')?.focus(), 260);
 }
 
-function currentModuleState(defaultType = 'element') {
-  const params = new URLSearchParams(location.search);
+function currentModuleState(defaultType = 'element', search = location.search) {
+  const params = new URLSearchParams(search);
   const requestedType = params.get('type') || defaultType;
   const type = requestedType === 'field' ? 'element' : requestedType;
   return {
@@ -90,6 +94,7 @@ function moduleLocation(state) {
 }
 
 async function openModuleList(initialState = currentModuleState(), updateHistory = true) {
+  moduleNavigationGeneration += 1;
   workspace.querySelector('.basic-info-pane, .module-management, .interface-management')?.remove();
   const management = document.createElement('section');
   management.className = 'module-management';
@@ -106,6 +111,7 @@ async function openModuleList(initialState = currentModuleState(), updateHistory
   try { list = await NiixyUI.fetchFragment(myPage.dataset.moduleListUrl); } catch { NiixyUI.showPaneError(loading); return; }
   loading.replaceWith(list);
   bindModuleList(list, initialState);
+  return list;
 }
 
 function openInterfaceList(updateHistory = true) {
@@ -141,6 +147,7 @@ function bindModuleList(list, initialState) {
 }
 
 async function openFieldDetail(url) {
+  moduleNavigationGeneration += 1;
   removeModuleDetailPanes();
   const loading = loadingPane('field-detail-pane', 'field-detail');
   moduleTrack().append(loading);
@@ -251,6 +258,7 @@ function bindRemoveSynonymButtons(root) {
 }
 
 async function openInterfaceDetail(url, historyUrl = null) {
+  moduleNavigationGeneration += 1;
   removeModuleDetailPanes();
   const loading = loadingPane('interface-detail-pane', 'interface-detail');
   moduleTrack().append(loading);
@@ -262,35 +270,63 @@ async function openInterfaceDetail(url, historyUrl = null) {
   bindInterfaceDetail(detail);
 }
 
+function showInterfaceMessage(root, message, failed = false) {
+  root.querySelector('[data-interface-operation-message]')?.remove();
+  const notice = document.createElement('p');
+  notice.dataset.interfaceOperationMessage = 'true';
+  notice.className = failed ? 'error' : 'success';
+  notice.setAttribute('role', failed ? 'alert' : 'status');
+  notice.textContent = message;
+  root.prepend(notice);
+}
+
 function bindAjaxForms(root) {
   root.querySelectorAll('form:not([data-summary-search-form])').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (form.dataset.submitting) return;
+    pageStack.align();
+    const generation = moduleNavigationGeneration;
     const refreshInterfaceList = form.hasAttribute('data-refresh-interface-list');
+    const isDraftUpdate = form.id === 'interface-draft-form';
     const data = new FormData(form);
     if (event.submitter?.name) data.set(event.submitter.name, event.submitter.value);
-    if (event.submitter) event.submitter.disabled = true;
+    form.dataset.submitting = 'true';
+    const buttons = Array.from(form.elements).filter((element) => element.type === 'submit' && !element.disabled);
+    buttons.forEach((button) => { button.disabled = true; });
+    root.querySelector('[data-interface-operation-message]')?.remove();
     try {
-      const response = await fetch(form.action || location.href, {method: 'POST', body: data});
-      if (!response.ok) throw new Error('Interface operation failed');
-      if (refreshInterfaceList) {
-        await openInterfaceList(true);
-        return;
-      }
-      const target = new URL(response.url);
+      const response = await fetch(form.getAttribute('action') || location.href, {
+        method: 'POST', body: data,
+        headers: isDraftUpdate ? {Accept: 'application/json'} : {},
+      });
+      if (!form.isConnected || generation !== moduleNavigationGeneration) return;
+      const result = isDraftUpdate && response.headers.get('content-type')?.includes('application/json')
+        ? await response.json() : null;
+      if (!response.ok) throw new Error(result?.message || '操作に失敗しました。もう一度お試しください。');
+      if (isDraftUpdate && !result) throw new Error('応答を確認できませんでした。再ログインしてお試しください。');
+      if (!form.isConnected || generation !== moduleNavigationGeneration) return;
+      const target = new URL(result?.url || response.url, location.origin);
+      const state = currentModuleState('interface', target.search);
+      state.type = 'interface';
       const draftId = target.searchParams.get('draft');
       const interfaceId = target.searchParams.get('interface');
-      if (draftId) {
-        await openModuleList({
-          type: 'interface',
-          subtype: target.searchParams.get('subtype') || 'thread',
-          collection: 'editing',
-        }, false);
+      if (refreshInterfaceList || (!draftId && !interfaceId)) {
+        const list = await openModuleList(state, true);
+        if (result?.message && list) showInterfaceMessage(list, result.message);
+      } else if (draftId) {
+        state.collection = 'editing';
+        await openModuleList(state, false);
         await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${draftId}/`, `${target.pathname}${target.search}`);
+      } else await openInterfaceDetail(`/mypage/interfaces/manage/${interfaceId}/`, `${target.pathname}${target.search}`);
+    } catch (error) {
+      if (form.isConnected && generation === moduleNavigationGeneration) {
+        showInterfaceMessage(form, error.message === 'Failed to fetch'
+          ? '通信に失敗しました。入力内容を保持しています。もう一度お試しください。' : error.message, true);
+        pageStack.align();
       }
-      else if (interfaceId) await openInterfaceDetail(`/mypage/interfaces/manage/${interfaceId}/`, `${target.pathname}${target.search}`);
-      else await openInterfaceList(true);
-    } catch {
-      if (event.submitter) event.submitter.disabled = false;
+    } finally {
+      delete form.dataset.submitting;
+      buttons.forEach((button) => { button.disabled = false; });
     }
   }));
 }

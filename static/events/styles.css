@@ -979,6 +979,12 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .thread-workspace.is-interface-list-open .thread-detail-pane, .thread-workspace.is-interface-detail-open .thread-detail-pane, .thread-workspace.is-field-list-open .thread-detail-pane, .thread-workspace.is-field-detail-open .thread-detail-pane { display: none; }
 .thread-workspace.is-interface-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width) minmax(0, var(--main-width)); width: 200vw; }
 .thread-workspace.is-field-list-open .thread-track, .thread-workspace.is-field-detail-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) var(--list-width) minmax(0, var(--main-width)); width: 200vw; }
+/* Creation helpers follow their retained form; search helpers still follow the Spot list. */
+.thread-workspace .thread-track:has(> .thread-create-module-selector-pane) { display: flex; width: max-content; }
+.thread-workspace .thread-track:has(> .thread-create-module-selector-pane) > .thread-detail-pane { display: block; }
+.thread-workspace .thread-track:has(> .thread-create-module-selector-pane):has(> .niimap-room-list-pane) > .thread-detail-pane { flex-basis: 100vw; width: 100vw; }
+.thread-create-module-list-pane { flex: 0 0 var(--list-width); }
+.thread-create-module-detail-pane { flex: 0 0 var(--main-width); }
 .thread-workspace.is-account-conditions-open .thread-track, .thread-workspace.is-account-selector-open .thread-track, .thread-workspace.is-account-condition-detail-open .thread-track, .thread-workspace.is-account-condition-history-edit-open .thread-track { display: flex; width: max-content; }
 .thread-workspace.is-room-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw; width: 200vw; }
 .thread-workspace.is-room-list-open .thread-track { grid-template-columns: minmax(0, var(--main-width)) var(--list-width) 100vw var(--list-width); width: calc(200vw + var(--list-width)); }

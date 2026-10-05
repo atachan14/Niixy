@@ -273,7 +273,7 @@ class InterfaceManagementViewTests(TestCase):
             self.field_payload(),
         )
         draft.refresh_from_db()
-        self.assertRedirects(save_response, f'/mypage/?section=module&type=interface&subtype=thread&collection=editing&draft={draft.pk}')
+        self.assertRedirects(save_response, '/mypage/?section=module&type=interface&subtype=thread&collection=editing')
         self.assertEqual(draft.name, 'Event')
         self.assertEqual(draft.fields.get().definition, self.definition)
 
@@ -407,7 +407,7 @@ class InterfaceManagementViewTests(TestCase):
 
         response = self.client.post(reverse('interfaces:draft-update', args=[draft.pk]), payload)
 
-        self.assertRedirects(response, f'/mypage/?section=module&type=interface&subtype=thread&collection=editing&draft={draft.pk}')
+        self.assertRedirects(response, '/mypage/?section=module&type=interface&subtype=thread&collection=editing')
         remaining = draft.fields.get()
         self.assertEqual(remaining.definition, second)
         self.assertEqual(remaining.position, 0)
@@ -450,6 +450,40 @@ class InterfaceManagementViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
         interface.refresh_from_db()
         self.assertEqual(interface.status, Interface.DELETED)
+
+
+    def test_ajax_save_and_publish_return_explicit_destination(self):
+        for kind in (Interface.ACCOUNT, Interface.THREAD, Interface.THREAD_POST):
+            draft = InterfaceDraft.objects.create(creator=self.user, kind=kind, name=kind)
+            url = reverse('interfaces:draft-update', args=[draft.pk])
+            response = self.client.post(url, self.field_payload(name=kind), HTTP_ACCEPT='application/json')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['url'], f'/mypage/?section=module&type=interface&subtype={kind}&collection=editing')
+            response = self.client.post(url, self.field_payload(name=kind, action='publish'), HTTP_ACCEPT='application/json')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['url'], f'/mypage/?section=module&type=interface&subtype={kind}')
+            self.assertFalse(InterfaceDraft.objects.filter(pk=draft.pk).exists())
+
+    def test_ajax_validation_errors_do_not_redirect_or_replace_input(self):
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Original')
+        for payload in [self.field_payload(name=''), self.field_payload(**{'fields-0-definition_id':'999999'})]:
+            response = self.client.post(reverse('interfaces:draft-update', args=[draft.pk]), payload, HTTP_ACCEPT='application/json')
+            self.assertEqual(response.status_code, 400)
+            self.assertTrue(response.json()['message'])
+            self.assertIn(f'draft={draft.pk}', response.json()['url'])
+            draft.refresh_from_db()
+            self.assertEqual(draft.name, 'Original')
+            self.assertFalse(draft.fields.exists())
+
+    def test_ajax_duplicate_publication_reports_error_and_keeps_draft(self):
+        existing = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='Duplicate')
+        publish_draft(existing.pk)
+        draft = InterfaceDraft.objects.create(creator=self.user, kind=Interface.THREAD, name='New')
+        response = self.client.post(reverse('interfaces:draft-update', args=[draft.pk]), self.field_payload(name='Duplicate', action='publish'), HTTP_ACCEPT='application/json')
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(response.json()['message'])
+        self.assertTrue(InterfaceDraft.objects.filter(pk=draft.pk).exists())
+        self.assertEqual(Interface.objects.filter(name='Duplicate').count(), 1)
 
 
 class ThreadInterfaceServiceTests(TestCase):
