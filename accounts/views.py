@@ -7,6 +7,7 @@ from django.db import IntegrityError
 from django.db.models import Prefetch, Q, Value
 from django.db.models.functions import Concat
 from django.http import JsonResponse
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -312,3 +313,44 @@ def my_page(request):
     if render_panes and show_module:
         context.update(module_list_context(request.user))
     return render(request, 'accounts/my_page.html', context)
+
+
+def account_applied(request, username):
+    from interfaces.account_applications import application_payload
+    account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    return render(request, 'accounts/partials/applied_list.html', {
+        'account': account, 'applied': application_payload(account),
+        'edit_mode': request.GET.get('edit') == '1' and request.user.is_authenticated and request.user.pk == account.pk,
+    })
+
+
+def account_applied_data(request, username):
+    from interfaces.account_applications import application_payload, application_catalog
+    account = get_object_or_404(User, username__iexact=username)
+    result = application_payload(account)
+    if request.user.is_authenticated and request.user.pk == account.pk:
+        result['catalog'] = application_catalog()
+    return JsonResponse(result)
+
+
+@require_POST
+def account_applied_change(request, username):
+    from interfaces.account_applications import change_application, MergeConfirmationRequired
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'ログインが必要です。'}, status=401)
+    account = get_object_or_404(User, username__iexact=username)
+    if account.pk != request.user.pk:
+        return JsonResponse({'error': '本人のAccountだけを変更できます。'}, status=403)
+    try:
+        payload = json.loads(request.body)
+        if not isinstance(payload, dict):
+            raise ValidationError('操作が正しくありません。')
+        confirmation = payload.pop('confirmation', None)
+        change_application(account, payload, confirmation)
+    except MergeConfirmationRequired as error:
+        return JsonResponse({'error': '共有される値の変更を確認してください。',
+            'changes': error.changes, 'confirmation': error.token}, status=409)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValidationError, ValueError, TypeError) as error:
+        messages = error.messages if isinstance(error, ValidationError) else ['操作が正しくありません。']
+        return JsonResponse({'error': ' '.join(messages)}, status=400)
+    return JsonResponse({'ok': True})

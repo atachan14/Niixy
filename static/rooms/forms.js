@@ -231,12 +231,12 @@ window.NiixyRoomForms = (() => {
     return header;
   }
 
-  function renderCatalog(panel, items, kind, openDetail) {
+  function renderCatalog(panel, items, kind, openDetail, interfaceLabel = 'ThreadIF') {
     panel.replaceChildren();
     if (!items.length) {
       const empty = document.createElement('p');
       empty.className = 'empty';
-      empty.textContent = kind === 'field' ? 'Fieldはありません。' : 'ThreadIFはありません。';
+      empty.textContent = kind === 'field' ? 'Fieldはありません。' : `${interfaceLabel}はありません。`;
       panel.append(empty);
       return;
     }
@@ -244,6 +244,7 @@ window.NiixyRoomForms = (() => {
   }
 
   function moduleSelector(form, kind, catalog, options) {
+    const interfaceLabel = options.interfaceLabel || 'ThreadIF';
     const host = options.selectorHost;
     host.querySelectorAll('.thread-create-module-selector-pane').forEach((pane) => pane.remove());
     window.NiixyWorkspaceTrail?.prepare(form);
@@ -260,7 +261,7 @@ window.NiixyRoomForms = (() => {
       detailPane.remove();
       options.setStage(options.returnStage);
     };
-    listPane.append(selectorHeader(`${kind === 'field' ? 'Field' : 'ThreadIF'}一覧`, 'Thread作成に戻る', close));
+    listPane.append(selectorHeader(`${kind === 'field' ? 'Field' : interfaceLabel}一覧`, 'Thread作成に戻る', close));
 
     const tabs = document.createElement('div');
     tabs.className = 'ui-tabs thread-interface-catalog-tabs';
@@ -297,7 +298,7 @@ window.NiixyRoomForms = (() => {
       detailPane.remove();
       options.setStage(`${kind}-list`);
     };
-    detailPane.append(selectorHeader(`${kind === 'field' ? 'Field' : 'ThreadIF'}詳細`, '一覧に戻る', showList), detailContent);
+    detailPane.append(selectorHeader(`${kind === 'field' ? 'Field' : interfaceLabel}詳細`, '一覧に戻る', showList), detailContent);
 
     const openDetail = async (item) => {
       const revision = ++detailRequest;
@@ -310,7 +311,7 @@ window.NiixyRoomForms = (() => {
         detailContent.replaceChildren(fragment.querySelector('.field-definition-detail') || fragment);
       } catch {
         if (!detailPane.isConnected || revision !== detailRequest) return;
-        detailContent.innerHTML = `<p class="ui-pane-error">${kind === 'field' ? 'Field' : 'ThreadIF'}の詳細を読み込めませんでした。</p>`;
+        detailContent.innerHTML = `<p class="ui-pane-error">${kind === 'field' ? 'Field' : interfaceLabel}の詳細を読み込めませんでした。</p>`;
         return;
       }
       const editor = document.createElement('section');
@@ -331,8 +332,12 @@ window.NiixyRoomForms = (() => {
       use.type = 'button';
       use.textContent = selected
         ? '入力内容を反映'
-        : (kind === 'field' ? 'このFieldを追加する' : 'このThreadIFを実装する');
-      use.addEventListener('click', () => {
+        : (kind === 'field' ? 'このFieldを追加する' : `この${interfaceLabel}を実装する`);
+      use.addEventListener('click', async () => {
+        if (options.onSelect) {
+          if (await options.onSelect(kind, item, editor, actions)) close();
+          return;
+        }
         if (kind === 'field') addDirectField(form, item, editor);
         else addInterface(form, item, editor);
         close();
@@ -362,32 +367,32 @@ window.NiixyRoomForms = (() => {
           && (!description || item.description.toLocaleLowerCase().includes(description))
           && (!fieldType || item.type === fieldType)
         )).slice(0, 10);
-        renderCatalog(results, matches, kind, openDetail);
+        renderCatalog(results, matches, kind, openDetail, interfaceLabel);
         search.open = false;
       };
       searchForm.addEventListener('submit', (event) => { event.preventDefault(); searchCatalog(); });
       search.append(summary, searchForm);
       panels.search.append(search, results);
-      renderCatalog(results, catalog.slice(0, 10), kind, openDetail);
+      renderCatalog(results, catalog.slice(0, 10), kind, openDetail, interfaceLabel);
     } else {
       const input = document.createElement('input');
       input.className = 'niimap-picker-search';
       input.type = 'search';
-      input.placeholder = 'ThreadIF名@NiixyID';
+      input.placeholder = `${interfaceLabel}名@NiixyID`;
       const results = document.createElement('div');
       results.className = 'ui-summary-list';
       const searchCatalog = () => renderCatalog(
         results,
         catalog.filter((item) => !input.value.trim() || `${item.name}@${item.creator}`.toLocaleLowerCase().includes(input.value.trim().toLocaleLowerCase())).slice(0, 10),
         kind,
-        openDetail,
+        openDetail, interfaceLabel,
       );
       input.addEventListener('input', searchCatalog);
       panels.search.append(input, results);
       searchCatalog();
     }
-    renderCatalog(panels.self, catalog.filter((item) => item.creator === options.currentAccount), kind, openDetail);
-    panels.saved.innerHTML = `<p class="empty">保存した${kind === 'field' ? 'Field' : 'ThreadIF'}はありません。</p>`;
+    renderCatalog(panels.self, catalog.filter((item) => item.creator === options.currentAccount), kind, openDetail, interfaceLabel);
+    panels.saved.innerHTML = `<p class="empty">保存した${kind === 'field' ? 'Field' : interfaceLabel}はありません。</p>`;
 
     host.append(listPane);
     NiixyUI.bindTabs(listPane);
@@ -505,5 +510,5 @@ window.NiixyRoomForms = (() => {
     });
   }
 
-  return {initialize, initializePolicy};
+  return {initialize, initializePolicy, moduleSelector, fieldControl, writeFieldValues, fieldValues};
 })();

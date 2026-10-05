@@ -247,6 +247,7 @@ window.NiixyWorkspaceTrail = (() => {
       response: ['Response一覧', account.dataset.responsePaneUrl],
       room: ['Room一覧', account.dataset.roomPaneUrl],
       module: ['Module一覧', account.dataset.modulePaneUrl],
+      'account-if': ['Applied一覧', account.dataset.appliedUrl],
     };
     const definition = definitions[kind];
     if (!definition) {
@@ -256,6 +257,11 @@ window.NiixyWorkspaceTrail = (() => {
     }
     const [title, listUrl] = definition;
     const entry = trail.push({title, width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind}), after: origin});
+    if (kind === 'account-if') entry.body.addEventListener('focusin', (event) => {
+      const tab = event.target;
+      if (!tab.matches('[data-ui-tab]')) return;
+      requestAnimationFrame(() => { if (entry.pane.isConnected && document.activeElement === tab) trail.align(entry); });
+    });
     entry.body.addEventListener('click', (event) => {
       const pagination = event.target.closest('[data-pane-pagination], [data-room-pagination], [data-summary-page]');
       if (pagination) {
@@ -276,7 +282,7 @@ window.NiixyWorkspaceTrail = (() => {
         }).catch((error) => showError(moduleEntry, error));
       }
     });
-    fetchInto(entry, listUrl).then(() => NiixyUI.bindTabs(entry.body)).catch((error) => showError(entry, error));
+    fetchInto(entry, listUrl, kind === 'account-if' ? '.applied-list-content' : null).then(() => NiixyUI.bindTabs(entry.body)).catch((error) => showError(entry, error));
   }
 
   function bindAccount(trail, entry, account) {

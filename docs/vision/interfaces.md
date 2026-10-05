@@ -101,3 +101,15 @@ ProfileLayout は Interface のフィールド定義や入力値を持たない�
 - ThreadInterface の更新履歴とシステム Response の関係
 - ThreadPostLayout の具体的な Slot、Item、編集形式
 - Tweet と Timeline に適用する Interface と Layout
+
+## Accountへの適用（v0.12）
+
+Accountにも直接FieldとAccountIFを適用し、同一Field・片同義のValueはそのAccount内で共有する。追加時の公開版を固定し、編集はMyPage、公開閲覧はAccountPageのApplied一覧で行う。Module定義一覧や将来のProfileLayout欄とは統合しない。
+
+Applied一覧はField／AccountIFタブ。Fieldは同一definitionを重複表示せず、Value更新日時の新しい順とその更新日時を表示する。AccountIFは参照Valueの最大更新日時順（値がない場合は適用日時）で表示する。参照を追加しただけでは既存Valueの更新日時を動かさない。
+
+共有Valueの編集は関連項目へ反映する。編集欄の下に他の共有先名称を短く示し、通常編集の確認modalは設けない。既存の異なるValueを片同義で統合する際は、従来方針どおり最初の適用Valueと変更内容を確認してから保存する。direct参照の取外しはIFの固定構成を変更せず、IF由来Fieldの取外しはIF単位で行う。
+
+## 長期構想・Version未割当
+
+Interface定義へ入力用プレースホルダを保存できるようにし、定義確認画面のレイアウトも将来改善したい。placeholderをIF内Fieldごとの入力ヒントにするかなど、保存単位・詳細は未定。v0.12には追加せず、ずっと後の検討対象とする。

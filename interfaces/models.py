@@ -383,3 +383,118 @@ class ThreadInterfaceValue(models.Model):
         if isinstance(value, list):
             return ' / '.join(str(item) for item in value)
         return str(value)
+
+
+class AccountInterfaceImplementation(models.Model):
+    account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='interface_implementations')
+    interface = models.ForeignKey(Interface, on_delete=models.PROTECT, related_name='account_implementations')
+    version = models.ForeignKey(InterfaceVersion, on_delete=models.PROTECT, related_name='account_implementations')
+    position = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['account', 'interface'], name='unique_account_interface'),
+            models.UniqueConstraint(fields=['account', 'position'], name='unique_account_interface_position'),
+        ]
+        ordering = ['position', 'pk']
+
+
+class AccountFieldValue(models.Model):
+    account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='field_values')
+    value = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class AccountFieldBinding(models.Model):
+    account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='field_bindings')
+    definition = models.ForeignKey(
+        FieldDefinition,
+        on_delete=models.PROTECT,
+        related_name='account_bindings',
+    )
+    value = models.ForeignKey(AccountFieldValue, on_delete=models.CASCADE, related_name='bindings')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['account', 'definition'],
+                name='unique_account_field_binding',
+            ),
+        ]
+        ordering = ['created_at', 'pk']
+
+
+class AccountDirectField(models.Model):
+    account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='direct_fields')
+    definition = models.ForeignKey(
+        FieldDefinition,
+        on_delete=models.PROTECT,
+        related_name='direct_account_implementations',
+    )
+    version = models.ForeignKey(
+        FieldVersion,
+        on_delete=models.PROTECT,
+        related_name='direct_account_implementations',
+    )
+    binding = models.ForeignKey(
+        AccountFieldBinding,
+        on_delete=models.PROTECT,
+        related_name='direct_implementations',
+    )
+    position = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['account', 'definition'], name='unique_account_direct_field'),
+            models.UniqueConstraint(fields=['account', 'position'], name='unique_account_direct_field_position'),
+        ]
+        ordering = ['position', 'pk']
+
+    @property
+    def value(self):
+        return self.binding.value.value
+
+    @property
+    def display_value(self):
+        value = self.value
+        if isinstance(value, bool):
+            return 'はい' if value else 'いいえ'
+        if isinstance(value, list):
+            return ' / '.join(str(item) for item in value)
+        return str(value)
+
+
+class AccountInterfaceValue(models.Model):
+    implementation = models.ForeignKey(
+        AccountInterfaceImplementation,
+        on_delete=models.CASCADE,
+        related_name='values',
+    )
+    field = models.ForeignKey(InterfaceField, on_delete=models.PROTECT, related_name='account_values')
+    binding = models.ForeignKey(
+        AccountFieldBinding,
+        on_delete=models.PROTECT,
+        related_name='interface_values',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['implementation', 'field'], name='unique_account_interface_field_value'),
+        ]
+
+    @property
+    def value(self):
+        return self.binding.value.value
+
+    @property
+    def display_value(self):
+        value = self.value
+        if isinstance(value, bool):
+            return 'はい' if value else 'いいえ'
+        if isinstance(value, list):
+            return ' / '.join(str(item) for item in value)
+        return str(value)

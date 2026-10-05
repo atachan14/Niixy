@@ -8,7 +8,7 @@
 {% block footer %}{% endblock %}
 
 {% block content %}
-<section class="mypage" data-initial-section="{% if show_basic_info %}basic{% elif show_module %}module{% else %}overview{% endif %}" data-pane-url="{% url 'mypage' %}" data-module-list-url="{% url 'interfaces:module-management-list' %}">
+<section class="mypage" data-initial-section="{% if show_basic_info %}basic{% elif show_module %}module{% else %}overview{% endif %}" data-pane-url="{% url 'mypage' %}" data-applied-url="{% url 'accounts:applied' account.username %}?edit=1" data-current-account="{{ account.username }}" data-module-list-url="{% url 'interfaces:module-management-list' %}">
   <header class="mypage-header"><h1><button id="mypage-identity" type="button"{% if not show_basic_info and not show_module %} disabled{% endif %}>{{ account.niixy_profile.display_label }} のマイページ</button></h1></header>
   <div class="mypage-viewport"><div class="mypage-workspace ui-workspace-track">
     <section class="mypage-overview" aria-label="マイページ概要"><div class="mypage-overview-content">
@@ -16,6 +16,7 @@
       <div class="mypage-actions" aria-label="マイページ機能">
         <button id="open-basic-info" class="is-active" type="button">基本情報</button>
         <button type="button" disabled>Album</button>
+        <button id="open-applied" class="is-active" type="button">Applied</button>
         <button id="open-module" class="is-active" type="button">Module</button>
       </div>
     </div></section>
@@ -32,4 +33,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/mypage.js' %}?v=20261005-interface-actions"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/applied.js' %}?v=20261005-v12"></script><script src="{% static 'accounts/mypage.js' %}?v=20261005-v12"></script>{% endblock %}

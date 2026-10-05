@@ -3,6 +3,12 @@ const workspace = document.querySelector('.mypage-workspace');
 const identity = document.getElementById('mypage-identity');
 const pageStack = NiixyUI.createWorkspace(document.querySelector('.mypage-viewport'), {
   overview: {root: true},
+  applied: {target: '.applied-list-pane', width: 'fixed'},
+  'applied-edit': {target: '.applied-editor-pane', width: 'remaining'},
+  'applied-field-list': {target: '.thread-field-list-pane', width: 'fixed'},
+  'applied-field-detail': {target: '.thread-field-detail-pane', width: 'remaining'},
+  'applied-interface-list': {target: '.thread-create-module-list-pane:not(.thread-field-list-pane)', width: 'fixed'},
+  'applied-interface-detail': {target: '.thread-create-module-detail-pane:not(.thread-field-detail-pane)', width: 'remaining'},
   basic: {target: '.basic-info-pane'},
   module: {target: '.module-list-pane'},
   'interface-detail': {target: '.interface-detail-pane'},
@@ -18,8 +24,35 @@ function updateHeaderNavigation(feature = null) {
 }
 
 let moduleNavigationGeneration = 0;
+let appliedController = null;
+function closeApplied() {
+  appliedController?.destroy();
+  appliedController = null;
+  workspace.querySelector('.applied-management')?.remove();
+}
+async function openApplied(updateHistory = true) {
+  const generation = ++moduleNavigationGeneration;
+  closeApplied();
+  workspace.querySelector('.basic-info-pane, .module-management, .interface-management')?.remove();
+  const management = document.createElement('section'); management.className = 'module-management applied-management';
+  const loading = loadingPane('ui-list-pane applied-list-pane', 'applied'); management.append(loading); workspace.append(management);
+  pageStack.set('applied'); updateHeaderNavigation('applied');
+  if (updateHistory) history.pushState({}, '', `${myPage.dataset.paneUrl}?section=applied`);
+  try {
+    const pane = await NiixyUI.fetchFragment(myPage.dataset.appliedUrl, '[data-applied-pane]');
+    if (generation !== moduleNavigationGeneration || !loading.isConnected) return;
+    loading.replaceWith(pane);
+    appliedController = NiixyAccountApplied.initialize(pane, {
+      track: workspace, currentAccount: myPage.dataset.currentAccount,
+      setStage: stage => pageStack.set(stage === 'applied' || stage === 'applied-edit' ? stage : `applied-${stage}`),
+      onClose: showOverview, refresh: () => openApplied(false),
+    });
+  } catch { if (loading.isConnected && generation === moduleNavigationGeneration) NiixyUI.showPaneError(loading); }
+}
+
 
 function showOverview() {
+  closeApplied();
   moduleNavigationGeneration += 1;
   pageStack.set('overview');
   updateHeaderNavigation();
@@ -57,6 +90,7 @@ function removeModuleDetailPanes() {
 }
 
 async function openBasic(updateHistory = true) {
+  closeApplied();
   moduleNavigationGeneration += 1;
   const url = new URL(myPage.dataset.paneUrl, location.origin);
   url.searchParams.set('_panes', '1');
@@ -94,6 +128,7 @@ function moduleLocation(state) {
 }
 
 async function openModuleList(initialState = currentModuleState(), updateHistory = true) {
+  closeApplied();
   moduleNavigationGeneration += 1;
   workspace.querySelector('.basic-info-pane, .module-management, .interface-management')?.remove();
   const management = document.createElement('section');
@@ -411,6 +446,7 @@ function appendFieldFromPicker(pane) {
   bindFieldEditor(editor);
 }
 
+document.getElementById('open-applied').addEventListener('click', () => openApplied());
 document.getElementById('open-basic-info').addEventListener('click', () => openBasic());
 document.getElementById('open-module').addEventListener('click', () => openModuleList({
   type: 'element',
@@ -420,7 +456,9 @@ document.getElementById('open-module').addEventListener('click', () => openModul
 identity.addEventListener('click', showOverview);
 
 const initialParams = new URLSearchParams(location.search);
-if (initialParams.get('section') === 'module') {
+if (initialParams.get('section') === 'applied') {
+  openApplied(false);
+} else if (initialParams.get('section') === 'module') {
   const type = initialParams.get('type') || 'field';
   openModuleList(currentModuleState(type), false).then(async () => {
     if (initialParams.get('field_edit')) await openFieldDetail(`/mypage/interfaces/manage/fields/${initialParams.get('field_edit')}/edit/`);

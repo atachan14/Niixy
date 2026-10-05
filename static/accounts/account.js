@@ -61,7 +61,7 @@ profileStack.onRetain = (stage) => {
 
 function updateAccountNavigation() {
   const isPaneOpen = !profileStack.is('overview');
-  const label = {'account-if': 'AccountIF', people: 'People', response: 'Response', room: 'Room', module: 'Module'}[activePane] || 'Thread';
+  const label = {'account-if': 'Applied', people: 'People', response: 'Response', room: 'Room', module: 'Module'}[activePane] || 'Thread';
   accountListTitle.textContent = `${label}一覧`;
   accountIdentity.disabled = !isPaneOpen;
 }
@@ -133,7 +133,9 @@ function openPane(pane, query = '', shouldUpdateUrl = true) {
   loadPane(pane, query);
 }
 
-function openStaticFeature(pane, stage, shouldUpdateUrl = true) {
+let appliedRequestId = 0;
+async function openStaticFeature(pane, stage, shouldUpdateUrl = true) {
+  const request = ++appliedRequestId;
   NiixyWorkspaceTrail.clear();
   removeProfileModule();
   resetThreadDetail();
@@ -143,6 +145,15 @@ function openStaticFeature(pane, stage, shouldUpdateUrl = true) {
   profileStack.set(stage);
   updateAccountNavigation();
   if (shouldUpdateUrl) updateUrl(new URLSearchParams({pane}));
+  if (pane === 'account-if') {
+    const container = document.querySelector('[data-account-applied-container]');
+    container.innerHTML = '<p class="empty">読み込み中...</p>';
+    try {
+      const content = await NiixyUI.fetchFragment(accountPage.dataset.appliedUrl, '.applied-list-content');
+      if (request !== appliedRequestId || activePane !== pane || !profileStack.is(stage)) return;
+      container.replaceChildren(content); NiixyUI.bindTabs(container);
+    } catch { if (request === appliedRequestId && activePane === pane) renderPaneError(container); }
+  }
 }
 
 function moduleStateFromParams(params = new URLSearchParams(window.location.search)) {
@@ -479,10 +490,7 @@ document.getElementById('close-account-thread-detail').addEventListener('click',
 document.getElementById('close-account-room-list').addEventListener('click', closePane);
 document.getElementById('close-account-room-detail').addEventListener('click', () => closeAccountRoomDetail());
 document.getElementById('close-account-if-list').addEventListener('click', closePane);
-document.getElementById('close-account-if-detail').addEventListener('click', () => {
-  profileStack.set('account-if-list');
-  updateUrl(new URLSearchParams({pane: 'account-if'}));
-});
+
 document.getElementById('close-people-list').addEventListener('click', closePane);
 
 paneContainer.addEventListener('click', (event) => {
@@ -611,3 +619,9 @@ if (['thread', 'response'].includes(initialParams.get('pane'))) {
 }
 
 document.documentElement.classList.remove('has-restored-account-thread-pane');
+
+document.querySelector('[data-account-applied-container]').addEventListener('focusin', (event) => {
+  const tab = event.target;
+  if (!tab.matches('[data-ui-tab]')) return;
+  requestAnimationFrame(() => { if (activePane === 'account-if' && document.activeElement === tab) profileStack.align(); });
+});

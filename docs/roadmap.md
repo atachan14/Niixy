@@ -181,6 +181,16 @@ Status: Complete (local implementation / focused verification)
 
 ---
 
+## v0.12 - Account Applied
+
+Status: Complete (local implementation / focused verification)
+
+MyPageでAccountへ直接Field／AccountIFを適用・値編集・取外しできるようにし、公開AccountPageのApplied一覧にField／AccountIFを表示する。固定版とAccount内共有Valueを扱い、Value更新日時で一覧を並べる。Moduleと将来ProfileLayout欄は別機能として維持する。
+
+詳細: [v0.12要件](v0.12/requirements.md)。schema migration 0007は共有Neonへ適用済み。公開版の確認結果は別途確認する。
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。

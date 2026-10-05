@@ -9,7 +9,7 @@
 
 {% block content %}
 <script>if (['account-if', 'people', 'thread', 'response', 'room', 'module'].includes(new URLSearchParams(location.search).get('pane'))) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
-<section class="account-page" data-account-id="{{ account.username }}" data-room-pane-url="{% url 'accounts:room-pane' account.username %}" data-room-detail-template="{% url 'rooms:pane' 0 %}" data-module-pane-url="{% url 'accounts:module-pane' account.username %}" data-module-field-detail-template="{% url 'accounts:module-field-detail' account.username 0 %}" data-module-interface-detail-template="{% url 'accounts:module-interface-detail' account.username 0 %}">
+<section class="account-page" data-account-id="{{ account.username }}" data-room-pane-url="{% url 'accounts:room-pane' account.username %}" data-room-detail-template="{% url 'rooms:pane' 0 %}" data-applied-url="{% url 'accounts:applied' account.username %}" data-module-pane-url="{% url 'accounts:module-pane' account.username %}" data-module-field-detail-template="{% url 'accounts:module-field-detail' account.username 0 %}" data-module-interface-detail-template="{% url 'accounts:module-interface-detail' account.username 0 %}">
   <header class="account-page-header"><h1><button id="account-page-identity" type="button" disabled>{{ account.niixy_profile.display_label }}</button><span> のプロフィール</span></h1></header>
   <div class="account-workspace">
     <div class="account-track ui-workspace-track">
@@ -33,16 +33,13 @@
           <aside class="ui-detail-pane account-room-detail-pane" aria-label="Room詳細"><header class="ui-pane-header ui-detail-pane-header account-room-detail-header"><h2 id="account-room-detail-title"></h2><button id="close-account-room-detail" class="icon-button" type="button" aria-label="Room一覧に戻る">×</button></header><div data-account-room-detail-container><p class="account-thread-detail-empty">Roomを選択してください。</p></div></aside>
         </div>
       </section>
-      <section class="account-static-workspace ui-feature-workspace" aria-label="AccountIF" data-ui-feature-workspace="account-if" hidden>
+      <section class="account-static-workspace ui-feature-workspace" aria-label="Applied" data-ui-feature-workspace="account-if" hidden>
         <div class="account-static-track">
-          <section id="account-if-list-pane" class="ui-list-pane account-static-list-pane" aria-label="実装済みAccountIF一覧">
-            <header class="ui-pane-header ui-list-pane-header"><h2>AccountIF一覧</h2><button id="close-account-if-list" class="icon-button" type="button" aria-label="Profileに戻る">×</button></header>
-            <div class="account-static-column"><div class="ui-summary-list"><p class="empty">未実装</p></div></div>
+          <section id="account-if-list-pane" class="ui-list-pane account-static-list-pane" aria-label="Applied一覧">
+            <header class="ui-pane-header ui-list-pane-header"><h2>Applied一覧</h2><button id="close-account-if-list" class="icon-button" type="button" aria-label="Profileに戻る">×</button></header>
+            <div class="account-static-column" data-account-applied-container></div>
           </section>
-          <aside id="account-if-detail-pane" class="ui-detail-pane account-static-detail-pane" aria-label="実装済みAccountIF詳細">
-            <header class="ui-pane-header ui-detail-pane-header account-thread-detail-header"><h2></h2><button id="close-account-if-detail" class="icon-button" type="button" aria-label="AccountIF一覧に戻る">×</button></header>
-            <p class="account-thread-detail-empty">AccountIFを選択してください。</p>
-          </aside>
+
         </div>
       </section>
       <section class="account-static-workspace ui-feature-workspace" aria-label="People" data-ui-feature-workspace="people" hidden>
@@ -69,4 +66,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261005-v10"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261005-v12"></script>{% endblock %}

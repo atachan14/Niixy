@@ -1,0 +1,42 @@
+# v0.12 - Account Applied
+
+Status: Complete (local implementation / focused verification)
+
+## 操作と公開範囲
+
+MyPageで本人Accountへ直接Field／AccountIFを追加し、値を編集・取り外しできる。公開AccountPageの左上導線は「Applied」、Pane見出しは「Applied一覧」。Field／AccountIFの既存形式タブで適用済み情報と値を表示する。本人がAccountPageを見る場合も閲覧のみ。作成・保存したMod定義を扱う「Module」と下部の将来ProfileLayout欄は別機能のまま維持する。項目はすべて公開し、項目別権限は後回し。
+
+直接Fieldは追加時の最新公開FieldVersionに固定。AccountIFは最新公開InterfaceVersionに固定し、そのIFの公開FieldVersionを使用する。新規IF適用は既存Threadと同様に依存Fieldの最新版整合を検証する。既に適用された版と値は定義更新・soft deleteで変更しない。値編集は適用中の固定版で検証する。
+
+直接Fieldは必須、IF内Fieldは固定版のrequiredに従う。同じdirect definition／同じAccountIFの重複適用を拒否する。directとIF経由の同一Field・片同義はAccount内Valueを共有し、他Account／ThreadのValueとは分離する。
+
+## Applied一覧と更新日時
+
+FieldタブはIF由来も含む適用済みFieldを表示し、同一FieldDefinitionの複数参照は1件にまとめる。代表は残る適用の最初の固定版、参照追加で既存Bindingの初回順を変更しない。片同義の別definitionを表示上の同一Fieldにはまとめない。IF所属によるgroup分けは行わない。
+
+Field一覧はAccountFieldValue.updated_atの新しい順。同SummaryItemにそのValue更新日時を表示し、定義更新日時は使わない。同じ共有Valueの関連Fieldは同じ更新日時と値を持つ。参照追加・無変更保存・再描画でValue更新日時を変更しない。
+
+AccountIF一覧は参照するValue.updated_atの最大日時の新しい順。同SummaryItemもその最大日時を表示する。値がないIFは適用日時をfallbackとする。IF内部Field順は固定版定義順を維持する。
+
+## 値編集・取外し・統合
+
+編集画面では他の具体的なField／IF参照がある場合、入力欄下に「InterfaceB、InterfaceCと共有されています。」形式の短い補助textを表示する。現在編集中IFを共有先に重複列挙しない。名称はescapeし、通常の保存は確認modalなしで関連項目へ反映する。
+
+Field単独取外しはdirect参照だけを外す。IF由来のみのFieldはIF全体の取外しで除去し、固定IF構成を部分変更しない。他の適用参照が残るBinding／Value／表示を消さない。最後の参照がなくなったBinding／Valueだけを除去する。
+
+[Vision](../vision/interfaces.md#field-と片同義)に従い、片同義で異なる既存Valueを統合する場合はAccountへ最初に実装されたFieldのValueを残す。変更前後を保存前に表示し、署名付きpreview確認後に統合する。tokenはAccount・payload・固定版・現Value状態に紐付け、並行変更後の古い確認や改ざんでは保存しない。固定版の型／選択制約が両立しない場合は自動解決せず拒否する。
+
+## 保存とmigration計画
+
+Account行lockとtransactionで追加・編集・取外しを行う。Guest／他Accountの変更を拒否し、不正入力・共有値に矛盾する編集・制約衝突では半端な適用やValueを残さない。二重送信・失敗時入力保持・破棄後の遅い応答を考慮する。
+
+interfacesのschema migration 0007はAccountFieldValue、AccountFieldBinding、AccountDirectField、AccountInterfaceImplementation、AccountInterfaceValueの5新テーブルとFK／一意制約を追加する。公開version参照はPROTECT。既存データ移行・backfill・既存テーブル値変更は不要。2026-10-05に共有Neonへ適用し、通常runserverを明示的に再起動した。
+
+Version更新／履歴UI／Template／Layout／Account条件による検索認可／投稿Snapshotは対象外。広域QAは後回しとし、認可・Account分離・原子性・統合確認・timestampと代表PC/mobileを直接検証する。
+
+## 完了確認（2026-10-05）
+
+- `manage.py test interfaces.tests_account_applications scripts.account_applied_browser_tests --noinput`: 隔離SQLiteで18件成功。共有値編集Paneの展開・右端位置と、Fieldを持たないAccountIFの保存不可・取り外し可能を含む。
+- 共有Neonでの`migrate --plan`は適用前に0007のみ、適用後に未適用なし。既存データを使ったテスト投稿・設定変更は実施していない。
+- 通常runserverは単一の親子プロセスとして再起動し、公開AccountPageのGETで更新済みassetの配信を確認した。公開デプロイ自体の確認はこの記録に含めない。
+- 通常runserverへのGETとPane操作だけを行う`browser_smoke.py`はPC・スマートフォンともに成功し、警告・ブラウザエラーはなかった。スクリーンショットのWorkspace配置も確認した。
