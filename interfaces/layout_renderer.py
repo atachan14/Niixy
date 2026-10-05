@@ -19,13 +19,18 @@ VOID = {'br', 'hr'}
 ALIAS = re.compile(r'[A-Za-z][A-Za-z0-9_]{0,31}\Z')
 CLASS = re.compile(r'[A-Za-z][A-Za-z0-9_-]{0,47}\Z')
 BINDING = re.compile(r'\{\{\s*([A-Za-z][A-Za-z0-9_]*)\.(name|value)\s*\}\}')
+MAX_BINDINGS = 128
+MAX_DOCUMENT_BYTES = 256 * 1024
+MAX_BINDING_BYTES = 64 * 1024
+OMISSION = '［表示上限のため省略］'
+OMISSION_BYTES = len(OMISSION.encode('utf-8'))
 
 
 def fail(message):
     raise ValidationError(message)
 
 
-def text_binding(text, items, *, values=None):
+def text_binding(text, items):
     out, end = [], 0
     for match in BINDING.finditer(text):
         literal = text[end:match.start()]
@@ -35,21 +40,68 @@ def text_binding(text, items, *, values=None):
         if alias not in items:
             fail(f'変数「{alias}」のItemがありません。RequireからItemを追加してください。')
         out.append(escape(literal))
-        out.append(escape(str(values[alias][part])) if values is not None else match.group())
+        # Keep references separate until the whole document's static structure
+        # and omission markers have been reserved. Never expand unbounded values.
+        out.append((alias, part, match.group()))
         end = match.end()
     literal = text[end:]
     if any(s in literal for s in ('{{', '}}', '{%', '%}')):
         fail('HTMLの変数は {{変数名.name}} / {{変数名.value}} で書いてください。')
     out.append(escape(literal))
-    return ''.join(out)
+    return out
+
+
+def utf8_size(text):
+    try:
+        return len(text.encode('utf-8'))
+    except UnicodeEncodeError:
+        fail('HTML / CSSの文字を確認してください。UTF-8で表示できる文字を使ってください。')
+
+
+def bounded_escape(value, limit):
+    """Escape at most limit bytes, without slicing an entity or Unicode character."""
+    tokens, size = [], 0
+    for char in str(value):
+        # A legacy JSON string can contain an isolated surrogate. Keep the
+        # response valid UTF-8 rather than emitting an invalid code point.
+        token = escape('\ufffd' if 0xD800 <= ord(char) <= 0xDFFF else char)
+        cost = utf8_size(token)
+        if size + cost > limit:
+            while size > limit - OMISSION_BYTES:
+                size -= utf8_size(tokens.pop())
+            return ''.join(tokens) + OMISSION
+        tokens.append(token)
+        size += cost
+    return ''.join(tokens)
+
+
+def render_parts(parts, values, budget):
+    remaining = budget - sum(utf8_size(p) for p in parts if isinstance(p, str))
+    references = sum(isinstance(p, tuple) for p in parts)
+    # Reserve every tag/literal and one readable marker per reference up front.
+    # Even at the total limit, all later structure and closing tags survive.
+    if remaining < references * OMISSION_BYTES:
+        fail('HTML / CSSの表示構造が大きすぎます。文字やselectorを減らしてください。表示全体は256KiB以内です。')
+    output = []
+    for part in parts:
+        if isinstance(part, str):
+            output.append(part)
+            continue
+        alias, member, _ = part
+        references -= 1
+        limit = min(MAX_BINDING_BYTES, remaining - references * OMISSION_BYTES)
+        rendered = bounded_escape(values[alias][member], limit)
+        remaining -= utf8_size(rendered)
+        output.append(rendered)
+    return ''.join(output)
 
 
 class LayoutHTML(HTMLParser):
-    def __init__(self, items, values=None):
+    def __init__(self, items):
         super().__init__(convert_charrefs=False)
-        self.items, self.values = items, values
+        self.items = items
         self.output, self.stack = [], []
-        self.nodes = 0
+        self.nodes, self.references = 0, 0
 
     def handle_starttag(self, tag, attrs):
         self.nodes += 1
@@ -85,7 +137,11 @@ class LayoutHTML(HTMLParser):
     def handle_data(self, data):
         if '<' in data:
             fail('HTMLのタグ構文を確認してください。文字としての < は &lt; と書いてください。')
-        self.output.append(text_binding(data, self.items, values=self.values))
+        parts = text_binding(data, self.items)
+        self.references += sum(isinstance(p, tuple) for p in parts)
+        if self.references > MAX_BINDINGS:
+            fail('HTMLの変数参照はname / valueを合わせて128個以内にしてください。')
+        self.output.extend(parts)
 
     def handle_entityref(self, name):
         self.output.append(escape(unescape('&' + name + ';')))
@@ -106,15 +162,23 @@ class LayoutHTML(HTMLParser):
         fail('HTML宣言は使用できません。')
 
 
-def html_fragment(source, items, values=None):
+def html_parts(source, items):
     if not isinstance(source, str) or len(source) > 20000 or '\x00' in source:
         fail('HTMLは20,000文字以内で書いてください。')
-    parser = LayoutHTML(items, values)
+    utf8_size(source)
+    parser = LayoutHTML(items)
     parser.feed(source)
     parser.close()
     if parser.stack:
         fail(f'HTMLの <{parser.stack[-1]}> を閉じてください。')
-    return ''.join(parser.output)
+    return parser.output
+
+
+def html_fragment(source, items, values=None):
+    parts = html_parts(source, items)
+    if values is None:
+        return ''.join(p if isinstance(p, str) else p[2] for p in parts)
+    return render_parts(parts, values, MAX_DOCUMENT_BYTES)
 
 
 ENUMS = {
@@ -241,6 +305,7 @@ def selectors(tokens):
 def stylesheet(source, scope=None):
     if not isinstance(source, str) or len(source) > 10000:
         fail('CSSは10,000文字以内で書いてください。')
+    utf8_size(source)
     # CSS parsers repair EOF by implicitly closing blocks. This authoring language
     # instead reports malformed source. Strings/comments are outside its grammar,
     # so delimiter validation is unambiguous; the parser still validates all tokens.
@@ -287,7 +352,7 @@ def stylesheet(source, scope=None):
 
 
 def render_document(html, css, items, values):
-    content = html_fragment(html, items, values)
+    parts = html_parts(html, items)
     scope = 'niixy-layout-' + uuid.uuid4().hex
     # No size containment or forced height: content contributes its natural height.
     # Shadow DOM/containment are layout defenses, not the script security boundary.
@@ -295,4 +360,7 @@ def render_document(html, css, items, values):
     style = ':host{all:initial;display:block;contain:layout style paint;isolation:isolate;min-width:0;max-width:100%;color:#202027;background:#fff;font:16px/1.5 sans-serif}'
     style += f'.{scope}{{box-sizing:border-box;width:100%;padding:16px;overflow-wrap:anywhere}}.{scope} *{{box-sizing:border-box;max-width:100%;min-width:0}}'
     style += stylesheet(css, scope)
-    return '<div data-account-layout-surface><template><style>' + style + '</style><div class="' + scope + '">' + content + '</div></template></div>'
+    opening = '<div data-account-layout-surface><template><style>' + style + '</style><div class="' + scope + '">'
+    closing = '</div></template></div>'
+    content = render_parts(parts, values, MAX_DOCUMENT_BYTES - utf8_size(opening) - utf8_size(closing))
+    return opening + content + closing

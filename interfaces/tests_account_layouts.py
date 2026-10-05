@@ -1,5 +1,6 @@
 import copy
 import json
+from html.parser import HTMLParser
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -10,7 +11,8 @@ from .models import AccountLayoutDraft, AccountLayoutApplication, InterfaceDraft
 from .services import publish_field_definition, publish_draft
 from .account_applications import change_application, MergeConfirmationRequired
 from . import account_layouts as layouts
-from .layout_renderer import html_fragment, stylesheet, render_document
+from .layout_renderer import (html_fragment, stylesheet, render_document,
+                              MAX_DOCUMENT_BYTES, MAX_BINDING_BYTES, OMISSION)
 
 
 class AccountLayoutTests(TestCase):
@@ -108,6 +110,40 @@ class AccountLayoutTests(TestCase):
         self.assertIn('&lt;img', output); self.assertNotIn('<img', output)
         self.assertIn('サンプル値', layouts.preview(self.other, self.payload)['document'])
 
+    def test_giant_values_are_omitted_in_preview_and_profile_without_db_changes(self):
+        value = '&猫😀<script>' * 25000
+        self.apply_if(value)
+        before = list(AccountFieldValue.objects.values_list('pk', 'value', 'updated_at'))
+        payload = copy.deepcopy(self.payload)
+        payload['html'] = '<section>' + '<p>{{blood.value}}</p>' * 128 + '<p>末尾を保持</p></section>'
+        preview = layouts.preview(self.owner, payload)['document']
+        version = self.publish(payload)
+        layouts.apply_layout(self.owner, version.layout_id)
+        profile = layouts.profile_context(self.owner)['account_layout_document']
+        for document in (preview, profile):
+            self.assertLessEqual(len(document.encode('utf-8')), MAX_DOCUMENT_BYTES)
+            self.assertEqual(document.count(OMISSION), 128)
+            self.assertIn('<p>末尾を保持</p></section>', document)
+            self.assertNotIn('<script>', document)
+        self.assertEqual(list(AccountFieldValue.objects.values_list('pk', 'value', 'updated_at')), before)
+        self.assertContains(self.client.get(reverse('accounts:detail', args=[self.owner.username])), OMISSION)
+
+    def test_binding_count_is_checked_by_preview_and_publication(self):
+        payload = copy.deepcopy(self.payload)
+        payload['html'] = '<p>{{blood.name}}{{blood.value}}</p>' * 64
+        draft = AccountLayoutDraft.objects.create(creator=self.owner)
+        token = layouts.preview(self.owner, payload)['token']
+        payload['html'] += '<p>{{blood.value}}</p>'
+        with self.assertRaisesMessage(ValidationError, '128個以内'):
+            layouts.preview(self.owner, payload)
+        with self.assertRaisesMessage(ValidationError, '128個以内'):
+            layouts.save_draft(self.owner, draft.pk, payload, publish=True, token=token)
+        self.assertFalse(self.owner.account_layouts.exists())
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse('interfaces:layout-draft-save', args=[draft.pk]), json.dumps({'operation': 'preview', 'layout': payload}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('128個以内', response.json()['error'])
+
     def test_invalid_aliases_items_and_unknown_bindings(self):
         for items in [[{'alias': 'blood', 'field_id': self.field.pk}]*2, [{'alias': '9bad', 'field_id': self.field.pk}], [{'alias': 'blood', 'field_id': 99999}]]:
             with self.subTest(items=items), self.assertRaises(ValidationError):
@@ -159,6 +195,82 @@ class AccountLayoutTests(TestCase):
 
 
 class LayoutRendererSecurityTests(TestCase):
+    class DocumentAudit(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack, self.errors, self.paragraphs = [], [], []
+
+        def handle_starttag(self, tag, attrs):
+            if tag not in {'br', 'hr'}:
+                self.stack.append(tag)
+            if tag == 'p':
+                self.paragraphs.append('')
+
+        def handle_endtag(self, tag):
+            if not self.stack or self.stack.pop() != tag:
+                self.errors.append(tag)
+
+        def handle_data(self, data):
+            if self.stack and self.stack[-1] == 'p':
+                self.paragraphs[-1] += data
+
+    def audit(self, document):
+        parser = self.DocumentAudit()
+        parser.feed(document)
+        parser.close()
+        self.assertEqual(parser.errors, [])
+        self.assertEqual(parser.stack, [])
+        self.assertEqual(document.encode('utf-8').decode('utf-8'), document)
+        return parser
+
+    def test_individual_limit_preserves_unicode_and_entity_boundaries(self):
+        value = '猫😀&<>\"\'' * 20000
+        document = render_document('<p>{{x.value}}</p>', '', {'x'}, {'x': {'value': value}})
+        paragraph = self.audit(document).paragraphs[0]
+        self.assertTrue(paragraph.endswith(OMISSION))
+        self.assertTrue(value.startswith(paragraph[:-len(OMISSION)]))
+        fragment = document[document.index('<p>') + 3:document.index('</p>')]
+        self.assertLessEqual(len(fragment.encode('utf-8')), MAX_BINDING_BYTES)
+        self.assertGreater(len(fragment.encode('utf-8')), MAX_BINDING_BYTES - 8)
+        self.assertIn('&amp;', fragment)
+        self.assertNotIn('<script', document)
+        # Exact UTF-8 boundary fits without an unnecessary omission.
+        exact = render_document('<p>{{x.value}}</p>', '', {'x'}, {'x': {'value': '😀' * (MAX_BINDING_BYTES // 4)}})
+        self.assertNotIn(OMISSION, exact)
+
+    def test_total_limit_reserves_all_later_markup_and_markers(self):
+        source = '<section><h2>見出し</h2>' + '<p>{{x.value}}</p>' * 128 + '<p>末尾</p></section>'
+        document = render_document(source, '', {'x'}, {'x': {'value': '<&😀' * 250000}})
+        audit = self.audit(document)
+        self.assertLessEqual(len(document.encode('utf-8')), MAX_DOCUMENT_BYTES)
+        self.assertGreater(len(document.encode('utf-8')), MAX_DOCUMENT_BYTES - 8)
+        self.assertEqual(len(audit.paragraphs), 129)
+        self.assertEqual(document.count(OMISSION), 128)
+        self.assertEqual(audit.paragraphs[-2], OMISSION)
+        self.assertEqual(audit.paragraphs[-1], '末尾')
+
+    def test_scoped_css_and_static_structure_count_toward_total_budget(self):
+        css = ','.join(['.a'] * 3000) + '{color:red}'
+        source = '<p>' + "'" * 15000 + '{{x.value}}</p><p>末尾</p>'
+        document = render_document(source, css, {'x'}, {'x': {'value': '&' * 250000}})
+        self.audit(document)
+        self.assertLessEqual(len(document.encode('utf-8')), MAX_DOCUMENT_BYTES)
+        self.assertIn('<p>末尾</p>', document)
+        # Excess static markup is rejected before any dynamic expansion.
+        with self.assertRaisesMessage(ValidationError, '表示構造が大きすぎ'):
+            render_document("'" * 19980 + '{{x.value}}', ','.join(['.a'] * 3300) + '{color:red}', {'x'}, {'x': {'value': 'value'}})
+
+    def test_references_are_counted_across_text_nodes_and_unicode_values_are_safe(self):
+        html_fragment('<p>{{x.name}}{{x.value}}</p>' * 64, {'x'})
+        with self.assertRaisesMessage(ValidationError, '128個以内'):
+            html_fragment('<p>{{x.name}}{{x.value}}</p>' * 64 + '<span>{{x.name}}</span>', {'x'})
+        document = render_document('<p>{{x.value}}</p>', '', {'x'}, {'x': {'value': '\ud800<&'}})
+        self.assertEqual(self.audit(document).paragraphs, ['\ufffd<&'])
+        with self.assertRaisesMessage(ValidationError, 'UTF-8'):
+            html_fragment('<p>\ud800</p>', set())
+        with self.assertRaisesMessage(ValidationError, 'UTF-8'):
+            stylesheet('.\ud800{color:red}')
+
     def test_rejects_active_html_and_bad_structure(self):
         bad = ['<script>alert(1)</script>', '<img src="https://x">', '<svg><script /></svg>', '<iframe srcdoc="x"></iframe>',
             '<form><input></form>', '<a href="javascript:alert(1)">x</a>', '<embed>', '<object></object>',

@@ -21,6 +21,7 @@ AccountLayoutはRoomLayoutとは独立した型。Accountの適用はOneToOneで
 - CSSは公式PyPIの `tinycss2==1.5.1` で解析し、selector・property・value・function・nested ruleをallowlistで検証する。class / 要素名 / 子孫 / `>` / カンマselector、flex / grid、文字・背景・border色、余白、角丸、幅、高さ、generic fontなどを許可する。値は非負・上限付きpx/em/rem/%、grid用fr、列数上限付きrepeat/minmaxなど。色はCSS Color parserでも検証する。
 - @mediaはmin-width / max-widthの160〜2000pxに限定し、3段以内。@import / @font-face / URL / var / attr / expression / calc / pseudo / 属性selector / ID selector / 任意CSS入れ子 / custom property / position / transform / z-index / overflow / 負の余白 / viewport単位 / !importantは拒否する。文字列・コメントは今回は扱わず、閉じ括弧不正はCSS parserのEOF補完で黙って修復せずvalidationにする。
 - HTMLは20,000文字・300要素・20段、CSSは10,000文字・100 rule、Requireは種類ごと32件、Itemは32件、詳細は2,000文字。JSON requestは300KB以内。parser例外も入力エラーとして扱い、途中出力を表示しない。
+- HTMLのbinding参照はname / valueを合算して128個以内。プレビュー・公開validation共通で検査する。renderer document全体はescape後のUTF-8で256KiB以内、各bindingの表示は同じ基準で64KiB以内。巨大値は文字・HTML entityの途中で切らず、末尾へ「表示上限のため省略」を付ける。HTML/CSS、通常テキスト、全閉じタグと各参照の省略表示を先に予約し、総量が不足した後続参照は残量に応じたprefixまたは省略表示だけにする。構造自体が予約上限を超える入力は公開前にvalidationで拒否する。全Layoutの破棄・default切替は行わず、保存値・timestampは変更しない。巨大値を一括escape・連結してから切る処理もしない。この表示省略はユーザー承認済み。
 
 公開Profileとプレビューは同じrendererを使う。サーバー出力はtrusted templateに包み、Niixy自身の静的JSがShadow DOMへmountする。全user selectorに毎render異なるroot prefixを付ける。trusted hostは `contain: layout style paint` / `isolation: isolate`、size containmentと固定heightは使わず自然高さにする。長文は既存のAccount概要Paneのscrollで末尾まで読め、Profile内部へ別scrollを強制しない。
 
@@ -59,6 +60,8 @@ SQLiteでHTML/CSS攻撃、量・深さ・構文、binding、owner / CSRF、IF実
 Edgeの隔離LiveServerでPC1280px / mobile390pxの最小一周と、長文末尾、横溢れ、page / console error、外部requestなしを確認する。既存 `scripts/browser_smoke.py` も隔離LiveServerへ実行する。画像は `.artifacts/account-layout/` / `.artifacts/browser-smoke/` に保管しuntrackedのままにする。
 
 2026-10-05の実測: 新direct12件、追加migration保持1件、PC/mobile Layout browser1件、既存isolated smoke1件が成功。既存Interface/Account版基盤86件は85件成功と旧asset markerの個数assert1件を検出し、Applied JSそのもののmarkerを検査する形へ修正した当該1件も再実行成功。最後の変更箇所再実行（当該既存1件 + 新direct12件 + Layout browser1件）は14件成功。Draft保存/reload、Guest Module/Require readonly、Shadow DOM内外の文字色隔離を追加したbrowser再実行も成功。全領域testは行っていない。`makemigrations --check --dry-run` は追加差分なし、保護対象を除外した `git diff --check` も成功。
+
+表示上限の承認後、巨大値・escape増幅・反復参照・UTF-8/entity境界・総量到達後の閉じ構造/末尾/省略表示・CSS prefix出力量・過大な静的構造の拒否・128参照のAPI/公開validation・DB値/timestamp不変を6件追加した。追補の最終再実行はdirect18件 + PC/mobile Layout browser1件の19件が成功。desktop ProfileとmobileのProfile末尾画像も再確認した。制限以下の長文は従来どおり自然高さで表示する。
 
 通常serverはread-onlyにPID/親PID/path/command/starttimeを確認し、venv launcher30324 → base Python37964の1組、127.0.0.1:8000 listener owning37964を確認した。停止・追加起動・restartは行っていない。0009は共有Neon未適用。inboxは未読・未編集・stage除外、root READMEも不変更。
 
