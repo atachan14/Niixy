@@ -575,3 +575,39 @@ class AccountLayoutApplication(models.Model):
     account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='layout_application')
     version = models.ForeignKey(AccountLayoutVersion, on_delete=models.PROTECT, related_name='applications')
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class InterfaceList(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='interface_lists')
+    name = models.CharField(max_length=80)
+    submission_id = models.UUIDField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['owner', 'submission_id'], name='unique_interface_list_submission')]
+
+
+class InterfaceListReference(models.Model):
+    # Definition identity, never an applied version or a private Draft.
+    interface_list = models.ForeignKey(InterfaceList, on_delete=models.CASCADE, related_name='references')
+    target = models.ForeignKey(Interface, null=True, on_delete=models.SET_NULL, related_name='list_references')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [models.UniqueConstraint(fields=['interface_list', 'target'], name='unique_interface_list_reference')]
+
+
+class InterfaceRating(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='interface_ratings')
+    target = models.ForeignKey(Interface, on_delete=models.CASCADE, related_name='ratings')
+    sentiment = models.CharField(max_length=3, choices=[('fav', 'fav'), ('bad', 'bad')])
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['author', 'target'], name='unique_interface_rating'),
+            models.CheckConstraint(condition=models.Q(sentiment__in=['fav', 'bad']), name='interface_rating_sentiment'),
+        ]

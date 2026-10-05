@@ -33,7 +33,7 @@ def origin(value):
 
 
 def resolve_internal_url(request, value):
-    invalid = ValidationError('既知のNiixy AccountまたはAccountListの正規URLを入力してください。')
+    invalid = ValidationError('既知のNiixyコンテンツまたはListの正規URLを入力してください。')
     if not value or len(value) > 2048 or any(ord(char) < 33 for char in value) or '\\' in value:
         raise invalid
     try:
@@ -56,6 +56,23 @@ def resolve_internal_url(request, value):
             account_list = AccountList.objects.get(pk=match.kwargs['list_id'])
             path = reverse('accounts:list-page', args=[account_list.pk])
             target = InternalTarget('account-list', account_list, path)
+        elif match.view_name.startswith('references:'):
+            from .content_lists import get_target, list_query, route
+            name = match.view_name.removeprefix('references:')
+            if name in {'board-page', 'interface-page'}:
+                kind = name.removesuffix('-page')
+                instance = get_target(kind, match.kwargs['target_id'], request.user, require_view=False)
+                path = route(kind, 'page', instance.pk)
+                target = InternalTarget(kind, instance, path)
+            elif name in {'board-list-page', 'interface-list-page'}:
+                kind = name.removesuffix('-list-page')
+                instance = list_query(kind).filter(pk=match.kwargs['list_id']).first()
+                if instance is None:
+                    raise invalid
+                path = route(kind, 'list-page', instance.pk)
+                target = InternalTarget(kind + '-list', instance, path)
+            else:
+                raise invalid
         else:
             raise invalid
         if parts.path != path:

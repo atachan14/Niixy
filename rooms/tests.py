@@ -473,7 +473,7 @@ class RoomViewTests(TestCase):
         self.assertContains(response, 'data-account-selector-pane-template')
         self.assertContains(response, 'data-account-condition-list-url="/accounts/account-conditions/"')
         self.assertNotContains(response, 'id="room-account-condition-catalog"')
-        self.assertContains(response, 'accounts/account_conditions.js?v=20261005-v10')
+        self.assertContains(response, 'accounts/account_conditions.js?v=20261005-map-board-ui')
         self.assertContains(response, 'room.js?v=20261004-17')
 
     def test_board_policy_supports_and_groups_and_deny_precedence(self):

@@ -7,7 +7,7 @@
   <title>{% block title %}NiiMap{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'events/styles.css' %}?v=20261005-account-layout">
   <link rel="stylesheet" href="{% static 'accounts/reviews.css' %}?v=20261005-mute">
-  <link rel="stylesheet" href="{% static 'accounts/lists.css' %}?v=20261005-account-lists">
+  <link rel="stylesheet" href="{% static 'accounts/lists.css' %}?v=20261006-content-lists">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -64,9 +64,10 @@
   <script src="{% static 'rooms/forms.js' %}?v=20261005-v10"></script>
   <script src="{% static 'accounts/layouts.js' %}?v=20261005-account-layout"></script>
   <script src="{% static 'accounts/account_conditions.js' %}?v=20261005-map-board-ui"></script>
-  <script src="{% static 'shared/workspace_trail.js' %}?v=20261005-account-lists"></script>
+  <script src="{% static 'shared/workspace_trail.js' %}?v=20261006-content-lists"></script>
   <script src="{% static 'accounts/reviews.js' %}?v=20261005-account-lists"></script>
-  <script src="{% static 'accounts/lists.js' %}?v=20261005-account-lists"></script>
+  <script src="{% static 'accounts/lists.js' %}?v=20261006-content-lists"></script>
+  <script src="{% static 'shared/content_references.js' %}?v=20261006-content-lists"></script>
   {% block scripts %}{% endblock %}
   {% if not user.is_authenticated %}
     <script src="{% static 'accounts/auth.js' %}?v=20261003-1"></script>

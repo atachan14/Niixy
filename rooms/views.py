@@ -221,6 +221,10 @@ def room_boards(request, room_id=None, username=None):
             board.detail_url = _scope_url(room, 'board-threads', board.pk)
             result = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
             board.can_view = room.is_owner or result.allowed
+        from accounts.content_lists import describe_target
+        references = collection.references.select_related('target__placement__collection__room').prefetch_related('target__policy_conditions') if collection.account_id else []
+        muted = set(muted_account_ids(request.user))
+        collection.reference_summaries = [describe_target('board', ref.target, request.user) for ref in references if ref.target and ref.target.creator_id not in muted]
         collection.board_submission_id = uuid.uuid4()
         collection.board_policy_editor_rows = board_policy_editor_rows(
             Board(), room, conditions=default_board_policy_conditions(Board(), _scope_room(room), account=_scope_account(room)),
@@ -229,6 +233,7 @@ def room_boards(request, room_id=None, username=None):
     return render(request, 'rooms/partials/board_list.html', {
         **_scope_context(room),
         'collections': collections,
+        'rating_boards': _rated_boards(request, room) if username else {},
     })
 
 
@@ -496,3 +501,15 @@ def map_board_thread_detail(request, board_id, thread_id):
     # ThreadPolicy alone controls existing Thread reading and replies.
     prepare_thread_for_view(thread, request.user)
     return render(request, 'rooms/partials/thread_detail.html', {'thread': thread})
+
+
+def _rated_boards(request, account):
+    from accounts.content_lists import describe_target
+    from .models import BoardRating
+    muted = set(muted_account_ids(request.user))
+    rows = BoardRating.objects.filter(author=account).select_related('target__placement__collection__room').prefetch_related('target__policy_conditions').order_by('-updated_at', '-pk')
+    result = {'fav': [], 'bad': []}
+    for row in rows:
+        if row.target.creator_id not in muted:
+            result[row.sentiment].append(describe_target('board', row.target, request.user))
+    return result

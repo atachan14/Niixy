@@ -1,6 +1,7 @@
 window.NiixyWorkspaceTrail = (() => {
   function workspaceHost() {
     const candidates = [
+      ['.reference-page', '.reference-workspace', '.reference-track'],
       ['.thread-workspace', '.thread-workspace', '.thread-track'],
       ['.account-page', '.account-workspace', '.account-track'],
       ['.room-page', '.room-workspace', '.room-track'],
@@ -21,6 +22,8 @@ window.NiixyWorkspaceTrail = (() => {
     const url = new URL(anchor.href, location.origin);
     if (url.origin !== location.origin) return null;
     if (url.pathname === '/' && /^\d+$/.test(url.searchParams.get('board') || '') && !url.searchParams.has('room')) return {kind: 'board', id: url.searchParams.get('board'), pageUrl: url};
+    const referenceMatch = url.pathname.match(/^\/(boards|interfaces|board-lists|interface-lists)\/(\d+)\/$/);
+    if (referenceMatch) return {kind:'content-reference', pageUrl:url};
     let listMatch = url.pathname.match(/^\/accounts\/lists\/(\d+)\/$/);
     if (listMatch) return {kind:'account-list', id:listMatch[1], pageUrl:url};
     let match = url.pathname.match(/^\/accounts\/([^/]+)\/$/);
@@ -370,7 +373,7 @@ window.NiixyWorkspaceTrail = (() => {
     const boardEntry = trail.push({
       title: board.dataset.boardTitle,
       width: 'fixed',
-      url: childUrl(pageUrl, {...listParams, collection: board.dataset.boardCollection, board: board.dataset.openBoard}),
+      url: board.dataset.boardPageUrl || childUrl(pageUrl, {...listParams, collection: board.dataset.boardCollection, board: board.dataset.openBoard}),
       after: origin,
     });
     const boardUrl = board.dataset.boardUrl;
@@ -618,6 +621,7 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   async function openEntity(trail, entity, origin) {
+    if (entity.kind === 'content-reference') return window.NiixyContentReferences.open(entity.pageUrl, origin);
     if (entity.kind === 'account-list') return window.NiixyAccountLists.openDetail(entity.pageUrl, origin);
     if (entity.kind === 'board') return openMapBoard(entity.id, origin, entity.pageUrl.searchParams.get('thread'));
     const entry = trail.push({title: '読み込み中...', width: 'full', url: entity.pageUrl, after: origin});
@@ -657,6 +661,21 @@ window.NiixyWorkspaceTrail = (() => {
     return entry;
   }
 
+  function openReferenceBoard(boardId, origin, threadId = null, postNumber = null) {
+    const source = document.createElement('div');
+    source.dataset.mapBoard = 'true'; source.dataset.roomPageUrl = '/';
+    source.dataset.threadDetailTemplate = `/boards/${boardId}/references/threads/0/`;
+    const root = host.root;
+    for (const key of ['currentAccount','authenticated','accountConditionListUrl','accountConditionSaveUrl','accountConditionDeleteUrl','accountSearchUrl','accountConditionRoomSearchUrl']) source.dataset[key] = root.dataset[key] || '';
+    for (const id of ['thread-field-catalog-data','thread-interface-catalog-data','board-pane-field-catalog','room-pane-field-catalog','board-pane-interface-catalog','room-pane-interface-catalog']) {
+      const catalog = document.getElementById(id); if (catalog) source.append(catalog.cloneNode(true));
+    }
+    const board = {dataset:{openBoard:String(boardId), boardTitle:'Board', boardUrl:`/boards/${boardId}/reference/`, boardPageUrl:`/boards/${boardId}/`}};
+    return openBoardPane(trail, source, board, origin).then(entry => {
+      if (entry && /^\d+$/.test(threadId || '')) openThreadDetail(trail, source, threadId, postNumber, entry);
+      return entry;
+    });
+  }
   const host = workspaceHost();
   if (!host) return {clear() {}, open() {}, prepare() {}};
   const trail = create(host);
@@ -698,7 +717,7 @@ window.NiixyWorkspaceTrail = (() => {
     return entry;
   }
 
-  return {openContentPane, openReviewEditor, openMapBoard, openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
+  return {openReferenceBoard, openContentPane, openReviewEditor, openMapBoard, openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
     if (preserveUrl) history.replaceState(history.state, '', url);

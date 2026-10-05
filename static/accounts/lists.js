@@ -42,6 +42,7 @@ window.NiixyAccountLists = (() => {
   function patchSummaries(result) {
     if (!result.list_id) return;
     document.querySelectorAll(`[data-account-list-id="${result.list_id}"]`).forEach(item => {
+      if ((item.dataset.contentListKind || 'account') !== (result.kind || 'account')) return;
       if (result.deleted) { item.remove(); return; }
       if (result.name && item.matches('.account-list-summary')) item.querySelector('span').textContent = result.name;
       const count = item.querySelector('[data-list-count]');
@@ -54,7 +55,7 @@ window.NiixyAccountLists = (() => {
       }
     });
     if (result.deleted) document.querySelectorAll('[data-account-lists-index] .ui-summary-list, [data-account-list-picker] .ui-summary-list').forEach(list => {
-      if (!list.children.length) { const empty = document.createElement('p'); empty.className = 'empty'; empty.textContent = 'まだAccountListはありません。'; list.append(empty); }
+      if (!list.children.length) { const empty = document.createElement('p'); empty.className = 'empty'; empty.textContent = 'まだListはありません。'; list.append(empty); }
     });
   }
   async function load(entry, fetchUrl, {updateUrl = false} = {}) {
@@ -150,7 +151,7 @@ window.NiixyAccountLists = (() => {
     const entry = entries.get(root);
     const key = keyFor(form);
     if (!entry || locked || mutations.has(key)) return;
-    if (form.dataset.listOperation === 'delete' && !window.confirm('このListと参照を削除しますか？Account本体は残ります。')) return;
+    if (form.dataset.listOperation === 'delete' && !window.confirm(form.dataset.listConfirm || 'このListと参照を削除しますか？元のコンテンツは残ります。')) return;
     const pending = NiixyUI.beginPendingAction(event.submitter || form.querySelector('[type=submit]'));
     if (!pending) return;
     let finished;
@@ -192,5 +193,5 @@ window.NiixyAccountLists = (() => {
       controls.forEach((control,index) => { control.disabled = disabled[index]; }); pending.restore();
     }
   });
-  return {openIndex,openDetail,setLocked,hasDrafts:() => [...drafts.values()].some(draft => draft.dirty), isPending:() => mutations.size > 0};
+  return {open,openIndex,openDetail,setLocked,hasDrafts:() => [...drafts.values()].some(draft => draft.dirty), isPending:() => mutations.size > 0};
 })();

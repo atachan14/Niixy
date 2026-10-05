@@ -1,0 +1,7 @@
+{% if rating_url %}<section class="content-feedback" data-content-feedback data-content-kind="{{ kind }}" data-content-target="{{ target_id }}" data-content-sentiment="{{ sentiment }}" data-rating-url="{{ rating_url }}">
+  <form method="post" action="{{ rating_url }}" data-content-rating-form>{% csrf_token %}
+    <button class="button secondary" type="submit" value="fav" name="sentiment" data-content-rate="fav" aria-pressed="{% if sentiment == 'fav' %}true{% else %}false{% endif %}"{% if not can_rate %} disabled{% endif %}>fav</button><span aria-hidden="true">｜</span><button class="button secondary" type="submit" value="bad" name="sentiment" data-content-rate="bad" aria-pressed="{% if sentiment == 'bad' %}true{% else %}false{% endif %}"{% if not can_rate %} disabled{% endif %}>bad</button><span aria-hidden="true">｜</span><button class="button secondary" type="button" data-account-list-picker-url="{{ picker_url }}"{% if not can_rate %} disabled{% endif %}>追加</button>
+    <p class="account-list-error" role="alert" hidden></p>
+  </form>
+  <p class="content-rating-counts"><button type="button" data-reference-fetch="{{ ratings_url }}?sentiment=fav" data-reference-title="fav" data-content-count="fav">fav ({{ fav_count }})</button> · <button type="button" data-reference-fetch="{{ ratings_url }}?sentiment=bad" data-reference-title="bad" data-content-count="bad">bad ({{ bad_count }})</button> <small>公開評価</small></p>
+</section>{% endif %}

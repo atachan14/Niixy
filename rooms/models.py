@@ -70,6 +70,7 @@ class RoomMembership(models.Model):
 
 
 class Collection(models.Model):
+    list_submission_id = models.UUIDField(null=True, blank=True)
     name = models.CharField('Collection名', max_length=120)
     account = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -99,6 +100,7 @@ class Collection(models.Model):
                 ),
                 name='collection_has_one_container',
             ),
+            models.UniqueConstraint(fields=['account', 'list_submission_id'], name='unique_board_list_submission'),
             models.UniqueConstraint(
                 fields=['account'],
                 condition=models.Q(
@@ -221,4 +223,28 @@ class BoardPlacement(models.Model):
                 ),
                 name='valid_board_placement_target',
             ),
+        ]
+
+
+class BoardListReference(models.Model):
+    """A free reference; BoardPlacement remains the sole placement authority."""
+    board_list = models.ForeignKey(Collection, on_delete=models.CASCADE, related_name='references')
+    target = models.ForeignKey(Board, null=True, on_delete=models.SET_NULL, related_name='list_references')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [models.UniqueConstraint(fields=['board_list', 'target'], name='unique_board_list_reference')]
+
+
+class BoardRating(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='board_ratings')
+    target = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='ratings')
+    sentiment = models.CharField(max_length=3, choices=[('fav', 'fav'), ('bad', 'bad')])
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['author', 'target'], name='unique_board_rating'),
+            models.CheckConstraint(condition=models.Q(sentiment__in=['fav', 'bad']), name='board_rating_sentiment'),
         ]

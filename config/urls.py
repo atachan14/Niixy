@@ -22,6 +22,7 @@ from accounts import views as account_views
 urlpatterns = [
     path('mypage/', account_views.my_page, name='mypage'),
     path('mypage/interfaces/', include('interfaces.urls')),
+    path('', include('accounts.reference_urls')),
     path('accounts/', include('accounts.urls')),
     path('rooms/', include('rooms.urls')),
     path('', include('events.urls')),

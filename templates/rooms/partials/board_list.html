@@ -1,6 +1,6 @@
 <div class="room-collection-browser">
   {% if collections or board_is_owner or account_boards %}
-    <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="Collection一覧">
+    <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="BoardList一覧">
       {% for collection in collections %}
         <button class="{% if forloop.first %}is-active{% endif %}" type="button" role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" data-ui-tab="collection-{{ collection.pk }}" data-collection-id="{{ collection.pk }}">{{ collection.name }}</button>
       {% endfor %}
@@ -22,7 +22,8 @@
             <div class="room-collection-window-body">
               <section class="room-collection-information" data-collection-information-view>
                 <dl class="room-board-information-list">
-                  <div><dt>Collection名</dt><dd>{{ collection.name }}</dd></div>
+                  <div><dt>BoardList名</dt><dd>{{ collection.name }}</dd></div>
+                  {% if account_boards %}<div><dt>自由な参照</dt><dd><a href="{% url 'references:board-list-page' collection.pk %}">BoardListを開く</a></dd></div>{% endif %}
                   <div><dt>Board数</dt><dd>{{ collection.visible_boards|length }}</dd></div>
                 </dl>
               </section>
@@ -30,15 +31,15 @@
                 <section class="room-collection-editor" data-collection-editor hidden>
                   <form id="collection-edit-form-{{ collection.pk }}" class="room-collection-edit" action="{{ collection.edit_url }}" data-collection-action data-collection-action-kind="edit">
                     {% csrf_token %}
-                    <label><span>Collection名</span><input name="name" maxlength="120" value="{{ collection.name }}" required></label>
+                    <label><span>BoardList名</span><input name="name" maxlength="120" value="{{ collection.name }}" required></label>
                     <p class="room-form-error" hidden></p>
                   </form>
                   <div class="room-collection-edit-actions">
                     <button class="button primary" type="submit" form="collection-edit-form-{{ collection.pk }}" data-pending-label="保存中...">保存する</button>
-                    <form action="{{ collection.delete_url }}" data-collection-action data-collection-action-kind="delete" data-confirm-message="Collectionを削除しますか？配置されているBoardは未分類Collectionへ移動します。">
+                    <form action="{{ collection.delete_url }}" data-collection-action data-collection-action-kind="delete" data-confirm-message="BoardListを削除しますか？配置されているBoardは未分類BoardListへ移動します。">
                       {% csrf_token %}
                       <p class="room-form-error" hidden></p>
-                      <button class="button event-delete-button" type="submit" data-pending-label="削除中...">Collectionを削除する</button>
+                      <button class="button event-delete-button" type="submit" data-pending-label="削除中...">BoardListを削除する</button>
                     </form>
                   </div>
                 </section>
@@ -66,6 +67,7 @@
           </div>
         {% endif %}
 
+        {% if collection.reference_summaries %}<p>自由な参照</p>{% for summary in collection.reference_summaries %}{% include 'shared/content_summary.html' %}{% endfor %}<p>配置されているBoard</p>{% endif %}
         {% for board in collection.visible_boards %}
           <button class="ui-summary-item" type="button" data-open-board="{{ board.pk }}" data-board-title="{{ board.name }}" data-board-url="{{ board.detail_url }}" data-board-collection="{{ collection.pk }}" data-summary-kind="board">
             <span class="ui-summary-item-context"{% if board.can_view %} aria-hidden="true"{% endif %}>{% if not board.can_view %}閲覧不可{% endif %}</span>
@@ -78,23 +80,23 @@
       </div>
     </section>
   {% empty %}
-    <p class="empty">Collectionはありません。</p>
+    <p class="empty">BoardListはありません。</p>
   {% endfor %}
 
   {% if account_boards %}
-    <section class="ui-tab-panel room-collection-panel{% if not collections %} is-active{% endif %}" data-ui-tab-panel="fav"><div class="ui-summary-list"><p class="empty">未実装</p></div></section>
-    <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="bad"><div class="ui-summary-list"><p class="empty">未実装</p></div></section>
+    <section class="ui-tab-panel room-collection-panel{% if not collections %} is-active{% endif %}" data-ui-tab-panel="fav"><div class="ui-summary-list">{% for summary in rating_boards.fav %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">favはありません。</p>{% endfor %}</div></section>
+    <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="bad"><div class="ui-summary-list">{% for summary in rating_boards.bad %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">badはありません。</p>{% endfor %}</div></section>
   {% endif %}
 
   {% if board_is_owner %}
     <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="collection-management">
       <div class="room-collection-management">
         <details class="ui-control-accordion room-collection-create">
-          <summary>Collection作成</summary>
+          <summary>BoardList作成</summary>
           <div class="ui-control-accordion-body">
             <form action="{{ collection_create_url }}" data-collection-action data-collection-action-kind="create">
               {% csrf_token %}
-              <label>Collection名<input name="name" maxlength="120" required></label>
+              <label>BoardList名<input name="name" maxlength="120" required></label>
               <p class="room-form-error" hidden></p>
               <button class="button primary" type="submit" data-pending-label="作成中...">作成する</button>
             </form>
