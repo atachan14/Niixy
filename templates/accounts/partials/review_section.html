@@ -5,14 +5,19 @@
     <div class="review-actions">
       <button type="button" class="review-choice review-love" data-review-edit="love" aria-pressed="{% if own_review.sentiment == 'love' %}true{% else %}false{% endif %}" {% if not can_review %}disabled{% if not user.is_authenticated %} title="ログインが必要です"{% else %} title="自分のAccountにはReviewできません"{% endif %}{% endif %}>Love ({{ review_counts.love }})</button>
       <button type="button" class="review-choice review-hate" data-review-edit="hate" aria-pressed="{% if own_review.sentiment == 'hate' %}true{% else %}false{% endif %}" {% if not can_review %}disabled{% if not user.is_authenticated %} title="ログインが必要です"{% else %} title="自分のAccountにはReviewできません"{% endif %}{% endif %}>Hate ({{ review_counts.hate }})</button>
+      <form method="post" action="{% url 'accounts:mute-change' account.username %}" data-mute-form>{% csrf_token %}<input type="hidden" name="enabled" value="{{ own_mute|yesno:'false,true' }}"><button type="submit" class="review-choice review-mute" aria-pressed="{{ own_mute|yesno:'true,false' }}" {% if not can_review %}disabled title="{% if user.is_authenticated %}自分のAccountはMuteできません{% else %}ログインが必要です{% endif %}"{% endif %}>Mute</button></form>
     </div>
   </header>
-  <div class="ui-tabs review-tabs" role="tablist" aria-label="紹介文の種類">
+  <div class="ui-tabs review-tabs" role="tablist" aria-label="Reviewの種類">
     <button type="button" role="tab" data-review-tab="all" aria-selected="{% if review_filter == 'all' %}true{% else %}false{% endif %}" {% if review_filter == 'all' %}class="is-active"{% endif %}>全紹介文 ({{ review_counts.total }})</button>
     <button type="button" role="tab" data-review-tab="love" aria-selected="{% if review_filter == 'love' %}true{% else %}false{% endif %}" {% if review_filter == 'love' %}class="is-active"{% endif %}>Lover ({{ review_counts.love }})</button>
     <button type="button" role="tab" data-review-tab="hate" aria-selected="{% if review_filter == 'hate' %}true{% else %}false{% endif %}" {% if review_filter == 'hate' %}class="is-active"{% endif %}>Hater ({{ review_counts.hate }})</button>
+    <button type="button" role="tab" data-review-tab="muter" aria-selected="{% if review_filter == 'muter' %}true{% else %}false{% endif %}" {% if review_filter == 'muter' %}class="is-active"{% endif %}>Muter ({{ muter_count }})</button>
   </div>
-  <div class="review-list" role="tabpanel" aria-label="紹介文">
+  <div class="review-list" role="tabpanel" aria-label="{% if review_filter == 'muter' %}Muter{% else %}紹介文{% endif %}">
+    {% if review_filter == 'muter' %}
+      <div class="muter-list ui-summary-list">{% for mute in review_page %}<a class="muter-summary" data-muter-id="{{ mute.pk }}" href="{% url 'accounts:detail' mute.muter.username %}"><span>{{ mute.muter.niixy_profile.display_label }}</span><time datetime="{{ mute.created_at|date:'c' }}">{{ mute.created_at|date:'Y/m/d H:i' }}</time></a>{% empty %}<p class="empty">まだMuterはいません。</p>{% endfor %}</div>
+    {% else %}
     {% for review in review_page %}
       <article class="thread-post review-post" data-review-id="{{ review.pk }}">
         <div class="thread-post-layout-area">
@@ -24,10 +29,11 @@
         </div>
       </article>
     {% empty %}<p class="empty">まだ紹介文はありません。</p>{% endfor %}
+    {% endif %}
   </div>
   <div class="review-pagination">
     {% if review_expanded %}
-      {% if review_page.has_other_pages %}<nav class="thread-pagination" aria-label="紹介文のページ">{% if review_page.has_previous %}<button type="button" data-review-go-page="{{ review_page.previous_page_number }}">前へ</button>{% endif %}<span>{{ review_page.number }} / {{ review_page.paginator.num_pages }}</span>{% if review_page.has_next %}<button type="button" data-review-go-page="{{ review_page.next_page_number }}">次へ</button>{% endif %}</nav>{% endif %}
+      {% if review_page.has_other_pages %}<nav class="thread-pagination" aria-label="Review一覧のページ">{% if review_page.has_previous %}<button type="button" data-review-go-page="{{ review_page.previous_page_number }}">前へ</button>{% endif %}<span>{{ review_page.number }} / {{ review_page.paginator.num_pages }}</span>{% if review_page.has_next %}<button type="button" data-review-go-page="{{ review_page.next_page_number }}">次へ</button>{% endif %}</nav>{% endif %}
       <button type="button" data-review-collapse>畳む</button>
     {% elif review_page.has_next %}<button type="button" data-review-expand>もっと見る</button>{% endif %}
   </div>

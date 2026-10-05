@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db.models import Prefetch
 
+from accounts.mutes import prepare_muted_posts
 from interfaces.services import prepare_thread_fields
 
 from .models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
@@ -28,7 +29,7 @@ def thread_queryset():
     )
 
 
-def prepare_thread_for_view(thread, viewer):
+def prepare_thread_for_view(thread, viewer, muted_ids=None):
     view_policy = thread.evaluate_policy(viewer, ThreadAccessRule.VIEW)
     write_policy = thread.evaluate_policy(viewer, ThreadAccessRule.WRITE)
     thread.can_view = thread.allows(viewer, ThreadAccessRule.VIEW)
@@ -37,6 +38,12 @@ def prepare_thread_for_view(thread, viewer):
     thread.write_policy = write_policy
     thread.unmet_write_requirements = write_policy.unmet_allow_labels
     thread.matched_write_denials = write_policy.matched_deny_labels
+    if thread.can_view:
+        posts = thread.posts.all()
+        prepare_muted_posts(posts, viewer, muted_ids)
+        if not hasattr(thread, "_prefetched_objects_cache"):
+            thread._prefetched_objects_cache = {}
+        thread._prefetched_objects_cache["posts"] = posts
     return thread
 
 

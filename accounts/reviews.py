@@ -1,4 +1,5 @@
 """Public Account Reviews; only the author can change their one Review."""
+from django.views.decorators.cache import never_cache
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
@@ -9,7 +10,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import AccountReview
+from .models import AccountMute, AccountReview
 
 
 class ReviewIdentityForm(forms.Form):
@@ -35,23 +36,27 @@ def review_context(account, viewer, params=None):
         total=Count('pk'), love=Count('pk', filter=Q(sentiment=AccountReview.LOVE)),
         hate=Count('pk', filter=Q(sentiment=AccountReview.HATE)),
     )
+    muters = AccountMute.objects.filter(muted_account=account)
+    muter_count = muters.count()
+    own_mute = muters.filter(muter=viewer).exists() if viewer.is_authenticated else False
     own = reviews.filter(author=viewer).first() if viewer.is_authenticated else None
     kind = params.get('review_filter', 'all')
-    if kind not in {'all', AccountReview.LOVE, AccountReview.HATE}:
+    if kind not in {'all', AccountReview.LOVE, AccountReview.HATE, 'muter'}:
         kind = 'all'
-    filtered = reviews if kind == 'all' else reviews.filter(sentiment=kind)
+    filtered = muters.select_related('muter__niixy_profile') if kind == 'muter' else (reviews if kind == 'all' else reviews.filter(sentiment=kind)).select_related('author__niixy_profile')
     expanded = params.get('review_expanded') == '1'
-    page = Paginator(filtered.select_related('author__niixy_profile'), 10 if expanded else 3).get_page(
+    page = Paginator(filtered, 10 if expanded else (8 if kind == 'muter' else 3)).get_page(
         params.get('review_page') if expanded else 1,
     )
     return {
         'review_counts': counts, 'review_score': counts['love'] - counts['hate'],
-        'own_review': own, 'review_filter': kind, 'review_expanded': expanded,
+        'muter_count': muter_count, 'own_mute': own_mute, 'own_review': own, 'review_filter': kind, 'review_expanded': expanded,
         'review_page': page, 'can_review': viewer.is_authenticated and viewer.pk != account.pk,
     }
 
 
 @require_GET
+@never_cache
 def listing(request, username):
     account = target_account(username)
     return render(request, 'accounts/partials/review_section.html', {

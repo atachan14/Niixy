@@ -28,7 +28,7 @@ class ReviewMigrationTests(TransactionTestCase):
                     cursor.execute(f'SELECT * FROM {connection.ops.quote_name(table)} ORDER BY rowid')
                     rows[table] = cursor.fetchall()
             executor = MigrationExecutor(connection)
-            executor.migrate(latest)
+            executor.migrate([node for node in latest if node[0] != 'accounts'] + [('accounts', '0003_accountreview')])
             with connection.cursor() as cursor:
                 cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('django_migrations', 'accounts_accountreview') ORDER BY name")
                 self.assertEqual(cursor.fetchall(), schema)

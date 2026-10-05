@@ -400,3 +400,12 @@ Mapmarker、SummaryList、検索からBoard詳細／Thread作成／Responseま�
 状態: 採用
 
 Love / Hateは排他的で必須紹介文とセットにする。ログインAccountから他Accountへの一件に限定し、自己評価は禁止する。編集・削除は作者本人だけ、対象Accountには他者Reviewの削除権を付けない。Guestは閲覧のみ。紹介文削除で評価も消える。既存Reviewの評価変更は本文編集窓の保存時に確定し、Cancelでは変えない。初回は件数付き全紹介文 / Lover / Hater Tab、更新順、3件から10件のpaginationと畳むまで。Mute / MuterとAccountList、DMの送信条件、紹介文への評価は後続とする。[実装と公開手順](../account-review.md)に記録する。
+
+
+## 2026-10-05 - Muteは公開意思表示と本人の表示filter
+
+状態: 採用（Board作成者記録を将来判断としていた2026-10-04の部分を置換）
+
+MuteはReviewから独立した公開の意思表示で、紹介文不要。ログイン本人が他AccountをMute / 解除し、自己Muteは禁止する。AccountPageの公開Muterタブは対象をMuteしたAccountsの一行Summaryと件数を表示する。追加の公開警告は設けない。
+
+Thread creatorをMuteするとSummaryListから除外し、Response creatorをMuteすると本文をplaceholderと一時表示にする。Board creator、Room OwnerのMuteも一覧から除外し、NiiMap一覧・search・markerを同じfilterにする。MuteはACLを変更せず、権限のある直接URL利用を維持する。Board creatorは今後の実作成主体だけ記録し、unknown / Guestはnull、用途はMuteだけ、管理権を新設しない。[実装・migration・QA](../account-mute.md)。

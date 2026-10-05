@@ -1,13 +1,14 @@
 from django.urls import path
 
 from . import views
-from . import reviews
+from . import reviews, mutes
 from rooms import views as board_views
 from interfaces import layout_views
 
 app_name = 'accounts'
 
 urlpatterns = [
+    path('<str:username>/mute/', mutes.change, name='mute-change'),
     path('<str:username>/reviews/', reviews.listing, name='reviews'),
     path('<str:username>/reviews/editor/', reviews.editor, name='review-editor'),
     path('<str:username>/reviews/save/', reviews.save, name='review-save'),

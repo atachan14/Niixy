@@ -48,6 +48,26 @@ class AccountReview(models.Model):
             raise ValidationError('自分のAccountにはReviewできません。')
 
 
+class AccountMute(models.Model):
+    """Public intent, independent of Review; a viewer's display filter only."""
+    muter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='account_mutes')
+    muted_account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='account_muters')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [
+            models.UniqueConstraint(fields=['muter', 'muted_account'], name='unique_account_mute'),
+            models.CheckConstraint(condition=~models.Q(muter=models.F('muted_account')), name='account_mute_not_self'),
+        ]
+        indexes = [models.Index(fields=['muted_account', '-created_at', '-id'], name='account_mute_recent')]
+
+    def clean(self):
+        super().clean()
+        if self.muter_id == self.muted_account_id:
+            raise ValidationError('自分のAccountはMuteできません。')
+
+
 class AccountCondition(models.Model):
     DEFAULT = 'default'
     ACCOUNT = 'account'

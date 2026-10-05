@@ -112,6 +112,30 @@
       if (entry.pane.isConnected && error.name !== 'AbortError') NiixyUI.showPaneError(entry.body, error.message);
     }
   }
+  document.addEventListener('submit', async event => {
+    const form = event.target.closest('[data-mute-form]');
+    if (!form) return;
+    event.preventDefault();
+    const section = form.closest('[data-review-section]');
+    const button = form.querySelector('[type=submit]');
+    const key = keyFor(section);
+    if (mutations.has(key)) return;
+    const pending = NiixyUI.beginPendingAction(button);
+    if (!pending) return;
+    let resolveMutation;
+    mutations.set(key, new Promise(resolve => { resolveMutation = resolve; }));
+    try {
+      const response = await fetch(form.action, {method: 'POST', body: new FormData(form)});
+      if (!response.ok) throw new Error(await errorText(response));
+      // Re-fetch the current URL so every retained list, Response, and map
+      // marker agrees with the new viewer state, including an Unmute.
+      location.reload();
+    } catch (error) {
+      if (section.isConnected) showError(section, error.message || '通信に失敗しました。');
+    } finally {
+      mutations.delete(key); resolveMutation(); pending.restore();
+    }
+  });
   document.addEventListener('click', event => {
     const section = event.target.closest('[data-review-section]');
     if (!section) return;

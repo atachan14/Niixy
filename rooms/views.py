@@ -1,8 +1,9 @@
+from django.views.decorators.cache import never_cache
 import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Value, When
+from django.db.models import Q, Case, Count, IntegerField, Value, When
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -10,6 +11,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from events.idempotency import run_once, submission_id_from
+from accounts.mutes import filter_muted, muted_account_ids
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from events.services import prepare_thread_for_view, prepare_thread_modules, thread_queryset
 from events.policies import prepare_thread_policy, save_thread_policy, default_thread_policy_groups, thread_policy_editor_rows
@@ -139,6 +141,7 @@ def room_create(request):
     return JsonResponse({'redirect_url': reverse('rooms:detail', args=[room.pk]), 'room_id': room.pk})
 
 
+@never_cache
 def room_detail(request, room_id):
     room = _room(request, room_id)
     return render(request, 'rooms/room_page.html', {
@@ -148,6 +151,7 @@ def room_detail(request, room_id):
     })
 
 
+@never_cache
 def room_pane(request, room_id):
     return render(request, 'rooms/partials/room_pane.html', {
         'room': _room(request, room_id),
@@ -198,6 +202,7 @@ def room_members(request, room_id):
     return render(request, 'rooms/partials/member_list.html', {'room': room})
 
 
+@never_cache
 def room_boards(request, room_id=None, username=None):
     room = _board_scope(request, room_id, username)
     collections = list(_container_collections(room))
@@ -206,10 +211,10 @@ def room_boards(request, room_id=None, username=None):
         collection.delete_url = _scope_url(room, 'collection-delete', collection.pk)
         collection.board_create_url = _scope_url(room, 'board-create', collection.pk)
         collection.visible_boards = list(
-            Board.objects.filter(placement__collection=collection)
+            filter_muted(Board.objects.filter(placement__collection=collection), request.user)
             .select_related('placement__collection')
             .prefetch_related('policy_conditions')
-            .annotate(thread_count=Count('thread_placements'))
+            .annotate(thread_count=Count('thread_placements', filter=~Q(thread_placements__thread__creator_id__in=muted_account_ids(request.user))))
             .order_by('-last_activity_at', '-created_at')
         )
         for board in collection.visible_boards:
@@ -352,6 +357,7 @@ def board_delete(request, board_id, room_id=None, username=None):
     })
 
 
+@never_cache
 def board_threads(request, board_id, room_id=None, username=None):
     room = _board_scope(request, room_id, username)
     board = get_object_or_404(_container_boards(room), pk=board_id)
@@ -361,9 +367,10 @@ def board_threads(request, board_id, room_id=None, username=None):
     board.can_create_thread = board.can_view and create_policy.allowed
     threads = []
     if board.can_view:
-        board_threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.BOARD, placements__board=board))
+        board_threads = list(filter_muted(thread_queryset().filter(placements__kind=ThreadPlacement.BOARD, placements__board=board), request.user))
+        muted = set(muted_account_ids(request.user))
         for thread in board_threads:
-            prepare_thread_for_view(thread, request.user)
+            prepare_thread_for_view(thread, request.user, muted)
         threads = board_threads
     return render(request, 'rooms/partials/board_threads.html', {
         **_scope_context(room),
@@ -385,6 +392,7 @@ def board_threads(request, board_id, room_id=None, username=None):
     })
 
 
+@never_cache
 def room_thread_detail(request, room_id, thread_id):
     room = _room(request, room_id)
     thread = get_object_or_404(
@@ -446,6 +454,7 @@ def board_thread_create(request, board_id, room_id=None, username=None):
     })
 
 
+@never_cache
 def account_board_thread_detail(request, username, thread_id):
     account = _board_scope(request, username=username)
     thread = get_object_or_404(
@@ -480,6 +489,7 @@ def map_board_create(request):
     return JsonResponse({'board_id': board.pk, 'redirect_url': f'{reverse("events:map")}?board={board.pk}'})
 
 
+@never_cache
 def map_board_thread_detail(request, board_id, thread_id):
     board = get_object_or_404(_container_boards(None), pk=board_id)
     thread = get_object_or_404(thread_queryset().filter(placements__kind=ThreadPlacement.BOARD, placements__board=board), pk=thread_id)

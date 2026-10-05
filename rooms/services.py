@@ -66,7 +66,7 @@ def initialize_account_boards(account):
     """Called only for a newly created Account, never while browsing or saving it."""
     Collection.objects.create(account=account, name='未分類', is_uncategorized=True)
     main = Collection.objects.create(account=account, name='Main')
-    board = Board.objects.create(name='日記')
+    board = Board.objects.create(name='日記', creator=account)
     BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
     seed_board_policy(board, account=account)
 
@@ -210,7 +210,7 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
         main = Collection.objects.create(name='Main', room=room)
         Collection.objects.create(name='未分類', room=room, is_uncategorized=True)
         for board_name in ('お知らせ', '掲示板'):
-            board = Board.objects.create(name=board_name)
+            board = Board.objects.create(name=board_name, creator=owner)
             BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
             conditions = default_board_policy_conditions(board, room)
             if board_name == 'お知らせ':
@@ -246,6 +246,7 @@ def create_board(*, submission_id, name, collection=None, latitude=None, longitu
             target = Collection.objects.select_for_update().get(pk=collection.pk) if collection else None
             board = Board.objects.create(
                 submission_id=submission_id,
+                creator=actor if actor is not None and actor.is_authenticated else None,
                 name=name,
                 description=description,
             )

@@ -123,6 +123,8 @@ class Collection(models.Model):
 
 
 class Board(models.Model):
+    # Only Mute filtering uses creator; placement still determines management.
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='created_boards')
     submission_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField('Board名', max_length=120)
     description = models.TextField('詳細', blank=True, max_length=10000)

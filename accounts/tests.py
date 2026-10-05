@@ -312,7 +312,7 @@ class AccountPageTests(TestCase):
         self.assertContains(response, '>Love</button>')
         self.assertContains(response, '>Hate</button>')
         self.assertContains(response, 'account.js?v=20261005-account-layout')
-        self.assertContains(response, 'reviews.js?v=20261005-review')
+        self.assertContains(response, 'reviews.js?v=20261005-mute')
         self.assertContains(response, 'class="account-overview-content identity-overview-content"')
         self.assertContains(response, 'class="account-hero identity-overview-hero"')
         self.assertContains(response, '<h2>Review</h2>')

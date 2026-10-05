@@ -1,3 +1,4 @@
+from django.views.decorators.cache import never_cache
 import uuid
 import json
 from datetime import date
@@ -14,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from accounts.mutes import filter_muted, muted_account_ids
 from accounts.policies import account_condition_matches
 from interfaces.models import FieldType
 from interfaces.services import (
@@ -35,6 +37,7 @@ from .policies import prepare_thread_policy, save_thread_policy, default_thread_
 CAPABILITIES = (ThreadAccessRule.VIEW, ThreadAccessRule.WRITE)
 
 
+@never_cache
 def map_view(request):
     interface_catalog = thread_interface_catalog()
     field_catalog = thread_field_catalog()
@@ -42,14 +45,25 @@ def map_view(request):
     if request.user.is_authenticated:
         preference, _ = NiiMapFilterPreference.objects.get_or_create(user=request.user)
         search_state = preference.search_state
-    threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.NII_MAP).distinct())
-    rooms = list(Room.objects.select_related('owner__niixy_profile', 'placement'))
+    threads = list(filter_muted(thread_queryset().filter(placements__kind=ThreadPlacement.NII_MAP).distinct(), request.user))
+    rooms = list(filter_muted(Room.objects.select_related('owner__niixy_profile', 'placement'), request.user, 'owner_id'))
+    muted = set(muted_account_ids(request.user))
     for thread in threads:
-        prepare_thread_for_view(thread, request.user)
+        prepare_thread_for_view(thread, request.user, muted)
 
-    boards = list(Board.objects.filter(placement__kind=BoardPlacement.NII_MAP).select_related('placement').prefetch_related('policy_conditions'))
+    boards = list(filter_muted(Board.objects.filter(placement__kind=BoardPlacement.NII_MAP).select_related('placement').prefetch_related('policy_conditions'), request.user))
     for board in boards:
         board.can_view = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW).allowed
+
+    # A direct URL can still open a muted Thread, without putting it back in
+    # the SummaryList, search results, or marker data.
+    detail_threads = list(threads)
+    direct_id = request.GET.get('thread', '')
+    if direct_id.isascii() and direct_id.isdecimal() and len(direct_id) <= 19 and 0 < int(direct_id) <= 9223372036854775807 and not request.GET.get('board'):
+        direct = thread_queryset().filter(pk=int(direct_id), placements__kind=ThreadPlacement.NII_MAP).first()
+        if direct is not None and all(item.pk != direct.pk for item in detail_threads):
+            prepare_thread_for_view(direct, request.user)
+            detail_threads.append(direct)
 
     markers = []
     for thread in threads:
@@ -78,7 +92,7 @@ def map_view(request):
     ]
 
     return render(request, 'events/map.html', {
-        'threads': threads,
+        'threads': threads, 'detail_threads': detail_threads,
         'boards': boards,
         'board_markers': [
             {'id': board.pk, 'name': board.name, 'latitude': float(board.placement.latitude), 'longitude': float(board.placement.longitude)}
@@ -327,8 +341,8 @@ def thread_search(request):
     except ValidationError as error:
         return JsonResponse({'errors': error.message_dict}, status=400)
 
-    threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.NII_MAP).distinct())
-    rooms = list(Room.objects.select_related('owner', 'placement'))
+    threads = list(filter_muted(thread_queryset().filter(placements__kind=ThreadPlacement.NII_MAP).distinct(), request.user))
+    rooms = list(filter_muted(Room.objects.select_related('owner', 'placement'), request.user, 'owner_id'))
     include_creators = _terms(request.POST.get('creator_include', ''))
     exclude_creators = _terms(request.POST.get('creator_exclude', ''))
     include_words = _terms(request.POST.get('freeword_include', ''))
@@ -411,7 +425,8 @@ def thread_search(request):
     target_type = request.POST.get('target_type', 'all')
     filtered_rooms = []
     filtered_boards = []
-    # Board has no creator and no Field/Interface modules. Filter its own
+    # Board creator is used only for Mute, not general creator search.
+    # Board has no Field/Interface modules. Filter its own
     # metadata; do not expose hidden descriptions or search its child Threads.
     board_search_allowed = target_type in {'all', 'board'} and not (
         creator_include_groups or creator_exclude_groups or include_creators or exclude_creators
@@ -419,7 +434,7 @@ def thread_search(request):
         or request.POST.get('sort_kind') == 'field'
     )
     if board_search_allowed:
-        boards = Board.objects.filter(placement__kind=BoardPlacement.NII_MAP).select_related('placement').prefetch_related('policy_conditions')
+        boards = filter_muted(Board.objects.filter(placement__kind=BoardPlacement.NII_MAP).select_related('placement').prefetch_related('policy_conditions'), request.user)
         for board in boards:
             if updated_date:
                 board_date = board.last_activity_at.date()

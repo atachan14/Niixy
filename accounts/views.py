@@ -1,3 +1,4 @@
+from django.views.decorators.cache import never_cache
 import json
 
 from django.contrib import messages
@@ -15,6 +16,7 @@ from django.views.decorators.http import require_POST
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from events.services import prepare_thread_for_view, thread_queryset
 
+from .mutes import filter_muted, muted_account_ids, prepare_muted_posts
 from .forms import DisplayNameForm, LoginForm, SignUpForm
 from .models import AccountCondition, AccountProfile
 from .services import account_condition_catalog, condition_payload, save_account_condition
@@ -142,7 +144,7 @@ def logout_view(request):
 
 def prepare_threads(queryset, viewer):
     threads = list(
-        queryset.select_related('creator').prefetch_related(
+        filter_muted(queryset, viewer).select_related('creator').prefetch_related(
             'access_rules',
             'policy_conditions',
             Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
@@ -151,11 +153,13 @@ def prepare_threads(queryset, viewer):
             'interface_implementations__values__field',
         )
     )
+    muted = set(muted_account_ids(viewer))
     for thread in threads:
-        prepare_thread_for_view(thread, viewer)
+        prepare_thread_for_view(thread, viewer, muted)
     return threads
 
 
+@never_cache
 def account_page(request, username):
     from interfaces.account_layouts import profile_context
     from .reviews import review_context
@@ -169,6 +173,7 @@ def account_page(request, username):
     })
 
 
+@never_cache
 def account_pane(request, username):
     from interfaces.account_layouts import profile_context
     from .reviews import review_context
@@ -182,6 +187,7 @@ def account_pane(request, username):
     })
 
 
+@never_cache
 def account_thread_pane(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     created_threads = prepare_threads(Thread.objects.filter(creator=account).order_by('-created_at'), request.user)
@@ -192,10 +198,11 @@ def account_thread_pane(request, username):
     })
 
 
+@never_cache
 def account_response_pane(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     posts = list(
-        ThreadPost.objects.filter(creator=account, number__gt=1)
+        filter_muted(ThreadPost.objects.filter(creator=account, number__gt=1), request.user, 'thread__creator_id')
         .select_related('thread', 'creator__niixy_profile')
         .prefetch_related(
             'thread__access_rules',
@@ -204,6 +211,7 @@ def account_response_pane(request, username):
         )
         .order_by('-created_at')
     )
+    prepare_muted_posts(posts, request.user)
     visible_posts = []
     denied_threads = set()
     for post in posts:
@@ -221,9 +229,10 @@ def account_response_pane(request, username):
     })
 
 
+@never_cache
 def account_room_pane(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
-    base_rooms = Room.objects.select_related('owner__niixy_profile')
+    base_rooms = filter_muted(Room.objects.select_related('owner__niixy_profile'), request.user, 'owner_id')
     owner_page = Paginator(
         base_rooms.filter(owner=account).order_by('-last_activity_at', '-created_at'),
         20,
@@ -289,6 +298,7 @@ def account_module_interface_detail(request, username, interface_id):
     })
 
 
+@never_cache
 def account_thread_detail(request, username, thread_id):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     thread = get_object_or_404(

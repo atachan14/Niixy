@@ -1,0 +1,1 @@
+{% if post.is_muted %}<details class="muted-response" data-muted-response><summary>ミュート中 · 一時表示</summary><div class="thread-post-body">{{ post.body|linebreaksbr }}</div></details>{% else %}<div class="thread-post-body">{{ post.body|linebreaksbr }}</div>{% endif %}

@@ -34,3 +34,19 @@
   .review-tabs button { font-size: 12px; padding: 8px; }
   .review-editor { padding: 20px 16px; }
 }
+
+.review-mute { --review-color: #65518d; --review-tint: #f3effa; }
+.review-actions [data-mute-form] { display: flex; margin: 0; }
+.muter-summary { align-items: baseline; border-bottom: 1px solid var(--line); display: flex; gap: 10px; justify-content: space-between; padding: 10px 0; color: var(--text); }
+.muter-summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muter-summary time { color: var(--muted); flex-shrink: 0; font-size: 11px; }
+.muted-response { color: var(--muted); }
+.muted-response summary { cursor: pointer; padding: 8px 0; }
+.muted-response .thread-post-body { color: var(--text); }
+
+.account-review, .muter-list, .muter-summary { min-width: 0; }
+.muter-list { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 780px) {
+  .review-actions [data-mute-form] { flex: 1 1 0; min-width: 0; }
+  .review-actions > .review-choice { min-width: 0; }
+}

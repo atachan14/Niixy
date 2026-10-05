@@ -60,7 +60,7 @@
         {% include 'events/partials/thread_create_modules.html' with direct_fields_id='selected-direct-fields' direct_field_button_id='open-direct-field-selector' interfaces_id='selected-thread-interfaces' interface_button_id='open-thread-interface-selector' rule_capabilities=rule_capabilities %}
         <button class="button primary" type="submit" data-pending-label="作成中...">作成する</button>
       </form>
-      {% for thread in threads %}{% include 'events/partials/thread_detail.html' with thread=thread thread_detail_hidden=True %}{% endfor %}
+      {% for thread in detail_threads %}{% include 'events/partials/thread_detail.html' with thread=thread thread_detail_hidden=True %}{% endfor %}
     </aside>
     <dialog id="thread-rule-dialog" class="thread-rule-dialog"><form method="dialog"><div class="thread-rule-dialog-header"><h2>条件を追加</h2><button class="icon-button" value="cancel" aria-label="閉じる">×</button></div><div class="thread-rule-candidates"><button type="button" data-audience="guest">Guest</button><button type="button" data-audience="account">NiixyAccount</button></div></form></dialog>
     <template id="thread-interface-selector-template"><section id="thread-interface-selector" class="ui-list-pane thread-interface-list-pane" aria-label="ThreadIF一覧">
