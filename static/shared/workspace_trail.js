@@ -21,6 +21,8 @@ window.NiixyWorkspaceTrail = (() => {
     const url = new URL(anchor.href, location.origin);
     if (url.origin !== location.origin) return null;
     if (url.pathname === '/' && /^\d+$/.test(url.searchParams.get('board') || '') && !url.searchParams.has('room')) return {kind: 'board', id: url.searchParams.get('board'), pageUrl: url};
+    let listMatch = url.pathname.match(/^\/accounts\/lists\/(\d+)\/$/);
+    if (listMatch) return {kind:'account-list', id:listMatch[1], pageUrl:url};
     let match = url.pathname.match(/^\/accounts\/([^/]+)\/$/);
     if (match) return {kind: 'account', id: decodeURIComponent(match[1]), pageUrl: url, paneUrl: `${url.pathname}pane/`};
     match = url.pathname.match(/^\/rooms\/(\d+)\/$/);
@@ -243,6 +245,7 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   function openAccountFeature(trail, account, kind, origin) {
+    if (kind === 'people') return window.NiixyAccountLists.openIndex(account);
     if (kind === 'board') return openRoomList(trail, account, 'boards', origin);
     const definitions = {
       thread: ['Thread一覧', account.dataset.threadPaneUrl],
@@ -615,6 +618,7 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   async function openEntity(trail, entity, origin) {
+    if (entity.kind === 'account-list') return window.NiixyAccountLists.openDetail(entity.pageUrl, origin);
     if (entity.kind === 'board') return openMapBoard(entity.id, origin, entity.pageUrl.searchParams.get('thread'));
     const entry = trail.push({title: '読み込み中...', width: 'full', url: entity.pageUrl, after: origin});
     try {
@@ -686,7 +690,15 @@ window.NiixyWorkspaceTrail = (() => {
     return entry;
   }
 
-  return {openReviewEditor, openMapBoard, openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
+  function openContentPane({title, width = 'fixed', url = location.href, source}) {
+    const entry = trail.push({title, width, url, after: source});
+    const align = () => requestAnimationFrame(() => { if (entry.pane.isConnected && trail.entries.at(-1) === entry) trail.align(entry, true); });
+    entry.body.addEventListener('focusin', align);
+    entry.body.addEventListener('input', align);
+    return entry;
+  }
+
+  return {openContentPane, openReviewEditor, openMapBoard, openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
     if (preserveUrl) history.replaceState(history.state, '', url);

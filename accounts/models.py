@@ -68,6 +68,28 @@ class AccountMute(models.Model):
             raise ValidationError('自分のAccountはMuteできません。')
 
 
+class AccountList(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='account_lists')
+    name = models.CharField(max_length=80)
+    submission_id = models.UUIDField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['owner', 'submission_id'], name='unique_account_list_submission')]
+
+
+class AccountListReference(models.Model):
+    account_list = models.ForeignKey(AccountList, on_delete=models.CASCADE, related_name='references')
+    target = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='account_list_references')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [models.UniqueConstraint(fields=['account_list', 'target'], name='unique_account_list_reference')]
+
+
 class AccountCondition(models.Model):
     DEFAULT = 'default'
     ACCOUNT = 'account'

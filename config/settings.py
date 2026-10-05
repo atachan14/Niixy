@@ -49,6 +49,8 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',')
     if origin
 ]
+# Extra deployment origins accepted by the local, no-fetch reference resolver.
+NIIXY_REFERENCE_ORIGINS = [value for value in os.environ.get('NIIXY_REFERENCE_ORIGINS', '').split(',') if value]
 GEOLONIA_API_KEY = os.environ.get('GEOLONIA_API_KEY', 'YOUR-API-KEY')
 
 

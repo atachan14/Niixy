@@ -129,18 +129,19 @@
     const section = form.closest('[data-review-section]');
     const button = form.querySelector('[type=submit]');
     const key = keyFor(section);
-    if (mutations.size) return;
+    if (mutations.size || window.NiixyAccountLists?.isPending()) return;
     // Match the shared Pane's confirmation convention. A reload discards all
     // Workspace drafts, including a Review that was closed or belongs elsewhere.
-    if ([...drafts.values()].some(draft => draft.dirty) &&
-        !window.confirm('未保存のReview入力があります。入力を破棄してMuteを変更しますか？')) return;
+    if (([...drafts.values()].some(draft => draft.dirty) || window.NiixyAccountLists?.hasDrafts()) &&
+        !window.confirm('未保存のReview / AccountList入力があります。入力を破棄してMuteを変更しますか？')) return;
     const pending = NiixyUI.beginPendingAction(button);
     if (!pending) return;
     let resolveMutation;
     mutations.set(key, new Promise(resolve => { resolveMutation = resolve; }));
     muteMutation = mutations.get(key);
+    window.NiixyAccountLists?.setLocked(true);
     // Prevent new Review edits after the confirmation and before the reload.
-    const controls = [...document.querySelectorAll('[data-review-form] input, [data-review-form] textarea, [data-review-form] [type=submit], [data-review-form] [data-review-delete], [data-review-edit]')];
+    const controls = [...document.querySelectorAll('[data-review-form] input, [data-review-form] textarea, [data-review-form] [type=submit], [data-review-form] [data-review-delete], [data-review-edit], [data-account-list-form] input, [data-account-list-form] button, [data-account-list-picker-url]')];
     const disabled = controls.map(control => control.disabled);
     controls.forEach(control => { control.disabled = true; });
     let reloadStarted = false;
@@ -158,6 +159,7 @@
       // document; failure restores their exact state and retained draft.
       if (!reloadStarted) {
         controls.forEach((control, index) => { control.disabled = disabled[index]; });
+        window.NiixyAccountLists?.setLocked(false);
         muteMutation = null; mutations.delete(key); resolveMutation(); pending.restore();
       }
     }

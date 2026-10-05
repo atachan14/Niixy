@@ -32,7 +32,7 @@ Niixy では一般的なアバターを使わない。Account は自由に画像
 
 AccountPageの評価欄はReviewとする。ログインAccountから他Accountへ一件、自己評価禁止、Love / Hateは排他的かつ必須紹介文とセットで保存する。作成・編集・削除は作者本人だけが行い、対象Accountに他者Reviewの削除権を追加しない。Guestは閲覧できる。紹介文を削除するとLove / Hateも消える。
 
-ヘッダは差（Lover − Hater）と保存済みLove / Hate選択を色で示す。Bodyは全紹介文 / Lover / Haterの件数付きTab、初回は更新順だけ、3件から10件単位のページ分割と畳むを使う。編集窓で保存するまでは既存評価を変更しない。初期実装・上限・認可・公開順序は[Review初期実装](../account-review.md)を参照。Mute / Muterは[公開意思表示と本人の表示filter](../account-mute.md)として追加する。AccountList、DM / AccountPolicy、紹介文への評価と作者評価sortは別工程とする。
+ヘッダは差（Lover − Hater）と保存済みLove / Hate選択を色で示す。Bodyは全紹介文 / Lover / Haterの件数付きTab、初回は更新順だけ、3件から10件単位のページ分割と畳むを使う。編集窓で保存するまでは既存評価を変更しない。初期実装・上限・認可・公開順序は[Review初期実装](../account-review.md)を参照。Mute / Muterは[公開意思表示と本人の表示filter](../account-mute.md)として追加する。AccountListの作成・自由参照・公開閲覧は[AccountList要件](../account-lists.md)を参照。DM / AccountPolicy、紹介文への評価と作者評価sortは後続工程とする。
 
 ## 保留する機能
 

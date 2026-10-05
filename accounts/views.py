@@ -160,11 +160,12 @@ def prepare_threads(queryset, viewer):
 
 
 @never_cache
-def account_page(request, username):
+def account_page(request, username, *, account_list=None):
     from interfaces.account_layouts import profile_context
     from .reviews import review_context
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     return render(request, 'accounts/account_page.html', {
+        'account_list_direct': account_list,
         'account': account,
         **profile_context(account),
         **review_context(account, request.user),

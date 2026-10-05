@@ -37,7 +37,6 @@ const profileStack = NiixyUI.createWorkspace(accountWorkspace, {
   'room-detail': {target: '.account-room-detail-pane', width: 'full'},
   'account-if-list': {target: '#account-if-list-pane', width: 'fixed'},
   'account-if-detail': {target: '#account-if-detail-pane', width: 'remaining'},
-  'people-list': {target: '#people-list-pane', width: 'fixed'},
   'module-list': {target: '.profile-module-list-pane', width: 'fixed'},
   'module-detail': {target: '.profile-module-management .ui-detail-pane', width: 'remaining'},
 }, {track: document.querySelector('.account-track')});
@@ -484,9 +483,8 @@ document.querySelectorAll('[data-open-account-threads]').forEach((button) => but
 document.querySelectorAll('[data-open-account-responses]').forEach((button) => button.addEventListener('click', () => openPane('response')));
 document.querySelectorAll('[data-open-account-rooms]').forEach((button) => button.addEventListener('click', () => openAccountRooms()));
 document.querySelectorAll('[data-open-account-account-if]').forEach((button) => button.addEventListener('click', () => openStaticFeature('account-if', 'account-if-list')));
-document.querySelectorAll('[data-open-account-people]').forEach((button) => button.addEventListener('click', () => openStaticFeature('people', 'people-list')));
+document.querySelectorAll('[data-open-account-people]').forEach((button) => button.addEventListener('click', () => NiixyAccountLists.openIndex(accountPage)));
 document.querySelectorAll('[data-open-account-modules]').forEach((button) => button.addEventListener('click', () => openProfileModule()));
-NiixyUI.bindTabs(document.querySelector('.account-people-list-pane'));
 accountIdentity.addEventListener('click', closePane);
 document.getElementById('close-account-list').addEventListener('click', closePane);
 document.getElementById('close-account-thread-detail').addEventListener('click', () => closeDetail());
@@ -494,7 +492,6 @@ document.getElementById('close-account-room-list').addEventListener('click', clo
 document.getElementById('close-account-room-detail').addEventListener('click', () => closeAccountRoomDetail());
 document.getElementById('close-account-if-list').addEventListener('click', closePane);
 
-document.getElementById('close-people-list').addEventListener('click', closePane);
 
 paneContainer.addEventListener('click', (event) => {
   const pagination = event.target.closest('[data-pane-pagination]');
@@ -567,7 +564,7 @@ function applyStateFromUrl() {
   } else if (pane === 'account-if') {
     openStaticFeature('account-if', 'account-if-list', false);
   } else if (pane === 'people') {
-    openStaticFeature('people', 'people-list', false);
+    NiixyAccountLists.openIndex(accountPage, true);
   } else if (pane === 'module') {
     const state = moduleStateFromParams(params);
     openProfileModule(state, false).then((loaded) => {
@@ -596,7 +593,12 @@ document.querySelector('[data-open-account-boards]')?.addEventListener('click', 
 });
 
 const initialParams = new URLSearchParams(window.location.search);
-if (initialParams.get('pane') === 'board' || initialParams.has('boards')) {
+if (accountPage.dataset.accountListDirect) {
+  const direct = new URL(accountPage.dataset.accountListDirect, location.origin);
+  const page = initialParams.get('page'); if (page) direct.searchParams.set('page', page);
+  history.replaceState(history.state, '', accountPage.dataset.accountPageUrl);
+  NiixyAccountLists.openDetail(direct, accountPage);
+} else if (initialParams.get('pane') === 'board' || initialParams.has('boards')) {
   NiixyWorkspaceTrail.openBoards(accountPage, true);
 } else if (['thread', 'response'].includes(initialParams.get('pane'))) {
   const pane = initialParams.get('pane');
@@ -617,7 +619,7 @@ if (initialParams.get('pane') === 'board' || initialParams.has('boards')) {
 } else if (initialParams.get('pane') === 'account-if') {
   openStaticFeature('account-if', 'account-if-list', false);
 } else if (initialParams.get('pane') === 'people') {
-  openStaticFeature('people', 'people-list', false);
+  NiixyAccountLists.openIndex(accountPage, true);
 } else if (initialParams.get('pane') === 'module') {
   const state = moduleStateFromParams(initialParams);
   openProfileModule(state, false).then((loaded) => {

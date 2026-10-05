@@ -1,13 +1,22 @@
 from django.urls import path
 
 from . import views
-from . import reviews, mutes
+from . import reviews, mutes, lists
 from rooms import views as board_views
 from interfaces import layout_views
 
 app_name = 'accounts'
 
 urlpatterns = [
+    path('lists/create/', lists.create, name='list-create'),
+    path('lists/<int:list_id>/', lists.page, name='list-page'),
+    path('lists/<int:list_id>/pane/', lists.detail, name='list-detail'),
+    path('lists/<int:list_id>/rename/', lists.rename, name='list-rename'),
+    path('lists/<int:list_id>/delete/', lists.delete, name='list-delete'),
+    path('lists/<int:list_id>/add/', lists.add, name='list-add'),
+    path('lists/<int:list_id>/references/<int:reference_id>/remove/', lists.remove, name='list-remove'),
+    path('<str:username>/lists/', lists.listing, name='list-index'),
+    path('<str:username>/lists/picker/', lists.picker, name='list-picker'),
     path('<str:username>/mute/', mutes.change, name='mute-change'),
     path('<str:username>/reviews/', reviews.listing, name='reviews'),
     path('<str:username>/reviews/editor/', reviews.editor, name='review-editor'),
