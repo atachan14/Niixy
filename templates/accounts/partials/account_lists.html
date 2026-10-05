@@ -1,7 +1,12 @@
-<section class="account-list-content" data-account-lists-index data-list-fetch-url="{{ summary_page_url }}" data-list-page-url="{% url 'accounts:detail' account.username %}?pane=people" data-list-title="AccountList一覧">
-  <div class="ui-summary-list">
-    {% for list in summary_page %}<a class="account-list-summary muter-summary" href="{% url 'accounts:list-page' list.pk %}" data-account-list-id="{{ list.pk }}" data-account-list-link><span>{{ list.name }}</span><span><span data-list-count>{{ list.reference_count }}</span> Accounts · {{ list.created_at|date:'Y/m/d' }}</span></a>{% empty %}<p class="empty">まだAccountListはありません。</p>{% endfor %}
+<section class="account-list-content" data-account-lists-index data-list-fetch-url="{{ summary_page_url }}" data-list-page-url="{% url 'accounts:detail' account.username %}?pane=people" data-list-title="People一覧">
+  <div class="ui-tabs" role="tablist" aria-label="Peopleの種類">
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="lists">AccountList</button>
+    {% for list in summary_page %}<button type="button" role="tab" aria-selected="false" data-ui-tab="list-{{ list.pk }}" data-list-tab-id="{{ list.pk }}" data-list-tab-url="{% url 'accounts:list-page' list.pk %}">{{ list.name }}</button>{% endfor %}
+    <button type="button" role="tab" aria-selected="false" data-ui-tab="love">Love</button>
+    <button type="button" role="tab" aria-selected="false" data-ui-tab="hate">Hate</button>
   </div>
-  {% include 'shared/summary_pagination.html' %}
-  {% if is_list_owner %}<form method="post" action="{% url 'accounts:list-create' %}" data-account-list-form data-list-operation="create">{% csrf_token %}<input type="hidden" name="submission_id" value="{{ submission_id }}"><label>新しいAccountList名<input name="name" maxlength="80" required></label><button class="button secondary" type="submit">Listを作成</button><p class="account-list-error" role="alert" hidden></p></form>{% endif %}
+  <section class="ui-tab-panel is-active" data-ui-tab-panel="lists">{% include 'accounts/partials/account_list_items.html' %}</section>
+  {% for list in summary_page %}<section class="ui-tab-panel" data-ui-tab-panel="list-{{ list.pk }}"><a class="account-list-summary muter-summary" href="{% url 'accounts:list-page' list.pk %}" data-account-list-id="{{ list.pk }}"><span>{{ list.name }}</span><span><span data-list-count>{{ list.reference_count }}</span> Accounts</span></a></section>{% endfor %}
+  <section class="ui-tab-panel" data-ui-tab-panel="love"><p class="empty">未実装</p></section>
+  <section class="ui-tab-panel" data-ui-tab-panel="hate"><p class="empty">未実装</p></section>
 </section>

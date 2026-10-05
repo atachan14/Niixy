@@ -59,3 +59,7 @@ Boardの通常参照Paneも既存Boardの操作初期化を再利用し、公開
 共有PostgreSQLの実並行競合、公開DB既存行保全、共有migration、公開Guest GET、通常server確認/切替は未検証。全域反復、削除参照とMute件数の最終UXは後続へ残す。機能の直接QAに未解決の失敗はない。ローカルcheckpointはこの結果記録を含むcommitとし、完成SHAは完了応答で報告する。
 
 保護対象 `docs/memo/inbox.md` は読取・編集・stageしない。root README、秘密、backup、既存userchanges、生成artifactsはcommit対象外。通常serverと共有DBを保全する。
+
+## AccountPage内のタブ配置訂正
+
+List専用一覧へ置換した当時の記述を訂正する。固定タブを残してユーザーListを保存相当の位置へ接続する。[確認した旧UIと修正要件](account-list-tabs.md)を参照する。Listモデル・参照・認可は保持する。

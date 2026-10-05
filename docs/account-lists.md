@@ -8,7 +8,7 @@ Status: 公開済み（最新公開基準 `e17e00e188e6863914a0863dc33c67f19cf85
 
 AccountListはAccountを自由に参照する名前付きList。`owner` AccountがList本体を管理し、Guestを含め誰でも閲覧できる。将来ListPolicyを追加できるが、今回は制限を設けない。Account自身や既存BoardCollectionを移動・改名しない。
 
-AccountPageの既存Peopleから、そのAccountが所有するListのSummary一覧を共通Workspace Paneで開く。owner本人にだけ新規作成を表示する。List詳細にはAccountSummary、追加日時、参照解除、URL共有、URLから追加、List名変更・削除を表示する。owner以外には書込みformを返さない。APIでもrequest.userとList.ownerを照合し、POSTのowner/target ID指定を信頼しない。全書込みはPOST / CSRFを必須とする。
+AccountPageのPeopleは旧Love / Hateの未実装タブを残し、先頭のAccountList枠にそのAccountが所有する名前付きListのタブ・Summary一覧を接続する。名前タブやSummaryから既存List詳細を共通Workspaceの右Paneで開く。owner本人にだけ新規作成を表示する。List詳細にはAccountSummary、追加日時、参照解除、URL共有、URLから追加、List名変更・削除を表示する。owner以外には書込みformを返さない。APIでもrequest.userとList.ownerを照合し、POSTのowner/target ID指定を信頼しない。全書込みはPOST / CSRFを必須とする。
 
 Reviewの［追加］は閲覧者本人が対象AccountへLove / Hateと紹介文を保存済みの場合だけ表示する。押すと「追加先を選択」Paneを開き、本人所有の既存Listへ対象Accountを追加するか、新規Listを作成して同時に追加できる。Picker GETでも保存済みReviewを再確認する。一般のList詳細のURL追加は、Review有無を要求しない自由参照とする。Reviewを削除しても既存参照は残る。Account評価は引き続きLove / Hateと紹介文のReviewだけで、新しいAccount fav / badを設けない。
 
@@ -53,3 +53,7 @@ Muteによるreloadの前に、既存Review draftとAccountList draft双方の�
 rollbackはコードを先に戻し、List/参照データを保存する。0005逆適用は保存したList/参照を削除するため自動実行しない。BoardCollection改名、BoardList / InterfaceListの実装、ListPolicy、他種類/ネスト参照、並び替え、DM、評価sortは親の後続工程へ引き継ぐ。
 
 保護指定の`docs/memo/inbox.md`は未読・未変更・未stage。root READMEは不変更。secret / backup / 既存userchanges / artifactsはcommit対象外にする。
+
+## AccountPage内のタブ配置訂正
+
+List専用一覧へ置換した当時の記述を訂正する。固定タブを残してユーザーListを保存相当の位置へ接続する。[確認した旧UIと修正要件](account-list-tabs.md)を参照する。Listモデル・参照・認可は保持する。

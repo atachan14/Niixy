@@ -116,7 +116,17 @@ def index_context(request, kind, account):
 @require_GET
 @never_cache
 def listing(request, kind, username):
-    return render(request, 'shared/content_list_index.html', index_context(request, kind, target_account(username)))
+    account = target_account(username)
+    context = index_context(request, kind, account)
+    if kind == 'interface':
+        # AccountPage shows published definitions only; private drafts and the
+        # separate Module management UI keep their existing authorization.
+        interfaces = public_interfaces().filter(creator=account).order_by('current_version__name', 'pk')
+        if request.user.is_authenticated:
+            interfaces = interfaces.exclude(creator_id__in=muted_account_ids(request.user))
+        context['own_interfaces'] = [describe_target(kind, item, request.user) for item in interfaces]
+        return render(request, 'accounts/partials/interface_lists.html', context)
+    return render(request, 'shared/content_list_index.html', context)
 
 
 @require_GET

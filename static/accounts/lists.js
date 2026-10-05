@@ -29,8 +29,34 @@ window.NiixyAccountLists = (() => {
     drafts.set(keyFor(form), {values:Object.fromEntries(inputs.map(input => [input.name,input.value])),
       dirty:inputs.some(input => input.type !== 'hidden' && input.value !== input.defaultValue)});
   }
+  function showSelectedTab(tab) {
+    const list = tab?.closest('[role=tablist]');
+    if (!list) return;
+    const bounds = list.getBoundingClientRect();
+    const selected = tab.getBoundingClientRect();
+    // Scroll only the tab row; scrollIntoView can move the whole Workspace.
+    if (selected.left < bounds.left) list.scrollLeft += selected.left - bounds.left;
+    else if (selected.right > bounds.right) list.scrollLeft += selected.right - bounds.right;
+  }
   function bind(root, entry) {
     entries.set(root, entry);
+    NiixyUI.bindTabs(root);
+    // Replacing a saved List must preserve the selected fixed/List tab without
+    // reopening a child Pane as a side effect of refreshing this index.
+    const selected = root.querySelector(`[data-ui-tab="${entry.selectedTab || ''}"]`);
+    selected?.click();
+    showSelectedTab(root.querySelector('[data-ui-tab][aria-selected=true]'));
+    root.addEventListener('click', event => {
+      const tab = event.target.closest('[data-ui-tab]');
+      if (!tab) return;
+      entry.selectedTab = tab.dataset.uiTab;
+      showSelectedTab(tab);
+      if (tab.dataset.listTabUrl) {
+        const url = tab.dataset.listTabUrl;
+        if (root.dataset.contentListKind === 'interface') window.NiixyContentReferences.open(url, root);
+        else openDetail(url, root);
+      } else NiixyWorkspaceTrail.prepare(root);
+    });
     if (locked) lockControls(root);
     root.querySelectorAll('[data-list-share-url]').forEach(input => { input.value = new URL(input.value, location.origin).href; });
     root.querySelectorAll('[data-account-list-form]').forEach(form => {
@@ -41,6 +67,17 @@ window.NiixyAccountLists = (() => {
   }
   function patchSummaries(result) {
     if (!result.list_id) return;
+    document.querySelectorAll('[data-account-lists-index]').forEach(root => {
+      if ((root.dataset.contentListKind || 'account') !== (result.kind || 'account')) return;
+      const tab = root.querySelector(`[data-list-tab-id="${result.list_id}"]`);
+      if (!tab) return;
+      if (result.deleted) {
+        const active = tab.getAttribute('aria-selected') === 'true';
+        root.querySelector(`[data-ui-tab-panel="${tab.dataset.uiTab}"]`)?.remove();
+        tab.remove();
+        if (active) root.querySelector('[data-ui-tab="lists"]').click();
+      } else if (result.name) tab.textContent = result.name;
+    });
     document.querySelectorAll(`[data-account-list-id="${result.list_id}"]`).forEach(item => {
       if ((item.dataset.contentListKind || 'account') !== (result.kind || 'account')) return;
       if (result.deleted) { item.remove(); return; }
@@ -107,7 +144,7 @@ window.NiixyAccountLists = (() => {
       if (page) { url.searchParams.set('page',page); pageUrl.searchParams.set('page',page); }
     }
     if (restore && account.closest('.account-page')) history.replaceState(history.state, '', account.dataset.accountPageUrl);
-    return open(url,pageUrl,account,'AccountList一覧');
+    return open(url,pageUrl,account,'People一覧');
   }
   function openDetail(pageUrl, source) {
     const page = new URL(pageUrl, location.origin);
