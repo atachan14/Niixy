@@ -19,7 +19,7 @@ class BoardCreationBrowserTests(StaticLiveServerTestCase):
         self.room, _ = create_room(submission_id=uuid4(), owner=owner, name='Board Create Room',
             description='', latitude='35.681236', longitude='139.767125')
         self.client.force_login(owner)
-        self.assertEqual(list(Board.objects.values_list('name', flat=True)), ['お知らせ', '掲示板'])
+        self.assertEqual(list(Board.objects.filter(placement__collection__room=self.room).values_list('name', flat=True)), ['お知らせ', '掲示板'])
         from django.urls import reverse
         html = self.client.get(reverse('rooms:boards', args=[self.room.pk])).content.decode()
         self.assertLess(html.index('data-board-title="お知らせ"'), html.index('data-board-title="掲示板"'))

@@ -10,13 +10,15 @@ Account ページでは、SiteHeader の直下に `表示名 @NiixyID` を表示
 
 ## MyPage と管理
 
-MyPage は、本人だけが使う Account の管理ハブとする。公開 Account ページは、本人が開いた場合も含めて公開状態を閲覧する場所とし、編集や管理の操作を集約しない。
+MyPage は、本人だけが使う Account の管理ハブとする。公開 Account ページは、本人が開いた場合も含めて公開状態を閲覧する場所とし、ProfileやAppliedの編集を集約しない。Account配下のCollection／Boardは、Roomと同じ一覧・詳細Pane内で本人向け管理を提供する。
 
 MyPage は将来、Album とサムネイルの管理、AccountInterface の実装・作成・更新、ProfileLayout の選択・作成・更新を担当する。Profile 側のサムネイルは Album を閲覧する導線とし、本人であっても画像の変更などの管理操作は MyPage 側から行う。フォロー管理、参加中 Room、通知などの本人用機能も後続で MyPage に追加する。
 
 ## Board と Collection
 
-AccountはCollectionを作成し、Boardを掲載できる。初期状態ではMain Collectionとブログ用Boardを用意する方向とする。日記やブログは独立したNote投稿形式を作らず、Board内のThreadとBoardの表示方法で表現する。
+AccountはCollectionを作成し、Boardを掲載できる。新規Accountの初期状態には通常CollectionのMainと、その配下の「日記」Boardを用意する。どちらも改名・削除でき、削除後は再生成しない。日記やブログは独立したNote投稿形式を作らず、Board内のThreadとBoardの表示方法で表現する。
+
+日記の初期BoardPolicyはGuest／NiixyAccountの閲覧を許可し、Thread作成を対象Account本人に限定する。返信の可否は各ThreadPolicy自身が決める。AccountのBoard一覧には通常Collection群、常設の未分類、未実装枠のfav／bad、本人向けの管理Tabを表示する。v0.13の承認済み実装と一度限りの既存Account追加の対象は[Account Board要件](../account-boards.md)に記録する。
 
 AccountのCollectionに配置されたBoardは、そのAccountが管理する。Boardは独立したOwnerを持たず、管理主体は配置先から決まる。Collectionを削除した場合、そこに配置されているBoardは同じAccount内のシステムCollection「未分類」へ移す。
 

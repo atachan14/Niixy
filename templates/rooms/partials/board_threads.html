@@ -1,4 +1,4 @@
-<div class="room-board-thread-list" data-board-id="{{ board.pk }}" data-board-name="{{ board.name }}" data-board-manageable="{{ room.is_owner|yesno:'true,false' }}">
+<div class="room-board-thread-list" data-board-id="{{ board.pk }}" data-board-name="{{ board.name }}" data-board-manageable="{{ board_is_owner|yesno:'true,false' }}">
   {% if not board.can_view %}
     <section class="room-board-unavailable" data-board-view-unavailable>
       <p><strong>「{{ board.name }}」を閲覧できません。</strong></p>
@@ -37,14 +37,14 @@
             <details class="room-board-information-section"><summary>Layout</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
             <details class="room-board-information-section"><summary>ThreadTemplate</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
           </section>
-          {% if room.is_owner %}<section class="room-board-editor" data-board-editor hidden>
-            <form id="board-edit-form-{{ board.pk }}" class="room-board-edit" action="{% url 'rooms:board-edit' room.pk board.pk %}" data-board-action data-board-action-kind="edit">{% csrf_token %}<input name="policy_present" type="hidden" value="true"><label><span>Board名</span><input name="name" maxlength="120" value="{{ board.name }}" required></label><label><span>詳細</span><textarea name="description" maxlength="10000" rows="4">{{ board.description }}</textarea></label>
+          {% if board_is_owner %}<section class="room-board-editor" data-board-editor hidden>
+            <form id="board-edit-form-{{ board.pk }}" class="room-board-edit" action="{{ board_edit_url }}" data-board-action data-board-action-kind="edit">{% csrf_token %}<input name="policy_present" type="hidden" value="true"><label><span>Board名</span><input name="name" maxlength="120" value="{{ board.name }}" required></label><label><span>詳細</span><textarea name="description" maxlength="10000" rows="4">{{ board.description }}</textarea></label>
               {% include 'rooms/partials/board_policy_editor.html' %}
               <details class="room-board-information-section"><summary>Layout</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
               <details class="room-board-information-section"><summary>ThreadTemplate</summary><div class="room-board-information-section-body"><p class="empty">未実装</p></div></details>
               <p class="room-form-error" hidden></p>
             </form>
-            <div class="room-board-edit-actions"><button class="button primary" type="submit" form="board-edit-form-{{ board.pk }}" data-pending-label="保存中...">保存する</button><form class="room-board-delete" action="{% url 'rooms:board-delete' room.pk board.pk %}" data-board-action data-board-action-kind="delete" data-confirm-message="Boardの削除は取り消せません。Board内のThreadとResponseは削除されず、未配置のThreadとして残ります。Boardを削除しますか？">{% csrf_token %}<p class="room-form-error" hidden></p><button class="button event-delete-button" type="submit" data-pending-label="削除中...">Boardを削除する</button></form></div>
+            <div class="room-board-edit-actions"><button class="button primary" type="submit" form="board-edit-form-{{ board.pk }}" data-pending-label="保存中...">保存する</button><form class="room-board-delete" action="{{ board_delete_url }}" data-board-action data-board-action-kind="delete" data-confirm-message="Boardの削除は取り消せません。Board内のThreadとResponseは削除されず、未配置のThreadとして残ります。Boardを削除しますか？">{% csrf_token %}<p class="room-form-error" hidden></p><button class="button event-delete-button" type="submit" data-pending-label="削除中...">Boardを削除する</button></form></div>
           </section>
           <button class="button secondary room-board-edit-toggle" type="button" data-board-edit-toggle aria-expanded="false">編集</button>{% endif %}
         </div>
@@ -53,7 +53,7 @@
 
     {% if board.can_create_thread %}<div id="board-thread-create-{{ board.pk }}" class="ui-accordion-content room-board-window" data-board-create-window aria-hidden="true">
       <div class="ui-accordion-content-inner">
-        <div class="room-board-window-body room-thread-create"><form action="{% url 'rooms:board-thread-create' room.pk board.pk %}" data-thread-create-form data-board-thread-create>{% csrf_token %}<input name="submission_id" type="hidden" value="{{ thread_submission_id }}"><label>タイトル<input name="title" maxlength="120" required></label><label>本文<textarea name="body" rows="5" required></textarea></label>
+        <div class="room-board-window-body room-thread-create"><form action="{{ board_thread_create_url }}" data-thread-create-form data-board-thread-create>{% csrf_token %}<input name="submission_id" type="hidden" value="{{ thread_submission_id }}"><label>タイトル<input name="title" maxlength="120" required></label><label>本文<textarea name="body" rows="5" required></textarea></label>
           {% include 'events/partials/thread_create_modules.html' with rule_capabilities=rule_capabilities %}
           <p class="room-form-error" hidden></p><button class="button primary" type="submit" data-pending-label="作成中...">作成する</button></form></div>
       </div>

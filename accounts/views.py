@@ -3,7 +3,7 @@ import json
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Prefetch, Q, Value
 from django.db.models.functions import Concat
 from django.http import JsonResponse
@@ -19,6 +19,7 @@ from .forms import DisplayNameForm, LoginForm, SignUpForm
 from .models import AccountCondition, AccountProfile
 from .services import account_condition_catalog, condition_payload, save_account_condition
 from interfaces.models import FieldDefinition, Interface
+from interfaces.services import thread_field_catalog, thread_interface_catalog
 from interfaces.views import mark_interface_update_status, module_list_context, profile_module_list_context
 from rooms.models import Room
 
@@ -103,6 +104,7 @@ def form_errors(form):
 
 
 @require_POST
+@transaction.atomic
 def signup(request):
     form = SignUpForm(request.POST)
     if form.is_valid():
@@ -158,6 +160,8 @@ def account_page(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     return render(request, 'accounts/account_page.html', {
         'account': account,
+        'thread_field_catalog': thread_field_catalog(),
+        'thread_interface_catalog': thread_interface_catalog(),
     })
 
 
@@ -165,6 +169,8 @@ def account_pane(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     return render(request, 'accounts/partials/account_pane.html', {
         'account': account,
+        'thread_field_catalog': thread_field_catalog(),
+        'thread_interface_catalog': thread_interface_catalog(),
     })
 
 

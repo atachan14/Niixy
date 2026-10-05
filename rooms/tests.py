@@ -20,6 +20,9 @@ from .services import create_board, create_room
 class RoomCreationServiceTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user('room_owner', password='eightchars')
+        self.initial_counts = {model: model.objects.count() for model in (
+            Room, RoomMembership, RoomPlacement, Collection, Board, BoardPlacement, BoardPolicyCondition,
+        )}
 
     def create(self, submission_id=None):
         return create_room(
@@ -40,8 +43,8 @@ class RoomCreationServiceTests(TestCase):
         self.assertTrue(room.has_member(self.owner))
         self.assertEqual(RoomMembership.objects.get().account, self.owner)
         self.assertEqual(RoomPlacement.objects.get().latitude, Decimal('35.681236'))
-        main = Collection.objects.get(name='Main')
-        uncategorized = Collection.objects.get(is_uncategorized=True)
+        main = room.collections.get(name='Main')
+        uncategorized = room.collections.get(is_uncategorized=True)
         self.assertEqual(main.name, 'Main')
         self.assertEqual(main.room, room)
         self.assertFalse(main.is_uncategorized)
@@ -83,7 +86,7 @@ class RoomCreationServiceTests(TestCase):
             with self.assertRaises(ValueError):
                 self.create()
         for model in (Room, RoomMembership, RoomPlacement, Collection, Board, BoardPlacement, BoardPolicyCondition):
-            self.assertEqual(model.objects.count(), 0)
+            self.assertEqual(model.objects.count(), self.initial_counts[model])
 
     def test_duplicate_submission_returns_existing_room_without_duplicates(self):
         submission_id = uuid4()
@@ -96,11 +99,11 @@ class RoomCreationServiceTests(TestCase):
         self.assertEqual(second, first)
         self.assertEqual(Room.objects.count(), 1)
         self.assertEqual(RoomMembership.objects.count(), 1)
-        self.assertEqual(Collection.objects.count(), 2)
-        self.assertEqual(Board.objects.count(), 2)
-        self.assertEqual(BoardPlacement.objects.count(), 2)
+        self.assertEqual(Collection.objects.filter(room=first).count(), 2)
+        self.assertEqual(Board.objects.filter(placement__collection__room=first).count(), 2)
+        self.assertEqual(BoardPlacement.objects.filter(collection__room=first).count(), 2)
         self.assertEqual(RoomPlacement.objects.count(), 1)
-        self.assertEqual(BoardPolicyCondition.objects.count(), 6)
+        self.assertEqual(BoardPolicyCondition.objects.filter(board__placement__collection__room=first).count(), 6)
 
     def test_room_membership_is_unique_per_account(self):
         room, _ = self.create()

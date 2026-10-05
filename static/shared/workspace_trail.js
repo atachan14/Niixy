@@ -242,6 +242,7 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   function openAccountFeature(trail, account, kind, origin) {
+    if (kind === 'board') return openRoomList(trail, account, 'boards', origin);
     const definitions = {
       thread: ['Thread一覧', account.dataset.threadPaneUrl],
       response: ['Response一覧', account.dataset.responsePaneUrl],
@@ -290,6 +291,7 @@ window.NiixyWorkspaceTrail = (() => {
       ['[data-open-account-threads]', 'thread'],
       ['[data-open-account-responses]', 'response'],
       ['[data-open-account-rooms]', 'room'],
+      ['[data-open-account-boards]', 'board'],
       ['[data-open-account-modules]', 'module'],
       ['[data-open-account-account-if]', 'account-if'],
       ['[data-open-account-people]', 'people'],
@@ -352,27 +354,35 @@ window.NiixyWorkspaceTrail = (() => {
     });
   }
 
-  function openRoomList(trail, room, kind, origin) {
+  function openRoomList(trail, room, kind, origin, restoreParams = null) {
     const boards = kind === 'boards';
+    const accountScope = Boolean(room.dataset.accountPageUrl);
+    const pageUrl = room.dataset.accountPageUrl || room.dataset.roomPageUrl;
+    const listParams = accountScope ? {pane: 'board'} : {[kind]: 1};
+    const initial = restoreParams || new URLSearchParams();
+    const threadSource = accountScope ? {dataset: {...room.dataset, threadDetailTemplate: room.dataset.boardThreadDetailTemplate}} : room;
     const entry = trail.push({
       title: boards ? 'Board一覧' : '参加者一覧',
       width: 'fixed',
-      url: childUrl(room.dataset.roomPageUrl, {[kind]: 1}),
+      url: childUrl(pageUrl, {...listParams, collection: initial.get('collection'), tab: initial.get('tab')}),
       after: origin,
     });
     const listUrl = boards ? room.dataset.boardsUrl : room.dataset.membersUrl;
-    const fields = JSON.parse(room.querySelector('#room-pane-field-catalog')?.textContent || '[]');
-    const interfaces = JSON.parse(room.querySelector('#room-pane-interface-catalog')?.textContent || '[]');
+    const fields = JSON.parse(room.querySelector('#board-pane-field-catalog, #room-pane-field-catalog')?.textContent || '[]');
+    const interfaces = JSON.parse(room.querySelector('#board-pane-interface-catalog, #room-pane-interface-catalog')?.textContent || '[]');
 
     let listAccountConditions = null;
     entry.dispose = () => listAccountConditions?.destroy();
     entry.pane.addEventListener('ui-workspace-retain', () => listAccountConditions?.close());
-    const loadList = async () => {
+    const loadList = async (collectionId = null) => {
       listAccountConditions?.destroy();
       listAccountConditions = null;
       await fetchInto(entry, listUrl);
       NiixyUI.bindTabs(entry.body);
       initializeCollectionControls(entry.body);
+      const selectedId = collectionId || new URL(entry.url).searchParams.get('collection');
+      const selected = selectedId && entry.body.querySelector(`[data-collection-id="${selectedId}"]`);
+      if (selected) selected.click();
       if (boards && window.NiixyAccountConditions) {
         listAccountConditions = NiixyAccountConditions.create({
           root: entry.body,
@@ -418,7 +428,7 @@ window.NiixyWorkspaceTrail = (() => {
       const boardEntry = trail.push({
         title: board.dataset.boardTitle,
         width: 'fixed',
-        url: childUrl(room.dataset.roomPageUrl, {boards: 1, collection: board.dataset.boardCollection, board: board.dataset.openBoard}),
+        url: childUrl(pageUrl, {...listParams, collection: board.dataset.boardCollection, board: board.dataset.openBoard}),
         after: entry,
       });
       const boardUrl = board.dataset.boardUrl;
@@ -499,7 +509,7 @@ window.NiixyWorkspaceTrail = (() => {
 
       boardEntry.body.addEventListener('click', (event) => {
         const thread = event.target.closest('[data-room-thread]');
-        if (thread) openThreadDetail(trail, room, thread.dataset.roomThread, null, boardEntry);
+        if (thread) openThreadDetail(trail, threadSource, thread.dataset.roomThread, null, boardEntry);
       });
       boardEntry.body.addEventListener('submit', async (event) => {
         const form = event.target.closest('[data-board-action], [data-board-thread-create]');
@@ -516,10 +526,10 @@ window.NiixyWorkspaceTrail = (() => {
         }
         try {
           await loadBoard();
-          if (result.thread_id) openThreadDetail(trail, room, result.thread_id, null, boardEntry);
+          if (result.thread_id) openThreadDetail(trail, threadSource, result.thread_id, null, boardEntry);
         } catch (error) { showError(boardEntry, error); }
       }, true);
-      loadBoard().catch((error) => showError(boardEntry, error));
+      return loadBoard().then(() => boardEntry).catch((error) => showError(boardEntry, error));
     };
 
     entry.body.addEventListener('focusin', (event) => {
@@ -531,6 +541,12 @@ window.NiixyWorkspaceTrail = (() => {
       });
     });
     entry.body.addEventListener('click', (event) => {
+      const tab = event.target.closest('[data-ui-tab]');
+      if (tab) {
+        const url = childUrl(pageUrl, {...listParams, collection: tab.dataset.collectionId || null, tab: tab.dataset.collectionId ? null : tab.dataset.uiTab});
+        entry.url = url.href;
+        history.replaceState(history.state, '', url);
+      }
       const board = event.target.closest('[data-open-board]');
       if (board) openBoard(board);
     });
@@ -542,14 +558,25 @@ window.NiixyWorkspaceTrail = (() => {
       const result = await submitJsonForm(form, event.submitter);
       if (!result || !entry.pane.isConnected || !form.isConnected) return;
       try {
-        await loadList();
+        const resultUrl = new URL(result.redirect_url, location.origin);
+        await loadList(result.collection_id && form.dataset.collectionActionKind !== 'delete' ? result.collection_id : resultUrl.searchParams.get('collection'));
         if (result.board_id) {
           const board = entry.body.querySelector(`[data-open-board="${result.board_id}"]`);
           if (board) openBoard(board);
         }
       } catch (error) { showError(entry, error); }
     }, true);
-    loadList().catch((error) => showError(entry, error));
+    return loadList().then(async () => {
+      const tab = initial.get('tab');
+      if (tab) entry.body.querySelector(`[data-ui-tab="${CSS.escape(tab)}"]`)?.click();
+      const boardId = initial.get('board');
+      const threadId = initial.get('thread');
+      const board = boardId && entry.body.querySelector(`[data-open-board="${boardId}"]`);
+      if (board) {
+        const boardEntry = await openBoard(board);
+        if (threadId && boardEntry) openThreadDetail(trail, threadSource, threadId, null, boardEntry);
+      }
+    }).catch((error) => showError(entry, error));
   }
 
   function bindRoom(trail, entry, room) {
@@ -611,7 +638,7 @@ window.NiixyWorkspaceTrail = (() => {
     event.stopImmediatePropagation();
     openEntity(trail, entity, anchor);
   }, true);
-  return {prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
+  return {openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
     if (preserveUrl) history.replaceState(history.state, '', url);

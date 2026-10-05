@@ -191,6 +191,16 @@ MyPageでAccountへ直接Field／AccountIFを適用・値編集・取外しで�
 
 ---
 
+## v0.13 - Account Board / Collection
+
+Status: Complete (implementation / isolated verification; release approved)
+
+AccountのBoard一覧Pane、本人向けCollection／Board管理、Main／日記／未分類の初期生成とBoardからThread投稿までをRoom共通処理で実装する。fav／badは未実装Tab枠に揃える。返信は各ThreadPolicyで決める。
+
+詳細: [v0.13要件](account-boards.md)。既存Accountへのrooms 0009はCollectionを一つも持たないAccountだけを対象とする一度限りのデータ追加。自動migrationを行うVercel本番buildでは、新コード公開後に0009を追加する二段階で反映する。
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。

@@ -1,5 +1,6 @@
 import uuid
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Value, When
 from django.core.exceptions import ValidationError
@@ -40,9 +41,47 @@ def _room(request, room_id):
     return room
 
 
-def _room_boards(room):
+def _board_scope(request, room_id=None, username=None):
+    if username is None:
+        return _room(request, room_id)
+    account = get_object_or_404(get_user_model().objects.select_related('niixy_profile'), username__iexact=username)
+    account.is_owner = request.user.is_authenticated and request.user.pk == account.pk
+    return account
+
+
+def _scope_room(scope):
+    return scope if isinstance(scope, Room) else None
+
+
+def _scope_account(scope):
+    return None if isinstance(scope, Room) else scope
+
+
+def _scope_url(scope, name, *ids):
+    namespace = 'rooms' if isinstance(scope, Room) else 'accounts'
+    identifier = scope.pk if isinstance(scope, Room) else scope.username
+    return reverse(f'{namespace}:{name}', args=[identifier, *ids])
+
+
+def _scope_board_query(scope):
+    return 'boards=1' if isinstance(scope, Room) else 'pane=board'
+
+
+def _scope_context(scope):
+    return {
+        'room': _scope_room(scope),
+        'account': _scope_account(scope),
+        'board_is_owner': scope.is_owner,
+        'account_boards': not isinstance(scope, Room),
+        'collection_create_url': _scope_url(scope, 'collection-create'),
+    }
+
+
+def _container_boards(room):
     return (
-        Board.objects.filter(placement__collection__room=room)
+        Board.objects.filter(**{
+            'placement__collection__room' if isinstance(room, Room) else 'placement__collection__account': room,
+        })
         .select_related('placement__collection')
         .prefetch_related('policy_conditions')
         .order_by('-last_activity_at', '-created_at')
@@ -50,10 +89,10 @@ def _room_boards(room):
 
 
 def _managed_board(room, board_id):
-    return get_object_or_404(_room_boards(room), pk=board_id)
+    return get_object_or_404(_container_boards(room), pk=board_id)
 
 
-def _room_collections(room):
+def _container_collections(room):
     return room.collections.annotate(
         collection_order=Case(
             When(is_uncategorized=True, then=Value(1)),
@@ -67,11 +106,11 @@ def _managed_collection(room, collection_id):
     return get_object_or_404(room.collections, pk=collection_id)
 
 
-def _require_room_owner(request, room):
+def _require_board_manager(request, room):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Boardの管理にはログインが必要です。'}, status=401)
     if not room.is_owner:
-        return JsonResponse({'error': 'Boardを管理できるのはRoomOwnerだけです。'}, status=403)
+        return JsonResponse({'error': 'Boardを管理できるのは配置先の管理者だけです。'}, status=403)
     return None
 
 
@@ -152,10 +191,13 @@ def room_members(request, room_id):
     return render(request, 'rooms/partials/member_list.html', {'room': room})
 
 
-def room_boards(request, room_id):
-    room = _room(request, room_id)
-    collections = list(_room_collections(room))
+def room_boards(request, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    collections = list(_container_collections(room))
     for collection in collections:
+        collection.edit_url = _scope_url(room, 'collection-edit', collection.pk)
+        collection.delete_url = _scope_url(room, 'collection-delete', collection.pk)
+        collection.board_create_url = _scope_url(room, 'board-create', collection.pk)
         collection.visible_boards = list(
             Board.objects.filter(placement__collection=collection)
             .select_related('placement__collection')
@@ -164,42 +206,44 @@ def room_boards(request, room_id):
             .order_by('-last_activity_at', '-created_at')
         )
         for board in collection.visible_boards:
+            board.detail_url = _scope_url(room, 'board-threads', board.pk)
             result = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
             board.can_view = room.is_owner or result.allowed
         collection.board_submission_id = uuid.uuid4()
         collection.board_policy_editor_rows = board_policy_editor_rows(
-            Board(), room, conditions=default_board_policy_conditions(Board(), room),
+            Board(), room, conditions=default_board_policy_conditions(Board(), _scope_room(room), account=_scope_account(room)),
             target_prefix=f'board-policy-create-{collection.pk}',
         )
     return render(request, 'rooms/partials/board_list.html', {
-        'room': room,
+        **_scope_context(room),
         'collections': collections,
     })
 
 
 @require_POST
-def collection_create(request, room_id):
-    room = _room(request, room_id)
-    denied = _require_room_owner(request, room)
+def collection_create(request, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    denied = _require_board_manager(request, room)
     if denied:
         return denied
     form = CollectionForm(request.POST)
     if not form.is_valid():
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
     collection = Collection.objects.create(
-        room=room,
+        room=_scope_room(room),
+        account=_scope_account(room),
         name=form.cleaned_data['name'],
     )
     return JsonResponse({
         'collection_id': collection.pk,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&collection={collection.pk}',
+        'redirect_url': f'{_scope_url(room, "detail")}?{_scope_board_query(room)}&collection={collection.pk}',
     })
 
 
 @require_POST
-def collection_edit(request, room_id, collection_id):
-    room = _room(request, room_id)
-    denied = _require_room_owner(request, room)
+def collection_edit(request, collection_id, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    denied = _require_board_manager(request, room)
     if denied:
         return denied
     collection = _managed_collection(room, collection_id)
@@ -212,33 +256,33 @@ def collection_edit(request, room_id, collection_id):
     collection.save(update_fields=['name', 'updated_at'])
     return JsonResponse({
         'collection_id': collection.pk,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&collection={collection.pk}',
+        'redirect_url': f'{_scope_url(room, "detail")}?{_scope_board_query(room)}&collection={collection.pk}',
     })
 
 
 @require_POST
-def collection_delete(request, room_id, collection_id):
-    room = _room(request, room_id)
-    denied = _require_room_owner(request, room)
+def collection_delete(request, collection_id, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    denied = _require_board_manager(request, room)
     if denied:
         return denied
     collection = _managed_collection(room, collection_id)
     if collection.is_uncategorized:
         return JsonResponse({'error': '未分類Collectionは削除できません。'}, status=400)
     fallback = delete_collection(collection)
-    query = '?boards=1'
+    query = f'?{_scope_board_query(room)}'
     if fallback:
         query += f'&collection={fallback.pk}'
     return JsonResponse({
         'collection_id': collection_id,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}{query}',
+        'redirect_url': f'{_scope_url(room, "detail")}{query}',
     })
 
 
 @require_POST
-def board_create(request, room_id, collection_id):
-    room = _room(request, room_id)
-    denied = _require_room_owner(request, room)
+def board_create(request, collection_id, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    denied = _require_board_manager(request, room)
     if denied:
         return denied
     form = BoardForm(request.POST)
@@ -258,14 +302,14 @@ def board_create(request, room_id, collection_id):
         return JsonResponse({'error': str(error)}, status=400)
     return JsonResponse({
         'board_id': board.pk,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&collection={collection.pk}&board={board.pk}',
+        'redirect_url': f'{_scope_url(room, "detail")}?{_scope_board_query(room)}&collection={collection.pk}&board={board.pk}',
     })
 
 
 @require_POST
-def board_edit(request, room_id, board_id):
-    room = _room(request, room_id)
-    denied = _require_room_owner(request, room)
+def board_edit(request, board_id, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    denied = _require_board_manager(request, room)
     if denied:
         return denied
     board = _managed_board(room, board_id)
@@ -278,32 +322,32 @@ def board_edit(request, room_id, board_id):
             board.description = form.cleaned_data['description']
             board.save(update_fields=['name', 'description', 'updated_at'])
             if request.POST.get('policy_present') == 'true':
-                update_board_policy(board, room, request.POST, request.user)
+                update_board_policy(board, _scope_room(room), request.POST, request.user, account=_scope_account(room))
     except ValueError as error:
         return JsonResponse({'error': str(error)}, status=400)
     return JsonResponse({
         'board_id': board.pk,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&board={board.pk}',
+        'redirect_url': f'{_scope_url(room, "detail")}?{_scope_board_query(room)}&board={board.pk}',
     })
 
 
 @require_POST
-def board_delete(request, room_id, board_id):
-    room = _room(request, room_id)
-    denied = _require_room_owner(request, room)
+def board_delete(request, board_id, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    denied = _require_board_manager(request, room)
     if denied:
         return denied
     board = _managed_board(room, board_id)
     board.delete()
     return JsonResponse({
         'board_id': board_id,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1',
+        'redirect_url': f'{_scope_url(room, "detail")}?{_scope_board_query(room)}',
     })
 
 
-def board_threads(request, room_id, board_id):
-    room = _room(request, room_id)
-    board = get_object_or_404(_room_boards(room), pk=board_id)
+def board_threads(request, board_id, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    board = get_object_or_404(_container_boards(room), pk=board_id)
     view_policy = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
     board.can_view = room.is_owner or view_policy.allowed
     create_policy = board.evaluate_policy(request.user, BoardPolicyCondition.CREATE_THREAD)
@@ -315,7 +359,10 @@ def board_threads(request, room_id, board_id):
             prepare_thread_for_view(thread, request.user)
         threads = board_threads
     return render(request, 'rooms/partials/board_threads.html', {
-        'room': room,
+        **_scope_context(room),
+        'board_edit_url': _scope_url(room, 'board-edit', board.pk),
+        'board_delete_url': _scope_url(room, 'board-delete', board.pk),
+        'board_thread_create_url': _scope_url(room, 'board-thread-create', board.pk),
         'board': board,
         'threads': threads,
         'board_policy_rows': board_policy_rows(board),
@@ -345,9 +392,9 @@ def room_thread_detail(request, room_id, thread_id):
 
 
 @require_POST
-def board_thread_create(request, room_id, board_id):
-    room = _room(request, room_id)
-    board = get_object_or_404(_room_boards(room), pk=board_id)
+def board_thread_create(request, board_id, room_id=None, username=None):
+    room = _board_scope(request, room_id, username)
+    board = get_object_or_404(_container_boards(room), pk=board_id)
     view_policy = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
     can_view = room.is_owner or view_policy.allowed
     create_policy = board.evaluate_policy(request.user, BoardPolicyCondition.CREATE_THREAD)
@@ -383,7 +430,22 @@ def board_thread_create(request, room_id, board_id):
             return thread
 
     thread, _ = run_once(Thread, submission_id, operation)
+    if not thread.placements.filter(kind=ThreadPlacement.BOARD, board=board).exists():
+        return JsonResponse({'error': 'この送信IDは別のBoardで使用されています。'}, status=409)
     return JsonResponse({
         'thread_id': thread.pk,
-        'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?board={board.pk}&thread={thread.pk}',
+        'redirect_url': f'{_scope_url(room, "detail")}?{_scope_board_query(room)}&board={board.pk}&thread={thread.pk}',
     })
+
+
+def account_board_thread_detail(request, username, thread_id):
+    account = _board_scope(request, username=username)
+    thread = get_object_or_404(
+        thread_queryset().filter(
+            placements__kind=ThreadPlacement.BOARD,
+            placements__board__placement__collection__account=account,
+        ),
+        pk=thread_id,
+    )
+    prepare_thread_for_view(thread, request.user)
+    return render(request, 'rooms/partials/thread_detail.html', {'thread': thread})

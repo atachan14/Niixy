@@ -364,6 +364,14 @@ Pane数の上限、画面外Paneの仮想化、状態だけを保存してDOMを
 
 ブラウザの再読み込みでは既存DOMを保持できないため、URLから最終的なCurrentPaneまでをアニメーションなしで再構築する。再読み込みをまたいで中間Paneのスクロール位置や入力途中状態まで復元する機能は、必要になった段階で`history.state`または`sessionStorage`を用いる別機能として扱う。
 
+## 2026-10-05 - Account配下のCollection／Boardと初期日記
+
+状態: v0.13として承認済み（実装・隔離検証済み。共有DB反映・公開・通常server再起動承認済み）
+
+AccountのBoard一覧Paneに、通常CollectionのMain、ユーザー追加Collection、常設の未分類、fav／badの未実装Tab枠、本人向け管理Tabを用意する。新規AccountにはMain配下に「日記」を初期作成する。Main／日記は改名・削除でき、通常閲覧やAccount更新で復活させない。既存Accountへの一度限りの初期追加はCollectionを一つも持たないAccountに限定し、既存Collection／Boardは変更しない。
+
+日記の初期BoardPolicyはGuest OR NiixyAccount閲覧、本人のみThread作成とする。Collection／Board管理は本人のみ。Thread閲覧・返信は既存ThreadPolicyが決め、日記への作成権限から返信本人限定を導出しない。RoomのBoard管理UI・Account条件・ThreadPolicy・Workspace共通処理を再利用し、Board詳細からThread投稿までを一組として扱う。要件・migration・DB反映計画は[Account Board / Collection](../account-boards.md)へ記録する。
+
 ## 2026-10-05 - Workspace遷移は起点Pane以降を置き換える
 
 状態: 採用（2026-10-04 の「Page遷移までWorkspaceのPaneと状態を保持する」の追加・Close規則を更新）

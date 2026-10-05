@@ -7,5 +7,8 @@ from .models import AccountProfile
 
 @receiver(post_save, sender=get_user_model())
 def create_account_profile(sender, instance, created, **kwargs):
-    if created:
+    if created and not kwargs.get('raw'):
         AccountProfile.objects.create(user=instance)
+        from rooms.services import initialize_account_boards
+
+        initialize_account_boards(instance)

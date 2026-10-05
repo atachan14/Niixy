@@ -12,7 +12,13 @@ from accounts.policies import condition_groups
 from .models import Board, BoardPlacement, BoardPolicyCondition, Collection, Room, RoomMembership, RoomPlacement
 
 
-def default_board_policy_conditions(board, room):
+def default_board_policy_conditions(board, room=None, *, account=None):
+    if account is not None:
+        kind, definition, label = _board_policy_condition_snapshot(
+            {'kind': 'account', 'definition': {'account_id': account.pk}}, None, account,
+        )
+    else:
+        kind, definition, label = 'room', {'room_id': room.pk, 'relation': 'member'}, f'{room.name}に参加'
     return [
         BoardPolicyCondition(
             board=board,
@@ -34,16 +40,26 @@ def default_board_policy_conditions(board, room):
             board=board,
             capability=BoardPolicyCondition.CREATE_THREAD,
             decision=BoardPolicyCondition.ALLOW,
-            kind='room',
-            definition={'room_id': room.pk, 'relation': 'member'},
-            label=f'{room.name}に参加',
+            kind=kind,
+            definition=definition,
+            label=label,
         ),
     ]
 
 
-def seed_board_policy(board, room):
+def seed_board_policy(board, room=None, *, account=None):
     if not board.policy_conditions.exists():
-        BoardPolicyCondition.objects.bulk_create(default_board_policy_conditions(board, room))
+        BoardPolicyCondition.objects.bulk_create(default_board_policy_conditions(board, room, account=account))
+
+
+@transaction.atomic
+def initialize_account_boards(account):
+    """Called only for a newly created Account, never while browsing or saving it."""
+    Collection.objects.create(account=account, name='未分類', is_uncategorized=True)
+    main = Collection.objects.create(account=account, name='Main')
+    board = Board.objects.create(name='日記')
+    BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
+    seed_board_policy(board, account=account)
 
 
 def _board_policy_condition_snapshot(condition, room, actor):
@@ -65,12 +81,17 @@ def _policy_groups_from_data(data, capability, decision):
 
 
 @transaction.atomic
-def update_board_policy(board, room, data, actor):
+def update_board_policy(board, room, data, actor, *, account=None):
     candidates = {
         'guest': ('default', {'code': 'guest'}, 'Guest'),
         'account': ('default', {'code': 'account'}, 'NiixyAccount'),
-        'room_member': ('room', {'room_id': room.pk, 'relation': 'member'}, f'{room.name}に参加'),
     }
+    if room is not None:
+        candidates['room_member'] = ('room', {'room_id': room.pk, 'relation': 'member'}, f'{room.name}に参加')
+    elif account is not None:
+        candidates['self'] = _board_policy_condition_snapshot(
+            {'kind': 'account', 'definition': {'account_id': account.pk}}, None, actor,
+        )
     conditions = []
     for capability, _ in BoardPolicyCondition.CAPABILITY_CHOICES:
         for decision, _ in BoardPolicyCondition.DECISION_CHOICES:
@@ -213,15 +234,16 @@ def create_board(*, submission_id, collection, name, description='', policy_data
                 kind=BoardPlacement.COLLECTION,
                 collection=target,
             )
-            room = target.room
-            if room is not None:
-                if policy_data is None:
-                    seed_board_policy(board, room)
-                else:
-                    update_board_policy(board, room, policy_data, actor)
+            if policy_data is None:
+                seed_board_policy(board, target.room, account=target.account)
+            else:
+                update_board_policy(board, target.room, policy_data, actor, account=target.account)
             return board
 
-    return run_once(Board, submission_id, operation)
+    board, created = run_once(Board, submission_id, operation)
+    if board.placement.collection_id != collection.pk:
+        raise ValueError('この送信IDは別のCollectionで使用されています。')
+    return board, created
 
 
 def delete_collection(collection):

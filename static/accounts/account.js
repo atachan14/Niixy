@@ -538,7 +538,9 @@ function applyStateFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const pane = params.get('pane');
   isApplyingHistory = true;
-  if (pane === 'thread' || pane === 'response') {
+  if (pane === 'board' || params.has('boards')) {
+    NiixyWorkspaceTrail.openBoards(accountPage, true);
+  } else if (pane === 'thread' || pane === 'response') {
     removeProfileModule();
     resetThreadDetail();
     profileFeatures.activate('conversation');
@@ -584,8 +586,15 @@ function applyStateFromUrl() {
 
 window.addEventListener('popstate', applyStateFromUrl);
 
+document.querySelector('[data-open-account-boards]')?.addEventListener('click', () => {
+  profileStack.set('overview');
+  NiixyWorkspaceTrail.openBoards(accountPage);
+});
+
 const initialParams = new URLSearchParams(window.location.search);
-if (['thread', 'response'].includes(initialParams.get('pane'))) {
+if (initialParams.get('pane') === 'board' || initialParams.has('boards')) {
+  NiixyWorkspaceTrail.openBoards(accountPage, true);
+} else if (['thread', 'response'].includes(initialParams.get('pane'))) {
   const pane = initialParams.get('pane');
   const query = paneQueryFromParams(initialParams, pane);
   openPane(pane, query, false);

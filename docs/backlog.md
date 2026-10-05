@@ -48,6 +48,12 @@
 - 後回しQA: 今回変更後の全Django・広域smoke、多重reload／history／遅い応答／reduced-motionの網羅確認、mobile Room／Board補助Pane全経路は未実施。BL-002の156 Django・広域ブラウザ成功を今回修正後の全体保証とはしない。進められる承認済み実装がなくなった安全な区切りでdeferred QAを行う。
 - 証跡: 未追跡 `.artifacts/module-selector-before.log`、`.artifacts/module-selector-after.log`、`.artifacts/module-selector/`。
 
+## BL-005 - Account配下のCollection／Board
+
+- 状態: v0.13実装・隔離検証済み。公開・共有Neon初期追加・通常server再起動承認済み。
+- 範囲: AccountのBoard一覧Pane、本人Collection／Board管理、初期Main／日記、BoardからThread投稿、fav／badの未実装Tab枠。
+- 要件・初期追加migration・検証・反映計画: [Account Board / Collection](account-boards.md)。
+
 ## 次作業の優先候補
 
 BL-002／BL-004の修正を公開した後、承認済みv0.11のBL-001／BL-003を実装・直接検証済み。広域QAは直接関連の検証後、安全な区切りで行う。
