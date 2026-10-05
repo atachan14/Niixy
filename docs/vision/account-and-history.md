@@ -28,6 +28,12 @@ AccountのCollectionに配置されたBoardは、そのAccountが管理する。
 
 Niixy では一般的なアバターを使わない。Account は自由に画像を Album へ投稿し、その一つをサムネイルに選択できる。ThreadPost の表示にはサムネイルのスナップショットを使い、Account が後から選び直しても過去の投稿表示が変わらないようにする。
 
+## Review
+
+AccountPageの評価欄はReviewとする。ログインAccountから他Accountへ一件、自己評価禁止、Love / Hateは排他的かつ必須紹介文とセットで保存する。作成・編集・削除は作者本人だけが行い、対象Accountに他者Reviewの削除権を追加しない。Guestは閲覧できる。紹介文を削除するとLove / Hateも消える。
+
+ヘッダは差（Lover − Hater）と保存済みLove / Hate選択を色で示す。Bodyは全紹介文 / Lover / Haterの件数付きTab、初回は更新順だけ、3件から10件単位のページ分割と畳むを使う。編集窓で保存するまでは既存評価を変更しない。初期実装・上限・認可・公開順序は[Review初期実装](../account-review.md)を参照。Mute / Muter、AccountList、DM / AccountPolicy、紹介文への評価と作者評価sortは別工程とする。
+
 ## 保留する機能
 
 ProfileArea、BoardとCollectionのAccount向け管理、Album、画像モデレーション、アカウント評価、フォロー、Tweet、Event参加はv0.6の対象外である。

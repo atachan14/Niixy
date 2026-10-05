@@ -394,3 +394,9 @@ Layout依存IFの凍結でも適用済みLayoutの表示を保持し、新規適
 Guest／Accountとも、NiiMap新規作成から地点を選びBoardを直接配置できる。独立Ownerも配置先管理者も付与しない。初期BoardPolicyは閲覧とThread作成がGuest OR NiixyAccount、deny空。作成時は共通4欄のAccount条件を変更できるが、保存後はPolicyを含め編集・削除・座標変更・未配置化を認めない。
 
 Mapmarker、SummaryList、検索からBoard詳細／Thread作成／Responseまで既存の共通処理で接続する。Thread作成はBoard閲覧と作成条件を再判定する。既存Threadの閲覧／返信はThreadPolicy自身で判定し、Board作成条件を追加制限にしない。実装・隔離QA・公開前互換性は[v0.15作業記録](../niimap-boards-and-pane-ui.md)に残す。
+
+## 2026-10-05 - Account評価を紹介文と一体のReviewにする
+
+状態: 採用
+
+Love / Hateは排他的で必須紹介文とセットにする。ログインAccountから他Accountへの一件に限定し、自己評価は禁止する。編集・削除は作者本人だけ、対象Accountには他者Reviewの削除権を付けない。Guestは閲覧のみ。紹介文削除で評価も消える。既存Reviewの評価変更は本文編集窓の保存時に確定し、Cancelでは変えない。初回は件数付き全紹介文 / Lover / Hater Tab、更新順、3件から10件のpaginationと畳むまで。Mute / MuterとAccountList、DMの送信条件、紹介文への評価は後続とする。[実装と公開手順](../account-review.md)に記録する。

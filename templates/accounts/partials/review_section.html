@@ -1,0 +1,35 @@
+<section class="account-review identity-overview-section" data-review-section data-review-target="{{ account.username }}" data-review-actor="{{ user.username }}" data-review-url="{% url 'accounts:reviews' account.username %}" data-review-editor-url="{% url 'accounts:review-editor' account.username %}" data-review-filter="{{ review_filter }}" data-review-expanded="{{ review_expanded|yesno:'1,0' }}" data-review-page="{{ review_page.number }}">
+  <header class="review-header">
+    <h2>Review</h2>
+    <span class="review-score {% if review_score > 0 %}review-love{% elif review_score < 0 %}review-hate{% endif %}" aria-label="LoverからHaterを引いた差">差 {% if review_score > 0 %}+{% endif %}{{ review_score }}</span>
+    <div class="review-actions">
+      <button type="button" class="review-choice review-love" data-review-edit="love" aria-pressed="{% if own_review.sentiment == 'love' %}true{% else %}false{% endif %}" {% if not can_review %}disabled{% if not user.is_authenticated %} title="ログインが必要です"{% else %} title="自分のAccountにはReviewできません"{% endif %}{% endif %}>Love ({{ review_counts.love }})</button>
+      <button type="button" class="review-choice review-hate" data-review-edit="hate" aria-pressed="{% if own_review.sentiment == 'hate' %}true{% else %}false{% endif %}" {% if not can_review %}disabled{% if not user.is_authenticated %} title="ログインが必要です"{% else %} title="自分のAccountにはReviewできません"{% endif %}{% endif %}>Hate ({{ review_counts.hate }})</button>
+    </div>
+  </header>
+  <div class="ui-tabs review-tabs" role="tablist" aria-label="紹介文の種類">
+    <button type="button" role="tab" data-review-tab="all" aria-selected="{% if review_filter == 'all' %}true{% else %}false{% endif %}" {% if review_filter == 'all' %}class="is-active"{% endif %}>全紹介文 ({{ review_counts.total }})</button>
+    <button type="button" role="tab" data-review-tab="love" aria-selected="{% if review_filter == 'love' %}true{% else %}false{% endif %}" {% if review_filter == 'love' %}class="is-active"{% endif %}>Lover ({{ review_counts.love }})</button>
+    <button type="button" role="tab" data-review-tab="hate" aria-selected="{% if review_filter == 'hate' %}true{% else %}false{% endif %}" {% if review_filter == 'hate' %}class="is-active"{% endif %}>Hater ({{ review_counts.hate }})</button>
+  </div>
+  <div class="review-list" role="tabpanel" aria-label="紹介文">
+    {% for review in review_page %}
+      <article class="thread-post review-post" data-review-id="{{ review.pk }}">
+        <div class="thread-post-layout-area">
+          <div class="thread-thumbnail" aria-hidden="true"></div>
+          <div class="review-post-content">
+            <div class="thread-post-info review-post-info"><a href="{% url 'accounts:detail' review.author.username %}">{{ review.author.niixy_profile.display_label }}</a><span class="review-sentiment review-{{ review.sentiment }}">{{ review.get_sentiment_display }}</span><time datetime="{{ review.updated_at|date:'c' }}">{{ review.updated_at|date:'Y/m/d H:i' }}</time>{% if user.pk == review.author_id %}<button type="button" class="review-edit" data-review-edit="{{ review.sentiment }}">編集</button>{% endif %}</div>
+            <div class="thread-post-body">{{ review.body|linebreaksbr }}</div>
+          </div>
+        </div>
+      </article>
+    {% empty %}<p class="empty">まだ紹介文はありません。</p>{% endfor %}
+  </div>
+  <div class="review-pagination">
+    {% if review_expanded %}
+      {% if review_page.has_other_pages %}<nav class="thread-pagination" aria-label="紹介文のページ">{% if review_page.has_previous %}<button type="button" data-review-go-page="{{ review_page.previous_page_number }}">前へ</button>{% endif %}<span>{{ review_page.number }} / {{ review_page.paginator.num_pages }}</span>{% if review_page.has_next %}<button type="button" data-review-go-page="{{ review_page.next_page_number }}">次へ</button>{% endif %}</nav>{% endif %}
+      <button type="button" data-review-collapse>畳む</button>
+    {% elif review_page.has_next %}<button type="button" data-review-expand>もっと見る</button>{% endif %}
+  </div>
+  <p class="review-error" role="alert" hidden></p>
+</section>

@@ -676,7 +676,17 @@ window.NiixyWorkspaceTrail = (() => {
     event.stopImmediatePropagation();
     openEntity(trail, entity, anchor);
   }, true);
-  return {openMapBoard, openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
+  function openReviewEditor(source) {
+    const entry = trail.push({title: 'Review', width: 'remaining', after: source});
+    // Focusing/typing in a retained offscreen form can make the browser scroll
+    // the overflow-hidden viewport in addition to our track transform.
+    const align = () => requestAnimationFrame(() => trail.align(entry, true));
+    entry.body.addEventListener('focusin', align);
+    entry.body.addEventListener('input', align);
+    return entry;
+  }
+
+  return {openReviewEditor, openMapBoard, openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
     if (preserveUrl) history.replaceState(history.state, '', url);

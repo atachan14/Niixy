@@ -8,6 +8,6 @@
       <button type="button" disabled>Timeline</button><button class="is-active" type="button" data-open-account-modules>Module</button>
     </div>
   </section>
-  <section class="account-placeholder-section identity-overview-section"><h2>評価</h2><p>未実装</p></section>
+  {% include 'accounts/partials/review_section.html' %}
   <section class="account-placeholder-section account-profile-placeholder identity-overview-section identity-profile-placeholder"><h2>Profile</h2>{% if account_layout_application %}<p class="field-help">{{ account_layout_application.version.name }} v{{ account_layout_application.version.version_number }}{% if account_layout_frozen %} · 依存更新待ち（表示は継続）{% endif %}</p>{{ account_layout_document|safe }}<noscript><p>このProfileの表示にはJavaScriptを有効にしてください。</p></noscript>{% else %}<p>未実装</p>{% endif %}</section>
 </div>
