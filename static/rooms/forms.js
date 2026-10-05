@@ -288,11 +288,23 @@ window.NiixyRoomForms = (() => {
 
     const detailContent = document.createElement('div');
     detailContent.className = 'thread-interface-selector-detail';
-    detailContent.addEventListener('focusin', () => requestAnimationFrame(() => {
-      if (detailPane.isConnected && detailPane.contains(document.activeElement)) {
+    let focusRequest = 0;
+    detailContent.addEventListener('focusin', () => {
+      const request = ++focusRequest;
+      const alignFocusedDetail = () => {
+        if (!detailPane.isConnected || request !== focusRequest || !detailPane.contains(document.activeElement)) return false;
         options.setStage(`${kind}-detail`);
-      }
-    }));
+        return true;
+      };
+      requestAnimationFrame(async () => {
+        if (!alignFocusedDetail()) return;
+        const track = detailPane.closest('.ui-workspace-track');
+        // Native focus scrolling can occur during the track's transform transition.
+        // Align again after it settles, without moving a closed or newer selector.
+        await Promise.allSettled((track?.getAnimations() || []).map((animation) => animation.finished));
+        requestAnimationFrame(alignFocusedDetail);
+      });
+    });
     const showList = () => {
       detailRequest += 1;
       detailPane.remove();

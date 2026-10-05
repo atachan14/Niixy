@@ -1,5 +1,7 @@
 # AccountList 作成・参照追加
 
+Status: 公開済み（最新公開基準 `e17e00e188e6863914a0863dc33c67f19cf85e6f`、親工程からの引き継ぎ）。新しいVersion番号は未割当。以下の実装開始時の基準・公開計画・隔離QAの「未実施」は当時の記録として保持する。accounts0003～0005、rooms0010～0011、interfaces0010は共有環境に適用済み。[最新状態と検証境界](qa-status-2026-10-06.md)を参照する。
+
 2026-10-05承認済みの次工程。リリースversionは未割当。local HEAD 5030762（Review / Mute / draft保護）の上に実装する。公開80a39cf（v0.16）へのpush、共有DB migration、通常server restartはこの工程に含めない。
 
 ## 要件と操作
