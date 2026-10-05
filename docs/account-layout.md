@@ -1,8 +1,8 @@
 # AccountLayout初期実装
 
-Version: 未割当（次候補 v0.16）
+Version: v0.16
 Base: `28e9de67bf6d65149467fc9345fd183a18c34871`（v0.14版更新基盤 / v0.15 UI・NiiMap）
-Status: 実装・隔離SQLite / Edge検証。共有Neon migration・公開・通常runserver切替は親調整。
+Status: 実装・隔離SQLite / Edge検証完了。v0.16公開・共有Neon migration・通常runserver切替はユーザー承認済み。以下に公開前の記録と公開工程を残す。
 
 ## 今回の終点
 
@@ -43,9 +43,9 @@ IFの自動復帰はv0.14基盤の無変更・追加入力不要条件をその�
 
 ## migration・公開順
 
-`interfaces/0009_account_layout.py` は0008を前提とし、AccountLayout / Draft / Version / RequireField / RequireIF / Item / Applicationの7テーブルとFK・一意制約を追加する。既存AccountFieldBinding、Value、IF適用、Threadの構造・値・timestamp・版参照を変えず、Layoutを自動適用しない。共有Neonへの適用は未実施。
+`interfaces/0009_account_layout.py` は0008を前提とし、AccountLayout / Draft / Version / RequireField / RequireIF / Item / Applicationの7テーブルとFK・一意制約を追加する。既存AccountFieldBinding、Value、IF適用、Threadの構造・値・timestamp・版参照を変えず、Layoutを自動適用しない。Djangoの通常post_migrateによる7モデル分のcontent type・既定permission追加も想定する。共有Neonへの適用は下記の公開工程で確認する。
 
-1. 親が差分・依存追加・隔離QAをreviewし、Version番号と公開範囲を確定する。inbox / root README / private artifactsはstageしない。
+1. ユーザーがv0.16として今回のコード・テスト・docs・migrationを公開GitHub `atachan14/Niixy` の既存masterへcommit・pushし、DB反映と通常runserver再起動まで進めることを承認した。既存checkpoint `e9f12eb` / `4634d5f`を保持し、通常commit・pushだけを使う。inbox / root README / secret / backup / private artifactsはstageしない。
 2. 共有Neonの0008適用状況と対象を確認し、必要な既存データのbackupをprivate / gitignore内に保持する。旧コードと共存できる追加migrationとして扱う。
 3. 承認された公開commitをpushし、既存Vercel production buildのmigrateで0009を適用する。手動migrationを重ねない。buildと公開SHA、migration記録・追加テーブル・既存値保持を確認する。
 4. 通常runserverの切替は親がAGENTS.mdどおりPythonのPID / 親PID / 実行path / commandline / start timeと8000 listenerを確認し、検証済みNiixy pairだけ停止する。process・listener両方が消えてから通常コマンドで1組起動する。今回のPython / template変更ではrestartが必要。
@@ -63,8 +63,8 @@ Edgeの隔離LiveServerでPC1280px / mobile390pxの最小一周と、長文末�
 
 表示上限の承認後、巨大値・escape増幅・反復参照・UTF-8/entity境界・総量到達後の閉じ構造/末尾/省略表示・CSS prefix出力量・過大な静的構造の拒否・128参照のAPI/公開validation・DB値/timestamp不変を6件追加した。追補の最終再実行はdirect18件 + PC/mobile Layout browser1件の19件が成功。desktop ProfileとmobileのProfile末尾画像も再確認した。制限以下の長文は従来どおり自然高さで表示する。
 
-通常serverはread-onlyにPID/親PID/path/command/starttimeを確認し、venv launcher30324 → base Python37964の1組、127.0.0.1:8000 listener owning37964を確認した。停止・追加起動・restartは行っていない。0009は共有Neon未適用。inboxは未読・未編集・stage除外、root READMEも不変更。
+公開前の通常serverはread-onlyにPID/親PID/path/command/starttimeを確認し、venv launcher30324 → base Python37964の1組、127.0.0.1:8000 listener owning37964を確認した。隔離実装工程では停止・追加起動・restartを行わず、0009も共有Neon未適用のまま維持した。公開工程では再度process・listenerを確認して上記手順で切り替える。inboxは未読・未編集・stage除外、root READMEも不変更。
 
 RoomLayout、AccountIFItem、自由参照パーツ、Timeline / Boardパーツ、defaultLayout再構築、ThreadPost表示名・値Snapshot、Threadの適用済み版編集、保存ライブラリ、Layout削除 / copy、高度検索は対象外。今回はAccountLayoutの最小一周で区切り、便利機能や装飾を拡充しない。既存Profile幅を維持する。将来、PC最大幅を使う紹介文・Timeline・Boardの3列案はページ構造の改善時に別途検討する。
 
-共有Neon / production / 通常server、実PostgreSQLの並行publish・apply、Edge以外のbrowser、JS無効時の完成表示、実際の大量定義は未検証。全領域の広域反復は今回後回しとする。
+公開前の隔離QAには共有Neon / production / 通常serverを含めず、それらは承認された公開工程で確認する。実PostgreSQLの並行publish・apply、Edge以外のbrowser、JS無効時の完成表示、実際の大量定義は未検証。全領域の広域反復は今回後回しとする。

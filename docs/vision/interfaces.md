@@ -127,8 +127,8 @@ Interface定義へ入力用プレースホルダを保存できるようにし�
 
 実装範囲・判定表・移行手順は[版更新基盤の未割当要件](../interface-version-foundation.md)を参照。v0.12の固定版値編集は当時の実績として維持し、この後続要件で変更する。
 
-## AccountLayout初期実装（Version未割当）
+## AccountLayout初期実装（v0.16）
 
-版更新基盤とUI/NiiMapの後続で、AccountLayoutのみのDraft→公開→必要Mod適用→Layout適用を実装する。RoomLayoutは別型として後続。Requireを先に選び、その範囲のFieldだけをユーザーが名付けたItem変数として限定HTML/CSSへ配置する。公開版と適用版を固定し、依存凍結でも現在のAccount値の表示を続ける。MyPageの編集と公開AccountPageの閲覧を分ける。
+版更新基盤とUI/NiiMapの後続で、v0.16にAccountLayoutのみのDraft→公開→必要Mod適用→Layout適用を実装した。RoomLayoutは別型として後続。Requireを先に選び、その範囲のFieldだけをユーザーが名付けたItem変数として限定HTML/CSSへ配置する。公開版と適用版を固定し、依存凍結でも現在のAccount値の表示を続ける。MyPageの編集と公開AccountPageの閲覧を分ける。
 
 初期はField名・値card等までで区切る。Profile幅は現状を維持し、将来のPC最大幅・紹介文/Timeline/Boardの3列は後回しにする。固定iframe内部scrollは採用せず、strict parser/allowlist・selector prefix・Shadow DOM・containmentによる自然高さをユーザー承認に基づき検証する。実装・制限・検証・公開手順は[AccountLayout初期実装](../account-layout.md)を参照。ThreadPostのSnapshotは引き続き別の将来要件。
