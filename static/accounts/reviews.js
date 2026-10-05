@@ -3,6 +3,7 @@
   // Nothing is persisted to shared storage or the server before Save.
   const drafts = new Map();
   const mutations = new Map();
+  let muteMutation = null;
   const listRequests = new WeakMap();
   const keyFor = section => `${section.dataset.reviewActor}:${section.dataset.reviewTarget}`;
   const errorText = async response => {
@@ -45,6 +46,7 @@
       .map(section => loadSection(section)));
   }
   async function openEditor(section, sentiment) {
+    if (muteMutation) return;
     const entry = window.NiixyWorkspaceTrail?.openReviewEditor(section);
     if (!entry) return;
     const key = keyFor(section);
@@ -61,19 +63,27 @@
       const response = await fetch(url, {cache: 'no-store', signal: entry.abort.signal});
       if (!response.ok) throw new Error(await errorText(response));
       const html = await response.text();
+      // A previously requested editor must not enable new input during Mute.
+      if (muteMutation) await muteMutation;
       if (!entry.pane.isConnected || entry.abort.signal.aborted) return;
       const form = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-review-form]');
       if (!form) throw new Error('Reviewを読み込めませんでした。');
       entry.body.replaceChildren(form);
       const originalId = form.elements.review_id.value;
       const originalRevision = form.elements.revision.value;
+      const originalBody = form.elements.body.value;
+      const originalSentiment = section.querySelector('[data-review-edit][aria-pressed="true"]')?.dataset.reviewEdit;
       const previous = drafts.get(key);
       if (previous?.id === originalId && previous?.revision === originalRevision) form.elements.body.value = previous.body;
-      const keepInput = () => drafts.set(key, {id: originalId, revision: originalRevision, body: form.elements.body.value});
+      const keepInput = () => drafts.set(key, {
+        id: originalId, revision: originalRevision, body: form.elements.body.value,
+        dirty: form.elements.body.value !== originalBody || (Boolean(originalId) && form.elements.sentiment.value !== originalSentiment),
+      });
+      keepInput();
       form.addEventListener('input', () => { keepInput(); form.querySelector('.review-error').hidden = true; });
       form.querySelector('[data-review-cancel]').addEventListener('click', () => entry.close.click());
       async function submit(operation, button) {
-        if (mutations.has(key)) return;
+        if (muteMutation || mutations.has(key)) return;
         const body = form.elements.body;
         if (operation === 'save' && !body.value.trim()) {
           showError(form, '紹介文を入力してください。'); body.focus(); return;
@@ -119,21 +129,37 @@
     const section = form.closest('[data-review-section]');
     const button = form.querySelector('[type=submit]');
     const key = keyFor(section);
-    if (mutations.has(key)) return;
+    if (mutations.size) return;
+    // Match the shared Pane's confirmation convention. A reload discards all
+    // Workspace drafts, including a Review that was closed or belongs elsewhere.
+    if ([...drafts.values()].some(draft => draft.dirty) &&
+        !window.confirm('未保存のReview入力があります。入力を破棄してMuteを変更しますか？')) return;
     const pending = NiixyUI.beginPendingAction(button);
     if (!pending) return;
     let resolveMutation;
     mutations.set(key, new Promise(resolve => { resolveMutation = resolve; }));
+    muteMutation = mutations.get(key);
+    // Prevent new Review edits after the confirmation and before the reload.
+    const controls = [...document.querySelectorAll('[data-review-form] input, [data-review-form] textarea, [data-review-form] [type=submit], [data-review-form] [data-review-delete], [data-review-edit]')];
+    const disabled = controls.map(control => control.disabled);
+    controls.forEach(control => { control.disabled = true; });
+    let reloadStarted = false;
     try {
       const response = await fetch(form.action, {method: 'POST', body: new FormData(form)});
       if (!response.ok) throw new Error(await errorText(response));
       // Re-fetch the current URL so every retained list, Response, and map
       // marker agrees with the new viewer state, including an Unmute.
       location.reload();
+      reloadStarted = true;
     } catch (error) {
       if (section.isConnected) showError(section, error.message || '通信に失敗しました。');
     } finally {
-      mutations.delete(key); resolveMutation(); pending.restore();
+      // Success keeps editors locked until navigation actually replaces this
+      // document; failure restores their exact state and retained draft.
+      if (!reloadStarted) {
+        controls.forEach((control, index) => { control.disabled = disabled[index]; });
+        muteMutation = null; mutations.delete(key); resolveMutation(); pending.restore();
+      }
     }
   });
   document.addEventListener('click', event => {

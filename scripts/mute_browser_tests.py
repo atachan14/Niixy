@@ -49,6 +49,111 @@ class MuteBrowserTests(StaticLiveServerTestCase):
             if creator == self.other: self.shown_thread = thread
         self.client.force_login(self.viewer)
 
+    def test_unsaved_review_mute_confirmation_pc_mobile(self):
+        from playwright.sync_api import sync_playwright, expect
+        from scripts.browser_smoke import wait_for_trail_count
+        output = Path(settings.BASE_DIR) / '.artifacts' / 'mute'
+        output.mkdir(parents=True, exist_ok=True)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(channel='msedge', headless=True)
+            try:
+                for name, size in [('desktop', {'width': 1280, 'height': 900}), ('mobile', {'width': 390, 'height': 844})]:
+                    context = browser.new_context(viewport=size, is_mobile=name == 'mobile', has_touch=name == 'mobile')
+                    context.add_cookies([{'name': settings.SESSION_COOKIE_NAME, 'value': self.client.cookies[settings.SESSION_COOKIE_NAME].value, 'url': self.live_server_url}])
+                    page = context.new_page(); page.set_default_timeout(10000)
+                    errors = []
+                    page.on('pageerror', lambda error: errors.append(str(error)))
+                    page.on('console', lambda msg: errors.append(msg.text) if msg.type == 'error' and not msg.location.get('url', '').endswith('/favicon.ico') else None)
+                    page.goto(self.live_server_url + '/accounts/mute_browser_target/')
+                    section = page.locator('.account-overview-pane [data-review-section]')
+                    mute = section.locator('[data-mute-form] button')
+                    form = page.locator('[data-review-form]')
+                    # Count writes without recording their contents.
+                    page.evaluate("""() => { window.muteWrites = 0; window.originalMuteFetch = window.fetch;
+                        window.fetch = (...args) => {
+                            if (String(args[0]).endsWith('/mute/')) window.muteWrites += 1;
+                            return window.originalMuteFetch(...args);
+                        }; }""")
+                    # An unchanged Review needs no confirmation; a dirty closed
+                    # draft does, even if the visible editing Pane is absent.
+                    section.locator('[data-review-edit=love]').first.click()
+                    expect(form).to_be_visible()
+                    form.locator('[data-review-cancel]').click(); wait_for_trail_count(page, 0)
+                    with page.expect_navigation(): mute.click()
+                    expect(mute).to_have_attribute('aria-pressed', 'true')
+                    with page.expect_navigation(): mute.click()
+                    expect(mute).to_have_attribute('aria-pressed', 'false')
+                    page.evaluate("""() => { window.muteWrites = 0; window.originalMuteFetch = window.fetch;
+                        window.fetch = (...args) => {
+                            if (String(args[0]).endsWith('/mute/')) window.muteWrites += 1;
+                            return window.originalMuteFetch(...args);
+                        }; }""")
+                    section.locator('[data-review-edit=hate]').first.click()
+                    expect(form).to_be_visible()
+                    form.locator('textarea').fill('保持する未保存Review ' + name)
+                    expect(section.locator('[data-review-edit=love]').first).to_have_attribute('aria-pressed', 'true')
+                    # Exercise an open-editor Mute submit, then normal UI after Close.
+                    def dismiss(dialog):
+                        self.assertIn('未保存のReview', dialog.message)
+                        dialog.dismiss()
+                    page.once('dialog', dismiss)
+                    section.locator('[data-mute-form]').evaluate("el => el.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}))")
+                    expect(form.locator('textarea')).to_have_value('保持する未保存Review ' + name)
+                    expect(form).to_be_visible()
+                    self.assertEqual(page.evaluate('window.muteWrites'), 0)
+                    # A failed confirmed Mute freezes input while pending and
+                    # restores it without discarding the Review afterward.
+                    page.evaluate("""() => { window.guardFetch = window.fetch; window.fetch = (...args) =>
+                        String(args[0]).endsWith('/mute/') ? new Promise(resolve => {
+                            window.releaseGuardWrite = () => resolve(new Response(JSON.stringify({error: 'QA保留後の通信失敗'}), {status: 503, headers: {'Content-Type': 'application/json'}}));
+                        }) : window.guardFetch(...args); }""")
+                    page.once('dialog', lambda dialog: dialog.accept())
+                    section.locator('[data-mute-form]').evaluate("el => el.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}))")
+                    expect(form.locator('textarea')).to_be_disabled()
+                    expect(form.locator('[type=submit]')).to_be_disabled()
+                    page.evaluate('() => window.releaseGuardWrite()')
+                    expect(section.locator('.review-error')).to_contain_text('QA保留後の通信失敗')
+                    expect(form.locator('textarea')).to_be_enabled()
+                    expect(form.locator('textarea')).to_have_value('保持する未保存Review ' + name)
+                    expect(mute).to_have_attribute('aria-pressed', 'false')
+                    page.evaluate('() => { window.fetch = window.guardFetch; }')
+                    form.locator('[data-review-cancel]').click(); wait_for_trail_count(page, 0)
+                    page.once('dialog', dismiss); mute.click()
+                    expect(mute).to_have_attribute('aria-pressed', 'false')
+                    self.assertEqual(page.evaluate('window.muteWrites'), 0)
+                    section.locator('[data-review-edit=love]').first.click()
+                    expect(form.locator('textarea')).to_have_value('保持する未保存Review ' + name)
+                    page.screenshot(path=output / f'{name}-draft-retained.png')
+                    form.locator('[data-review-cancel]').click(); wait_for_trail_count(page, 0)
+                    # Another Account's closed Review draft also survives a
+                    # cancelled Mute, because reload would otherwise discard it.
+                    section.locator('[data-review-tab=muter]').click()
+                    section.locator('.muter-summary').first.click(); wait_for_trail_count(page, 1)
+                    nested = page.locator('.ui-workspace-trail-pane [data-review-section]')
+                    nested.locator('[data-review-edit=love]').first.click(); wait_for_trail_count(page, 2)
+                    form.locator('textarea').fill('別Accountの未保存Review ' + name)
+                    form.locator('[data-review-cancel]').click(); wait_for_trail_count(page, 1)
+                    nested_mute = nested.locator('[data-mute-form] button')
+                    page.once('dialog', dismiss); nested_mute.click()
+                    self.assertEqual(page.evaluate('window.muteWrites'), 0)
+                    nested.locator('[data-review-edit=love]').first.click(); wait_for_trail_count(page, 2)
+                    expect(form.locator('textarea')).to_have_value('別Accountの未保存Review ' + name)
+                    form.locator('[data-review-cancel]').click(); wait_for_trail_count(page, 1)
+                    page.locator('.ui-workspace-trail-header .icon-button').click(); wait_for_trail_count(page, 0)
+                    # Confirmed discard still performs the requested Mute,
+                    # while the persisted Love/Review body remains unchanged.
+                    page.once('dialog', lambda dialog: dialog.accept())
+                    with page.expect_navigation(): mute.click()
+                    expect(mute).to_have_attribute('aria-pressed', 'true')
+                    expect(section.locator('[data-review-edit=love]').first).to_have_attribute('aria-pressed', 'true')
+                    expect(section.locator('.review-post .thread-post-body')).to_have_text('Muteから独立したReview本文')
+                    with page.expect_navigation(): mute.click()
+                    expect(mute).to_have_attribute('aria-pressed', 'false')
+                    self.assertEqual(errors, [])
+                    context.close()
+            finally:
+                browser.close()
+
     def test_mute_pc_mobile_and_existing_workspace_smoke(self):
         from playwright.sync_api import sync_playwright, expect
         from scripts.browser_smoke import main as smoke_main

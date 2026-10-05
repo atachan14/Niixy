@@ -8,7 +8,7 @@
 
 既存Reviewヘッダへ保存状態付きMuteボタン、Bodyへ公開Muter(count)タブを追加する。Muterは対象をMuteしているAccountsを表示名 @NiixyID・日時の一行Summaryで新しい順（同時刻はID降順）に表示する。初期8件、もっと見るは10件単位、前へ / 次へ / 畳むを既存Reviewと共通化する。Guestは閲覧でき、操作ボタンはGuest / 本人で無効。Muterタブで公開性が分かるため追加の「公開される」警告は設けない。
 
-Mute変更成功後は現在URLを再取得し、保持している一覧・本文・map markerを一緒に更新する。解除によって初期HTMLに無かった対象も復帰する。再取得はWorkspace内の未保存Review入力を破棄するため、未保存編集を伴う操作の継続保持は後続改善候補。通信失敗時は変更済み表示にせずエラーを示し、再送を可能にする。重複POSTは状態を反転しない。
+Mute変更成功後は現在URLを再取得し、保持している一覧・本文・map markerを一緒に更新する。解除によって初期HTMLに無かった対象も復帰する。Workspace内に未保存Reviewがある場合は、既存共通Paneと同じwindow.confirmで送信前に入力破棄の確認を求める。キャンセル時は送信・再取得を行わず、開いている／閉じた／別AccountのReview入力と保存済み評価を保持する。破棄を承認した場合だけMute変更後に再取得する。送信中はReviewの入力・新規編集を固定し、後から入力を黙って失うことを防ぐ。通信失敗時は変更済み表示にせずエラーを示し、再送を可能にする。重複POSTは状態を反転しない。
 
 ## 本人の表示filter
 
@@ -34,3 +34,6 @@ NiiMapの直接`?thread=`は必要な詳細だけを取得し、filtered Summary
 2026-10-05の結果: 直接回帰55件（Mute11件、Mute / Review migration2件、Review10件、AccountPage15件、Account Board / Map Board17件）とPC / mobile browser1件が成功。browser内の既存smokeは両viewport各17check、warnings / browser_errorsとも0。Muter / Response / WorkspaceのPC・mobile画像を目視確認し、mobileの長いMuter名による横はみ出しを修正して、viewport / scroll幅assertionとブラウザを再実行した。`manage.py check`問題なし、`makemigrations --check --dry-run`追加差分なし。途中の失敗はテスト期待（Roomの既存非表示説明、Review count契約、Board selector、更新asset version）と上記横幅問題を修正済み。全域反復は行っていない。
 
 画像は`.artifacts/mute/`と`.artifacts/browser-smoke/`に未追跡で保存する。通常serverは37132 → 34712（開始2026-10-05 21:48:11、8000 listener 34712）を維持し、起動・停止・restartは行っていない。共有Neon migration / テスト書込み、push、公開後GETは未実施。公開DB上の行保全・PostgreSQL並行競合は未検証。新規migrationはコード準備だけで、隔離SQLite以外に適用していない。root READMEは不変更、inboxの既存差分は変更・stageせず残す。
+
+
+追補（未保存Review保護）: Mute送信前にWorkspace全体のdirty draftを確認し、既存共通Paneのwindow.confirmで破棄確認する。CancelではPOST / reloadを行わない。未変更のReviewでは確認不要。入力と別AccountのReview保存をMute送信中に進めず、成功時はnavigationまで固定、失敗時は元のdisabled状態とdraftを復元する。永続storageへdraftを保存しない。隔離対象3件（新しいPC / mobile確認試験、既存Review browser回帰、asset marker直接試験）が成功し、既存smokeは各17check / warnings・browser_errorsとも0。さらに新規対象だけを再実行し、保留Mute失敗時の入力固定・復元も確認した。通常server / 共有DB / pushは未実施、新規migration追加なし。
