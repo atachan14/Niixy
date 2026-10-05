@@ -10,7 +10,7 @@ Interface・Field・Layoutは、既存内容の旧版表示を維持し、新規
 
 今回の実装対象はAccountのField／IF更新、凍結／復帰、共有値の確認付き統合、状態表示と隔離回帰。Threadは現在、新規作成時だけ最新Field／IFを解決し、既存IFのVersionと値表示を保持する。適用済みThreadの版／値編集APIはまだないため、Accountだけで共通の編集対応が完了したとは扱わない。Thread編集導入時は同じ最新版・preview契約を実装する。
 
-Layout本体は未実装。将来、依存IFが凍結しても適用済みLayout表示を継続し、新規適用／編集には最新版条件を要求する。非表示や標準Layoutへの自動差替えは行わない。投稿時SnapshotはThreadPostの`#1`・Response側に、当時の表示名／表示値と不変FieldVersion／LayoutVersion参照を保持する契約とし、defaultLayoutにも適用する。今回はSnapshotを実装しない。
+Layout本体はこのv0.14基盤の対象外で、後続の[AccountLayout初期実装](account-layout.md)で扱う。依存IFが凍結しても適用済みLayout表示を継続し、新規適用／編集には最新版条件を要求する。非表示や標準Layoutへの自動差替えは行わない。投稿時SnapshotはThreadPostの`#1`・Response側に、当時の表示名／表示値と不変FieldVersion／LayoutVersion参照を保持する契約とし、defaultLayoutにも適用する。Snapshotは引き続き別の将来要件。
 
 ## 判定表
 

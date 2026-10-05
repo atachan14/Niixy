@@ -157,18 +157,22 @@ def prepare_threads(queryset, viewer):
 
 
 def account_page(request, username):
+    from interfaces.account_layouts import profile_context
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     return render(request, 'accounts/account_page.html', {
         'account': account,
+        **profile_context(account),
         'thread_field_catalog': thread_field_catalog(),
         'thread_interface_catalog': thread_interface_catalog(),
     })
 
 
 def account_pane(request, username):
+    from interfaces.account_layouts import profile_context
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     return render(request, 'accounts/partials/account_pane.html', {
         'account': account,
+        **profile_context(account),
         'thread_field_catalog': thread_field_catalog(),
         'thread_interface_catalog': thread_interface_catalog(),
     })

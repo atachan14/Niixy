@@ -240,6 +240,8 @@ function bindProfileModuleList(list, initialState) {
       openProfileModuleDetail('field', item.dataset.detailUrl, new URL(item.href).searchParams.get('field'));
     } else if (type === 'interface') {
       openProfileModuleDetail('interface', item.dataset.detailUrl, new URL(item.href).searchParams.get('interface'));
+    } else if (type === 'layout') {
+      openProfileModuleDetail('layout', item.dataset.detailUrl, new URL(item.href).searchParams.get('layout'));
     }
   });
 }
@@ -267,6 +269,7 @@ async function openProfileModuleDetail(type, url, id, shouldUpdateUrl = true) {
   detail.classList.add('profile-module-detail-pane');
   loading.replaceWith(detail);
   profileStack.align();
+  if (type === 'layout') window.NiixyAccountLayouts?.bind(detail, {inline: true});
   const closeSelector = type === 'field' ? '[data-close-field-detail]' : '[data-close-interface-detail]';
   detail.querySelector(closeSelector)?.addEventListener('click', () => {
     detail.remove();
@@ -573,6 +576,7 @@ function applyStateFromUrl() {
       const interfaceId = params.get('interface');
       if (fieldId) openProfileModuleDetail('field', replaceTemplateId(moduleFieldDetailTemplate, fieldId), fieldId, false);
       else if (interfaceId) openProfileModuleDetail('interface', replaceTemplateId(moduleInterfaceDetailTemplate, interfaceId), interfaceId, false);
+      else if (params.get('layout')) openProfileModuleDetail('layout', `/mypage/interfaces/layouts/${encodeURIComponent(params.get('layout'))}/`, params.get('layout'), false);
     });
   } else {
     removeProfileModule();
@@ -622,6 +626,7 @@ if (initialParams.get('pane') === 'board' || initialParams.has('boards')) {
     const interfaceId = initialParams.get('interface');
     if (fieldId) openProfileModuleDetail('field', replaceTemplateId(moduleFieldDetailTemplate, fieldId), fieldId, false);
     else if (interfaceId) openProfileModuleDetail('interface', replaceTemplateId(moduleInterfaceDetailTemplate, interfaceId), interfaceId, false);
+    else if (initialParams.get('layout')) openProfileModuleDetail('layout', `/mypage/interfaces/layouts/${encodeURIComponent(initialParams.get('layout'))}/`, initialParams.get('layout'), false);
   });
 } else {
   updateAccountNavigation();

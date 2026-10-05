@@ -1,0 +1,15 @@
+<aside class="ui-pane ui-detail-pane interface-detail-pane account-layout-detail" data-mypage-pane="interface-detail" data-layout-detail data-layout-id="{{ layout.pk }}" data-layout-version="{{ version.pk }}" data-edit-url="{% url 'interfaces:layout-edit' layout.pk %}" {% if user.is_authenticated and management %}data-apply-url="{% url 'accounts:layout-change' user.username %}"{% endif %}>
+  <header class="ui-pane-header ui-detail-pane-header"><h2>{{ version.name }}@{{ layout.creator.username }} v{{ version.version_number }}/AccountLayout</h2><button type="button" class="icon-button" data-close-interface-detail aria-label="Module一覧に戻る">×</button></header>
+  <div class="layout-detail-content">
+    <p>{{ version.description|linebreaksbr }}</p><p class="field-help">AccountPage下部のProfileに適用します。Field/AccountIFと値はLayoutを切り替えても保持します。</p>
+    <h3>Require</h3><div class="layout-require-status">
+    {% for r in requirements %}<button class="ui-summary-item" type="button" data-layout-require-url="{% url 'interfaces:layout-requirement' r.kind r.id %}"><strong>{{ r.name }}@{{ r.creator }} v{{ r.version }}/{% if r.kind == 'field' %}Field{% else %}AccountIF{% endif %}</strong>{% if user.is_authenticated %}<small>{% if r.ready %}適用済み{% else %}{{ r.reason }}{% endif %}</small>{% endif %}</button>{% empty %}<p>Requireなし</p>{% endfor %}</div>
+    <h3>Item</h3>{% for item in version.items.all %}<p><code>{{ item.alias }}.name / {{ item.alias }}.value</code> → {{ item.field_version.name }} v{{ item.field_version.version_number }}</p>{% empty %}<p>Itemなし</p>{% endfor %}
+    <details><summary>HTML / CSSを確認</summary><pre>{{ version.html }}</pre><pre>{{ version.css }}</pre></details>
+    {% for reason in reasons %}<p class="field-error">{{ reason }}</p>{% endfor %}
+    {% if applied_layout and management %}<p>現在のProfile: {{ applied_layout.version.name }} v{{ applied_layout.version.version_number }}</p>{% endif %}
+    <p data-layout-message role="status"></p>
+    {% if user.is_authenticated and management %}{% csrf_token %}<div class="layout-actions"><button type="button" class="button" data-layout-apply {% if not can_apply %}disabled{% endif %}>この公開版を適用</button><button type="button" class="button secondary" data-layout-remove {% if not applied_layout %}disabled{% endif %}>現在のLayoutを取り外す</button>{% if user.pk == layout.creator_id %}<button type="button" class="button secondary" data-layout-edit>新しいDraftを編集</button>{% endif %}</div>{% endif %}
+    {% if not can_apply and user.is_authenticated and management %}<p class="field-help">不足するRequireを開き、必要Modを先に適用・最新版へ更新してください。</p>{% endif %}
+  </div>
+</aside>

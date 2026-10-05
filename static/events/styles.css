@@ -1239,3 +1239,4 @@ html.has-restored-niimap-workspace .thread-track { transition: none; visibility:
 .ui-pane-header { height: var(--pane-header-height); }
 
 #niimap-list-retry[hidden] { display: none !important; }
+[data-account-layout-surface] { display: block; min-width: 0; max-width: 100%; contain: layout style paint; isolation: isolate; }

@@ -2,10 +2,12 @@ from django.urls import path
 
 from . import views
 from rooms import views as board_views
+from interfaces import layout_views
 
 app_name = 'accounts'
 
 urlpatterns = [
+    path('<str:username>/layout/change/', layout_views.apply, name='layout-change'),
     path('account-conditions/', views.account_condition_list, name='account-condition-list'),
     path('account-conditions/accounts/', views.account_condition_search, name='account-condition-search'),
     path('account-conditions/rooms/', views.account_condition_room_search, name='account-condition-room-search'),

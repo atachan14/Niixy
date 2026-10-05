@@ -142,6 +142,8 @@ def change_application(account, payload, confirmation=None):
         except manager.model.DoesNotExist as error:
             raise ValidationError('適用済み項目が見つかりません。') from error
         affected = [item.binding_id] if operation == 'remove_field' else list(item.values.values_list('binding_id', flat=True))
+        from .account_layouts import removal_guard
+        removal_guard(account, operation, item)
         item.delete()
         account.field_bindings.filter(pk__in=affected, direct_implementations__isnull=True, interface_values__isnull=True).delete()
         account.field_values.filter(bindings__isnull=True).delete()

@@ -22,7 +22,8 @@
   </div>
   <div class="ui-tabs module-filter module-subtype-filter" role="tablist" aria-label="Layoutの種類" data-module-subtypes="layout" hidden>
     <button class="is-active" type="button" role="tab" aria-selected="true" data-module-subtype="thread_post">ThreadPost</button>
-    <button type="button" role="tab" aria-selected="false" data-module-subtype="profile">Profile</button>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="account">Account</button>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="room">Room</button>
   </div>
 
   <div class="ui-tabs module-filter" role="tablist" aria-label="Module一覧の分類" data-module-collection-filter>
@@ -70,9 +71,9 @@
       <p class="empty" data-module-empty>削除済みInterfaceはありません。</p>
     </section>{% endif %}
 
-    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:search"><p class="empty">選択したLayoutの検索は今後実装予定です。</p></section>{% endif %}
-    <section class="module-list-panel" data-module-panel="layout:self"><p class="empty">{% if profile_mode %}自作のLayoutはありません。{% else %}Layoutの作成は今後実装予定です。{% endif %}</p></section>
-    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:editing"><p class="empty">編集中のLayoutはありません。</p></section>{% endif %}
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:search"><div data-layout-account-panel><label>AccountLayoutを絞り込む<input type="search" data-layout-search placeholder="名前・作成者"></label>{% for layout in layout_search_results %}{% include 'interfaces/layout_summary_item.html' %}{% endfor %}</div><p data-layout-future hidden>この種類のLayoutは今後実装予定です。</p></section>{% endif %}
+    <section class="module-list-panel" data-module-panel="layout:self"><div data-layout-account-panel>{% if not profile_mode %}<div class="module-create-action"><button class="button" type="button" data-layout-create-url="{% url 'interfaces:layout-draft-create' %}">新規作成</button></div>{% endif %}{% for layout in account_layouts %}{% include 'interfaces/layout_summary_item.html' %}{% empty %}<p class="empty">自作のAccountLayoutはありません。</p>{% endfor %}</div><p data-layout-future hidden>この種類のLayoutは今後実装予定です。</p></section>
+    {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:editing"><div data-layout-account-panel>{% for draft in account_layout_drafts %}{% include 'interfaces/layout_summary_item.html' %}{% empty %}<p class="empty">編集中のAccountLayoutはありません。</p>{% endfor %}</div><p data-layout-future hidden>この種類のLayoutは今後実装予定です。</p></section>{% endif %}
     <section class="module-list-panel" data-module-panel="layout:saved"><p class="empty">保存したLayoutはありません。</p></section>
     {% if not profile_mode %}<section class="module-list-panel" data-module-panel="layout:deleted"><p class="empty">削除済みLayoutはありません。</p></section>{% endif %}
   </div>

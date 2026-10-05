@@ -698,3 +698,20 @@
 }
 
 .mypage-workspace .thread-create-module-selector-pane { display: block; }
+/* AccountLayout keeps the existing Pane sizing/navigation contract. */
+.layout-item-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+.layout-item-row > * { min-width: 0; width: 100%; }
+.layout-require-picker { max-height: 240px; overflow-y: auto; }
+.layout-require-choice { display: flex; gap: 8px; align-items: baseline; overflow-wrap: anywhere; padding: 6px 0; }
+.layout-require-choice input { width: auto; flex: none; }
+.layout-require-choice[hidden] { display: none; }
+.account-layout-editor textarea, .account-layout-editor input, .account-layout-editor select { max-width: 100%; min-width: 0; }
+.account-layout-editor textarea { width: 100%; box-sizing: border-box; }
+.account-layout-editor textarea[name=html], .account-layout-editor textarea[name=css] { font: 14px/1.5 monospace; }
+.layout-detail-content { padding: 16px; min-width: 0; overflow-y: auto; }
+.layout-detail-content pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.layout-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+.layout-require-status { display: grid; gap: 8px; }
+.account-layout-detail > .layout-requirement-pane { height: auto; width: 100%; flex: none; }
+.account-layout-detail [data-layout-message], .layout-requirement-pane p { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .layout-item-row { grid-template-columns: minmax(0, 1fr) auto; } .layout-item-row select { grid-column: 1 / -1; } }

@@ -507,3 +507,71 @@ class AccountInterfaceValue(models.Model):
         if isinstance(value, list):
             return ' / '.join(str(item) for item in value)
         return str(value)
+
+
+class AccountLayout(models.Model):
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='account_layouts')
+    name = models.CharField(max_length=120)
+    current_version = models.ForeignKey('AccountLayoutVersion', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(Lower('name'), 'creator', name='unique_account_layout_name')]
+        ordering = ['name', 'pk']
+
+
+class AccountLayoutDraft(models.Model):
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='account_layout_drafts')
+    layout = models.OneToOneField(AccountLayout, null=True, blank=True, on_delete=models.CASCADE, related_name='draft')
+    name = models.CharField(max_length=120, default='新しいAccountLayout')
+    description = models.TextField(blank=True, default='')
+    html = models.TextField(blank=True, default='')
+    css = models.TextField(blank=True, default='')
+    requirements = models.JSONField(default=dict)
+    items = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class AccountLayoutVersion(ImmutablePublishedModel):
+    layout = models.ForeignKey(AccountLayout, on_delete=models.CASCADE, related_name='versions')
+    version_number = models.PositiveIntegerField()
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True, default='')
+    html = models.TextField(blank=True, default='')
+    css = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['layout', 'version_number'], name='unique_account_layout_version')]
+
+
+class AccountLayoutRequireField(ImmutablePublishedModel):
+    version = models.ForeignKey(AccountLayoutVersion, on_delete=models.CASCADE, related_name='require_fields')
+    field_version = models.ForeignKey(FieldVersion, on_delete=models.PROTECT, related_name='layout_requirements')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['version', 'field_version'], name='unique_layout_require_field')]
+
+
+class AccountLayoutRequireIF(ImmutablePublishedModel):
+    version = models.ForeignKey(AccountLayoutVersion, on_delete=models.CASCADE, related_name='require_interfaces')
+    interface_version = models.ForeignKey(InterfaceVersion, on_delete=models.PROTECT, related_name='layout_requirements')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['version', 'interface_version'], name='unique_layout_require_if')]
+
+
+class AccountLayoutItem(ImmutablePublishedModel):
+    version = models.ForeignKey(AccountLayoutVersion, on_delete=models.CASCADE, related_name='items')
+    alias = models.CharField(max_length=32)
+    field_version = models.ForeignKey(FieldVersion, on_delete=models.PROTECT, related_name='layout_items')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['version', 'alias'], name='unique_layout_item_alias')]
+
+
+class AccountLayoutApplication(models.Model):
+    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='layout_application')
+    version = models.ForeignKey(AccountLayoutVersion, on_delete=models.PROTECT, related_name='applications')
+    updated_at = models.DateTimeField(auto_now=True)

@@ -221,7 +221,7 @@ window.NiixyUI = (() => {
     const subtypeByType = {
       element: new Set(['field', 'computed_field', 'action']),
       interface: new Set(['account', 'thread', 'thread_post']),
-      layout: new Set(['thread_post', 'profile']),
+      layout: new Set(['thread_post', 'account', 'room']),
     };
     const allowedCollections = new Set(['search', 'self', 'editing', 'saved', 'deleted']);
     const state = {
@@ -271,6 +271,8 @@ window.NiixyUI = (() => {
       list.querySelectorAll('[data-module-panel^="interface:"] .module-summary-entry').forEach((item) => {
         item.hidden = item.dataset.moduleSubtype !== state.subtypes.interface;
       });
+      list.querySelectorAll('[data-layout-account-panel]').forEach(panel => { panel.hidden = state.subtypes.layout !== 'account'; });
+      list.querySelectorAll('[data-layout-future]').forEach(panel => { panel.hidden = state.subtypes.layout === 'account'; });
       list.querySelectorAll('[data-module-empty]').forEach((empty) => {
         const panel = empty.closest('[data-module-panel]');
         const hasVisibleItem = Array.from(panel.querySelectorAll('.module-summary-entry')).some((item) => !item.hidden);

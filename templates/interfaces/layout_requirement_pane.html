@@ -1,0 +1,8 @@
+<aside class="ui-pane ui-detail-pane add-field-detail-pane layout-requirement-pane" data-layout-requirement>
+  <header class="ui-pane-header ui-detail-pane-header"><h2>{{ definition.name }}@{{ definition.creator.username }} / {% if kind == 'field' %}Field{% else %}AccountIF{% endif %}</h2><button class="icon-button" type="button" data-layout-require-close aria-label="Layoutに戻る">×</button></header>
+  <div class="layout-detail-content"><h3>最新定義 v{{ definition.current_version.version_number }}</h3><p>{{ definition.current_version.description|linebreaksbr }}</p>
+  {% if kind == 'field' %}<p>{{ definition.current_version.get_field_type_display }}</p>{% for option in definition.current_version.settings.options %}<p>{{ option }}</p>{% endfor %}{% else %}{% for field in definition.current_version.fields.all %}<p>{{ field.label }} v{{ field.field_version.version_number }} / {{ field.get_field_type_display }} / {% if field.required %}必須{% else %}任意{% endif %}</p>{% endfor %}{% endif %}
+  {{ requirement_data|json_script:'layout-requirement-data' }}
+  {% if user.is_authenticated and management %}<form data-layout-require-form data-change-url="{% url 'accounts:applied-change' account.username %}">{% csrf_token %}<div data-layout-require-inputs></div><button class="button" type="submit">適用・最新版へ更新</button><p data-layout-message role="status"></p></form>{% endif %}
+  </div>
+</aside>

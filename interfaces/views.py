@@ -113,7 +113,11 @@ def interface_list_context(user):
 
 
 def module_list_context(user):
+    from .models import AccountLayout
     context = interface_list_context(user)
+    context.update({'account_layouts': user.account_layouts.select_related('current_version'),
+                    'account_layout_drafts': user.account_layout_drafts.all(),
+                    'layout_search_results': AccountLayout.objects.select_related('creator', 'current_version').all()})
     fields = list(
         user.field_definitions.select_related('current_version').order_by('name')
     )
@@ -183,6 +187,7 @@ def profile_module_list_context(user):
         ).order_by('name')
     ))
     return {
+        'account_layouts': user.account_layouts.select_related('current_version', 'creator'),
         'profile_mode': True,
         'profile_account': user,
         'active_fields': fields,

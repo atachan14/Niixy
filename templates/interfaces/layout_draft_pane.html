@@ -1,0 +1,22 @@
+<aside class="ui-pane ui-detail-pane interface-detail-pane account-layout-editor" data-mypage-pane="interface-detail" data-layout-editor data-save-url="{% url 'interfaces:layout-draft-save' draft.pk %}" data-discard-url="{% url 'interfaces:layout-draft-discard' draft.pk %}">
+  <header class="ui-pane-header ui-detail-pane-header"><h2>AccountLayout Draft</h2><button type="button" class="icon-button" data-close-interface-detail aria-label="Module一覧に戻る">×</button></header>
+  {{ layout_data|json_script:'layout-editor-data' }}{{ layout_catalog|json_script:'layout-editor-catalog' }}
+  <form data-layout-form class="interface-draft-form">{% csrf_token %}
+    <div class="field"><label>名前<input name="name" maxlength="120" value="{{ draft.name }}"></label></div>
+    <div class="field"><label>詳細<textarea name="description" rows="2" maxlength="2000">{{ draft.description }}</textarea></label></div>
+    <details class="interface-form-section" open><summary>Requireを先に選択</summary><div class="interface-section-body">
+      <p class="field-help">最新版のRequireField / RequireAccountIFを選択します。AccountIF内のFieldもItemに使えます。</p>
+      <label>定義を絞り込む<input type="search" data-layout-require-search placeholder="名前・作成者"></label>
+      <div class="layout-require-picker" data-layout-require-picker></div>
+    </div></details>
+    <details class="interface-form-section" open><summary>Item変数名</summary><div class="interface-section-body"><div data-layout-items></div><button class="button secondary" type="button" data-layout-add-item>Itemを追加</button><p class="field-help">例: blood → HTML本文に {% templatetag openvariable %}blood.name{% templatetag closevariable %} / {% templatetag openvariable %}blood.value{% templatetag closevariable %}。属性・CSSには変数を使えません。</p></div></details>
+    <div class="ui-tabs layout-editor-tabs" role="tablist" aria-label="Layout編集">
+      <button type="button" class="is-active" role="tab" aria-selected="true" data-layout-tab="html">HTML</button><button type="button" role="tab" aria-selected="false" data-layout-tab="css">CSS</button><button type="button" role="tab" aria-selected="false" data-layout-tab="preview">プレビュー</button>
+    </div>
+    <div data-layout-panel="html"><label>HTML<textarea name="html" rows="14" maxlength="20000" spellcheck="false">{{ draft.html }}</textarea></label><p class="field-help">div / section / span / p / 見出し / リストなど。class・title・lang・aria-labelを使えます。</p></div>
+    <div data-layout-panel="css" hidden><label>CSS<textarea name="css" rows="14" maxlength="10000" spellcheck="false">{{ draft.css }}</textarea></label><p class="field-help">.classと要素名、flex/grid、色、余白、角丸、幅の@media。position・URL・script・formは使えません。例: .card { display: grid; gap: 12px; padding: 16px; background-color: #f2f4fa; border-radius: 12px; }</p></div>
+    <div data-layout-panel="preview" hidden><p class="field-help">自分の現在のApplied値を表示します。未適用Fieldはサンプル値です。プレビュー更新後に公開できます。</p><button class="button secondary" type="button" data-layout-preview>プレビューを更新</button><div data-layout-preview-surface aria-label="AccountLayoutプレビュー"></div></div>
+    <p data-layout-message role="status"></p>
+    <div class="layout-actions"><button class="button" type="button" data-layout-save>Draft保存</button><button class="button" type="button" data-layout-publish>公開</button><button class="button secondary" type="button" data-layout-discard>Draftを破棄</button></div>
+  </form>
+</aside>

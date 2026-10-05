@@ -1,10 +1,18 @@
 from django.urls import path
 
 from . import views
+from . import layout_views
 
 app_name = 'interfaces'
 
 urlpatterns = [
+    path('layouts/drafts/new/', layout_views.draft_create, name='layout-draft-create'),
+    path('layouts/drafts/<int:draft_id>/', layout_views.draft_detail, name='layout-draft-detail'),
+    path('layouts/drafts/<int:draft_id>/save/', layout_views.draft_save, name='layout-draft-save'),
+    path('layouts/drafts/<int:draft_id>/discard/', layout_views.draft_discard, name='layout-draft-discard'),
+    path('layouts/<int:layout_id>/', layout_views.detail, name='layout-detail'),
+    path('layouts/<int:layout_id>/edit/', layout_views.edit, name='layout-edit'),
+    path('layouts/require/<str:kind>/<int:definition_id>/', layout_views.requirement_detail, name='layout-requirement'),
     path('manage/modules/', views.module_management_list, name='module-management-list'),
     path('manage/modules/fields/search/', views.field_search, name='field-search'),
     path('manage/drafts/<int:draft_id>/', views.draft_detail, name='draft-detail'),

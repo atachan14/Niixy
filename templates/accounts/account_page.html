@@ -3,7 +3,7 @@
 
 {% block title %}{{ account.niixy_profile.display_label }} | Niixy{% endblock %}
 {% block main_class %}account-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261005-map-board-ui"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261005-map-board-ui">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261005-map-board-ui"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261005-account-layout"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261005-map-board-ui">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
@@ -68,4 +68,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261005-account-board"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'accounts/account.js' %}?v=20261005-account-layout"></script>{% endblock %}

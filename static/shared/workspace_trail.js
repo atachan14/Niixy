@@ -281,6 +281,8 @@ window.NiixyWorkspaceTrail = (() => {
         const moduleEntry = trail.push({title: '読み込み中...', width: 'remaining', url: module.href, after: entry});
         fetchInto(moduleEntry, module.dataset.detailUrl).then(() => {
           moduleEntry.heading.textContent = moduleEntry.body.querySelector('.ui-detail-pane h2, h2')?.textContent || 'Module詳細';
+          const layout = moduleEntry.body.querySelector('[data-layout-detail]');
+          if (layout) window.NiixyAccountLayouts?.bind(layout, {inline: true});
         }).catch((error) => showError(moduleEntry, error));
       }
     });

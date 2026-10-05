@@ -169,6 +169,7 @@ function bindModuleList(list, initialState) {
   });
   list.querySelector('[data-close-module-list]')?.addEventListener('click', showOverview);
   list.querySelector('[data-field-create-url]')?.addEventListener('click', (event) => openFieldDetail(event.currentTarget.dataset.fieldCreateUrl));
+  window.NiixyAccountLayouts?.bindList(list, openInterfaceDetail, () => openModuleList({type: 'layout', subtype: 'account', collection: 'editing'}, false));
   NiixyUI.bindSummarySearch(list);
   list.addEventListener('click', (event) => {
     const item = event.target.closest('[data-detail-url]');
@@ -176,7 +177,7 @@ function bindModuleList(list, initialState) {
     event.preventDefault();
     const [type, subtype] = item.closest('[data-module-panel]').dataset.modulePanel.split(':');
     if (type === 'element' && subtype === 'field') openFieldDetail(item.dataset.detailUrl);
-    else if (type === 'interface') openInterfaceDetail(item.dataset.detailUrl, item.getAttribute('href'));
+    else if (type === 'interface' || type === 'layout') openInterfaceDetail(item.dataset.detailUrl, item.getAttribute('href'));
   });
   bindAjaxForms(list);
 }
@@ -367,7 +368,9 @@ function bindAjaxForms(root) {
 }
 
 function bindInterfaceDetail(detail) {
+  window.NiixyAccountLayouts?.bind(detail, {open: openInterfaceDetail, stage: setInterfaceStage, refresh: () => openModuleList({type: 'layout', subtype: 'account', collection: 'self'})});
   detail.querySelector('[data-close-interface-detail]')?.addEventListener('click', () => {
+    if (detail.matches('[data-layout-editor], [data-layout-detail]')) { openModuleList(currentModuleState()); return; }
     setInterfaceStage('list');
     removePanes('interface-detail', 'add-field-list', 'add-field-detail');
     history.pushState({}, '', moduleLocation(currentModuleState('interface')));
@@ -461,6 +464,8 @@ if (initialParams.get('section') === 'applied') {
 } else if (initialParams.get('section') === 'module') {
   const type = initialParams.get('type') || 'field';
   openModuleList(currentModuleState(type), false).then(async () => {
+    if (initialParams.get('layout_draft')) await openInterfaceDetail(`/mypage/interfaces/layouts/drafts/${initialParams.get('layout_draft')}/`);
+    else if (initialParams.get('layout')) await openInterfaceDetail(`/mypage/interfaces/layouts/${initialParams.get('layout')}/?manage=1`);
     if (initialParams.get('field_edit')) await openFieldDetail(`/mypage/interfaces/manage/fields/${initialParams.get('field_edit')}/edit/`);
     else if (initialParams.get('field')) await openFieldDetail(`/mypage/interfaces/manage/fields/${initialParams.get('field')}/`);
     if (initialParams.get('draft')) await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${initialParams.get('draft')}/`);

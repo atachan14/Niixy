@@ -56,4 +56,4 @@ class AccountVersionMigrationTests(TransactionTestCase):
             self.assertIsNone(new.get_model('interfaces', 'AccountFieldBinding').objects.get(pk=legacy_binding.pk).version_id)
             self.assertEqual(new.get_model('interfaces', 'AccountInterfaceImplementation').objects.get(pk=legacy_item.pk).state, 'active')
         finally:
-            MigrationExecutor(connection).migrate(new_target)
+            MigrationExecutor(connection).migrate(executor.loader.graph.leaf_nodes())
