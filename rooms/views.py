@@ -15,8 +15,8 @@ from events.services import prepare_thread_for_view, prepare_thread_modules, thr
 from events.policies import prepare_thread_policy, save_thread_policy, default_thread_policy_groups, thread_policy_editor_rows
 from interfaces.services import save_thread_fields, thread_field_catalog, thread_interface_catalog
 
-from .forms import BoardForm, BoardThreadCreateForm, CollectionForm, RoomCreateForm, RoomEditForm
-from .models import Board, BoardPolicyCondition, Collection, Room, RoomMembership
+from .forms import BoardForm, BoardThreadCreateForm, CollectionForm, MapBoardForm, RoomCreateForm, RoomEditForm
+from .models import Board, BoardPlacement, BoardPolicyCondition, Collection, Room, RoomMembership
 from .services import (
     board_policy_editor_rows,
     board_policy_rows,
@@ -43,7 +43,7 @@ def _room(request, room_id):
 
 def _board_scope(request, room_id=None, username=None):
     if username is None:
-        return _room(request, room_id)
+        return _room(request, room_id) if room_id is not None else None
     account = get_object_or_404(get_user_model().objects.select_related('niixy_profile'), username__iexact=username)
     account.is_owner = request.user.is_authenticated and request.user.pk == account.pk
     return account
@@ -58,16 +58,21 @@ def _scope_account(scope):
 
 
 def _scope_url(scope, name, *ids):
+    if scope is None:
+        routes = {'detail': 'map', 'board-threads': 'board-pane', 'board-thread-create': 'board-thread-create'}
+        return reverse(f'events:{routes[name]}', args=ids)
     namespace = 'rooms' if isinstance(scope, Room) else 'accounts'
     identifier = scope.pk if isinstance(scope, Room) else scope.username
     return reverse(f'{namespace}:{name}', args=[identifier, *ids])
 
 
 def _scope_board_query(scope):
-    return 'boards=1' if isinstance(scope, Room) else 'pane=board'
+    return '' if scope is None else ('boards=1' if isinstance(scope, Room) else 'pane=board')
 
 
 def _scope_context(scope):
+    if scope is None:
+        return {'board_is_owner': False, 'map_board': True}
     return {
         'room': _scope_room(scope),
         'account': _scope_account(scope),
@@ -78,6 +83,8 @@ def _scope_context(scope):
 
 
 def _container_boards(room):
+    if room is None:
+        return Board.objects.filter(placement__kind=BoardPlacement.NII_MAP).select_related('placement').prefetch_related('policy_conditions')
     return (
         Board.objects.filter(**{
             'placement__collection__room' if isinstance(room, Room) else 'placement__collection__account': room,
@@ -109,7 +116,7 @@ def _managed_collection(room, collection_id):
 def _require_board_manager(request, room):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Boardの管理にはログインが必要です。'}, status=401)
-    if not room.is_owner:
+    if room is None or not room.is_owner:
         return JsonResponse({'error': 'Boardを管理できるのは配置先の管理者だけです。'}, status=403)
     return None
 
@@ -172,7 +179,7 @@ def room_leave(request, room_id):
 @require_POST
 def room_edit(request, room_id):
     room = _room(request, room_id)
-    if not room.is_owner:
+    if room is None or not room.is_owner:
         return JsonResponse({'error': 'Roomを編集できるのはRoomOwnerだけです。'}, status=403)
     form = RoomEditForm(request.POST)
     if not form.is_valid():
@@ -349,7 +356,7 @@ def board_threads(request, board_id, room_id=None, username=None):
     room = _board_scope(request, room_id, username)
     board = get_object_or_404(_container_boards(room), pk=board_id)
     view_policy = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
-    board.can_view = room.is_owner or view_policy.allowed
+    board.can_view = bool(room and room.is_owner) or view_policy.allowed
     create_policy = board.evaluate_policy(request.user, BoardPolicyCondition.CREATE_THREAD)
     board.can_create_thread = board.can_view and create_policy.allowed
     threads = []
@@ -360,8 +367,8 @@ def board_threads(request, board_id, room_id=None, username=None):
         threads = board_threads
     return render(request, 'rooms/partials/board_threads.html', {
         **_scope_context(room),
-        'board_edit_url': _scope_url(room, 'board-edit', board.pk),
-        'board_delete_url': _scope_url(room, 'board-delete', board.pk),
+        'board_edit_url': _scope_url(room, 'board-edit', board.pk) if room else '',
+        'board_delete_url': _scope_url(room, 'board-delete', board.pk) if room else '',
         'board_thread_create_url': _scope_url(room, 'board-thread-create', board.pk),
         'board': board,
         'threads': threads,
@@ -396,7 +403,7 @@ def board_thread_create(request, board_id, room_id=None, username=None):
     room = _board_scope(request, room_id, username)
     board = get_object_or_404(_container_boards(room), pk=board_id)
     view_policy = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
-    can_view = room.is_owner or view_policy.allowed
+    can_view = bool(room and room.is_owner) or view_policy.allowed
     create_policy = board.evaluate_policy(request.user, BoardPolicyCondition.CREATE_THREAD)
     if not can_view or not create_policy.allowed:
         return JsonResponse({'error': 'BoardのThread作成条件を満たしていません。'}, status=403)
@@ -432,9 +439,10 @@ def board_thread_create(request, board_id, room_id=None, username=None):
     thread, _ = run_once(Thread, submission_id, operation)
     if not thread.placements.filter(kind=ThreadPlacement.BOARD, board=board).exists():
         return JsonResponse({'error': 'この送信IDは別のBoardで使用されています。'}, status=409)
+    query_prefix = f'{_scope_board_query(room)}&' if room is not None else ''
     return JsonResponse({
         'thread_id': thread.pk,
-        'redirect_url': f'{_scope_url(room, "detail")}?{_scope_board_query(room)}&board={board.pk}&thread={thread.pk}',
+        'redirect_url': f'{_scope_url(room, "detail")}?{query_prefix}board={board.pk}&thread={thread.pk}',
     })
 
 
@@ -447,5 +455,34 @@ def account_board_thread_detail(request, username, thread_id):
         ),
         pk=thread_id,
     )
+    prepare_thread_for_view(thread, request.user)
+    return render(request, 'rooms/partials/thread_detail.html', {'thread': thread})
+
+
+@require_POST
+def map_board_create(request):
+    form = MapBoardForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
+    # NiiMap Boards are ownerless. All policy input is validated before the
+    # atomic creation completes; there is no management route after saving.
+    try:
+        board, _ = create_board(
+            submission_id=submission_id_from(request.POST.get('submission_id')),
+            **form.cleaned_data,
+            policy_data=request.POST if (request.POST.get('policy_present') == 'true' or any(
+                key.startswith('policy_') and key.endswith('_groups') for key in request.POST
+            )) else None,
+            actor=request.user,
+        )
+    except (ValueError, ValidationError) as error:
+        return JsonResponse({'error': str(error)}, status=400)
+    return JsonResponse({'board_id': board.pk, 'redirect_url': f'{reverse("events:map")}?board={board.pk}'})
+
+
+def map_board_thread_detail(request, board_id, thread_id):
+    board = get_object_or_404(_container_boards(None), pk=board_id)
+    thread = get_object_or_404(thread_queryset().filter(placements__kind=ThreadPlacement.BOARD, placements__board=board), pk=thread_id)
+    # ThreadPolicy alone controls existing Thread reading and replies.
     prepare_thread_for_view(thread, request.user)
     return render(request, 'rooms/partials/thread_detail.html', {'thread': thread})

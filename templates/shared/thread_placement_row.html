@@ -1,0 +1,15 @@
+{% load l10n %}
+{% with placement=thread.placements.all.0 %}{% if placement %}
+  {% if placement.kind == 'board' %}
+    {% if placement.board.placement.kind == 'niimap' %}
+      {% url 'events:map' as niimap_url %}{% include 'shared/placement_row.html' with placement_sticky=True placement_url=niimap_url placement_board_id=placement.board_id placement_label=placement.board.name %}
+    {% else %}
+      {% with collection=placement.board.placement.collection %}
+        {% if collection.room_id %}{% url 'rooms:detail' collection.room_id as container_url %}{% include 'shared/placement_row.html' with placement_sticky=True placement_room_url=container_url placement_room_label=collection.room.name placement_collection_label=collection.name placement_board_id=placement.board_id placement_board_label=placement.board.name %}
+        {% else %}{% url 'accounts:detail' collection.account.username as container_url %}{% include 'shared/placement_row.html' with placement_sticky=True placement_url=container_url|add:'?pane=board&board=' placement_label=placement.board.name placement_target_board_id=placement.board_id %}{% endif %}
+      {% endwith %}
+    {% endif %}
+  {% else %}
+    {% url 'events:map' as niimap_url %}{% with latitude=placement.latitude|unlocalize longitude=placement.longitude|unlocalize %}{% include 'shared/placement_row.html' with placement_sticky=True placement_url=niimap_url|add:'?latitude='|add:latitude|add:'&longitude='|add:longitude|add:'&zoom=15' placement_on_map=True placement_latitude=placement.latitude placement_longitude=placement.longitude %}{% endwith %}
+  {% endif %}
+{% endif %}{% endwith %}

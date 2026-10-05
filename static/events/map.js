@@ -1,4 +1,5 @@
 const markers = JSON.parse(document.getElementById('thread-markers').textContent);
+const boardMarkers = JSON.parse(document.getElementById('board-markers').textContent);
 const roomMarkers = JSON.parse(document.getElementById('room-markers').textContent);
 const interfaceCatalog = JSON.parse(document.getElementById('thread-interface-catalog-data').textContent);
 const fieldCatalog = JSON.parse(document.getElementById('thread-field-catalog-data').textContent);
@@ -38,16 +39,19 @@ const threadMotion = NiixyUI.createWorkspace(workspace, {
 }, {track: document.querySelector('.thread-track')});
 const list = document.getElementById('thread-list');
 const createForm = document.getElementById('thread-create-form');
+const boardCreateForm = document.getElementById('board-create-form');
 const roomCreateForm = document.getElementById('room-create-form');
 const searchControls = document.getElementById('niimap-search-controls');
 const searchForm = document.getElementById('niimap-search-form');
 const createControls = document.getElementById('niimap-create-controls');
 const openThreadCreate = document.getElementById('open-thread-create');
+const openBoardCreate = document.getElementById('open-board-create');
 const openRoomCreate = document.getElementById('open-room-create');
 const ruleDialog = document.getElementById('thread-rule-dialog');
 const map = new geolonia.Map('#map');
 const rootStyles = getComputedStyle(document.documentElement);
 const threadMarkerColor = rootStyles.getPropertyValue('--spot-thread-color').trim() || '#0f766e';
+const boardMarkerColor = rootStyles.getPropertyValue('--spot-board-color').trim() || '#2563eb';
 const roomMarkerColor = rootStyles.getPropertyValue('--spot-room-color').trim() || '#a33b50';
 function setThreadStage(stage) {
   threadStack.set(stage);
@@ -59,7 +63,7 @@ const resumeStorageKey = 'niixy:resume:niimap';
 let draftMarker;
 let creating = false;
 let spotControlWindows;
-const draftPlacementLinks = new Map(['thread', 'room'].map((kind) => {
+const draftPlacementLinks = new Map(['thread', 'room', 'board'].map((kind) => {
   const link = document.getElementById(`${kind}-create-placement-link`);
   return [kind, {link, href: link.href}];
 }));
@@ -75,6 +79,12 @@ let selectorReturnStage = 'detail';
 let searchSelectionTarget = null;
 let appliedSearchIds = null;
 let appliedRoomSearchIds = null;
+let appliedBoardSearchIds = null;
+let mapReady = false;
+let mapFailed = false;
+let searchReady = false;
+let searchRequestId = 0;
+let appliedSortKind = 'near';
 let appliedSpotOrder = null;
 let selectedSortField = null;
 let activeRoomId = null;
@@ -99,6 +109,7 @@ const accountConditions = NiixyAccountConditions.create({
   accountSearchUrl: workspace.dataset.accountSearchUrl,
   roomSearchUrl: workspace.dataset.accountConditionRoomSearchUrl,
   csrfToken: () => searchForm.querySelector('[name="csrfmiddlewaretoken"]').value,
+  extraDefaultCodes: (target) => /^(board-policy-|thread-policy-)/.test(target || '') ? ['guest', 'account'] : [],
   conditionKindAllowed: (kind, target) => !(target?.startsWith('board-policy-') || target?.startsWith('thread-policy-'))
     || ['default', 'account', 'room'].includes(kind),
   conditionAllowed: (condition, target) => !(target?.startsWith('board-policy-') || target?.startsWith('thread-policy-'))
@@ -122,7 +133,7 @@ threadMotion.onRetain = (stage) => {
 function resetDraftPlacement() {
   draftMarker?.remove();
   draftMarker = null;
-  ['thread', 'room'].forEach((kind) => {
+  ['thread', 'room', 'board'].forEach((kind) => {
     document.getElementById(`${kind}-latitude`).value = '';
     document.getElementById(`${kind}-longitude`).value = '';
     const placement = draftPlacementLinks.get(kind);
@@ -134,6 +145,7 @@ function resetDraftPlacement() {
   document.getElementById('niimap-create-location-status').textContent = '地点を選択してください。';
   openThreadCreate.disabled = true;
   openRoomCreate.disabled = true;
+  openBoardCreate.disabled = true;
 }
 
 function ensureInterfaceSelectorPanes() {
@@ -190,8 +202,9 @@ function threadIdFromUrl() {
   return /^\d+$/.test(value || '') ? value : null;
 }
 const resumeState = consumeResumeState();
+const initialBoardId = new URLSearchParams(location.search).get('board');
 const initialRoomId = new URLSearchParams(location.search).get('room');
-const initialThreadId = /^\d+$/.test(initialRoomId || '') ? null : threadIdFromUrl();
+const initialThreadId = /^\d+$/.test(initialRoomId || '') || /^\d+$/.test(initialBoardId || '') ? null : threadIdFromUrl();
 const activeResumeState = initialThreadId && String(resumeState?.threadId) === initialThreadId ? resumeState : null;
 const animateInitialThread = Boolean(activeResumeState?.animate);
 const initialThreadPane = initialThreadId && document.querySelector(`[data-thread-detail-pane="${initialThreadId}"]`);
@@ -203,7 +216,7 @@ if (initialThreadPane) {
   }
   initialThreadPane.hidden = false;
   detailTitle.textContent = `${initialThreadPane.dataset.threadTitle}${initialThreadPane.dataset.threadPostCount === undefined ? '（閲覧不可）' : ` (${initialThreadPane.dataset.threadPostCount})`}`;
-} else if (!initialRoomId) {
+} else if (!initialRoomId && !initialBoardId) {
   const url = new URL(location.href);
   url.searchParams.delete('thread');
   history.replaceState({}, '', url);
@@ -576,6 +589,7 @@ function closeInterfaceSelector() {
   synchronizeThreadFieldControls();
 }
 function applyFilters() {
+  if (!mapReady || !searchReady) return;
   const bounds = map.getBounds();
   let visibleCount = 0;
   list.querySelectorAll('.thread-item').forEach((item) => {
@@ -598,22 +612,37 @@ function applyFilters() {
     const marker = markerById.get(`room:${item.dataset.roomId}`);
     if (marker) marker.getElement().hidden = !visible;
   });
+  list.querySelectorAll('.board-item').forEach((item) => {
+    const board = boardMarkers.find((candidate) => String(candidate.id) === item.dataset.boardId);
+    const inSearch = appliedBoardSearchIds === null || appliedBoardSearchIds.has(item.dataset.boardId);
+    const inBounds = item.dataset.boardViewable === 'false' || (board && bounds.contains([board.longitude, board.latitude]));
+    const visible = inSearch && inBounds;
+    item.hidden = !visible;
+    if (visible) visibleCount += 1;
+    const marker = markerById.get(`board:${item.dataset.boardId}`);
+    if (marker) marker.getElement().hidden = !visible;
+  });
   document.getElementById('thread-search-empty').hidden = visibleCount !== 0;
-  if (searchForm.elements.sort_kind.value === 'near') sortByDistance();
+  if (appliedSortKind === 'near') sortByDistance();
   else if (appliedSpotOrder) {
     appliedSpotOrder.forEach(({kind, id}) => {
       const item = list.querySelector(`[data-${kind}-id="${id}"]`);
       if (item) list.append(item);
     });
   }
+  list.hidden = false;
+  document.getElementById('niimap-list-status').hidden = true;
+  document.getElementById('niimap-list-retry').hidden = true;
 }
 function sortByDistance() {
   const center = map.getCenter();
   const distance = (spot) => spot ? (spot.latitude - center.lat) ** 2 + (spot.longitude - center.lng) ** 2 : Infinity;
-  const spotFor = (item) => item.classList.contains('room-item')
+  const spotFor = (item) => item.classList.contains('board-item')
+    ? boardMarkers.find((board) => String(board.id) === item.dataset.boardId)
+    : item.classList.contains('room-item')
     ? roomMarkers.find((room) => String(room.id) === item.dataset.roomId)
     : markers.find((thread) => String(thread.id) === item.dataset.threadId);
-  Array.from(list.querySelectorAll('.thread-item, .room-item')).sort((first, second) => {
+  Array.from(list.querySelectorAll('.thread-item, .room-item, .board-item')).sort((first, second) => {
     return distance(spotFor(first)) - distance(spotFor(second));
   }).forEach((item) => list.append(item));
 }
@@ -755,7 +784,7 @@ function selectThread(id, scroll = false) {
     if (selected) summary?.setAttribute('aria-current', 'true');
     else summary?.removeAttribute('aria-current');
   });
-  list.querySelectorAll('.room-summary').forEach((summary) => {
+  list.querySelectorAll('.room-summary, .board-summary').forEach((summary) => {
     summary.classList.remove('is-selected');
     summary.removeAttribute('aria-current');
   });
@@ -765,7 +794,7 @@ function selectThread(id, scroll = false) {
   if (scroll) scrollThreadSummaryIntoView(item);
 }
 function selectRoom(id, scroll = false) {
-  list.querySelectorAll('.thread-summary').forEach((summary) => {
+  list.querySelectorAll('.thread-summary, .board-summary').forEach((summary) => {
     summary.classList.remove('is-selected');
     summary.removeAttribute('aria-current');
   });
@@ -780,6 +809,16 @@ function selectRoom(id, scroll = false) {
   const item = list.querySelector(`[data-room-id="${id}"]`);
   if (scroll) scrollThreadSummaryIntoView(item);
 }
+function selectBoard(id, scroll = false) {
+  list.querySelectorAll('.spot-summary').forEach((summary) => {
+    const selected = summary.closest('.board-item')?.dataset.boardId === String(id);
+    summary.classList.toggle('is-selected', selected);
+    if (selected) summary.setAttribute('aria-current', 'true'); else summary.removeAttribute('aria-current');
+  });
+  markerById.forEach((marker, markerId) => marker.getElement().classList.toggle('is-highlighted', markerId === `board:${id}`));
+  if (scroll) scrollThreadSummaryIntoView(list.querySelector(`.board-item[data-board-id="${id}"]`));
+}
+workspace.addEventListener('niimap-board-select', (event) => selectBoard(event.detail));
 function showThreadMarker(id) {
   const thread = markers.find((item) => String(item.id) === String(id));
   if (!thread) return;
@@ -848,6 +887,7 @@ async function openRoom(id, shouldUpdateUrl = true) {
   creating = false;
   createForm.hidden = true;
   roomCreateForm.hidden = true;
+  boardCreateForm.hidden = true;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   detailTitle.textContent = '読み込み中...';
   setThreadStage('room');
@@ -981,6 +1021,7 @@ function openDetail(id, shouldUpdateUrl = true) {
   creating = false;
   createForm.hidden = true;
   roomCreateForm.hidden = true;
+  boardCreateForm.hidden = true;
   setThreadStage('detail');
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => {
     const selected = pane.dataset.threadDetailPane === String(id);
@@ -996,13 +1037,14 @@ function closeDetail(shouldUpdateUrl = true) {
   setThreadStage('list');
   createForm.hidden = true;
   roomCreateForm.hidden = true;
+  boardCreateForm.hidden = true;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   markerById.forEach((marker) => marker.getElement().classList.remove('is-highlighted'));
-  list.querySelectorAll('.thread-summary').forEach((summary) => {
+  list.querySelectorAll('.thread-summary, .board-summary').forEach((summary) => {
     summary.classList.remove('is-selected');
     summary.removeAttribute('aria-current');
   });
-  list.querySelectorAll('.room-summary').forEach((summary) => {
+  list.querySelectorAll('.room-summary, .board-summary').forEach((summary) => {
     summary.classList.remove('is-selected');
     summary.removeAttribute('aria-current');
   });
@@ -1012,6 +1054,13 @@ function closeDetail(shouldUpdateUrl = true) {
 async function applyThreadStateFromUrl() {
   const url = new URL(location.href);
   const roomId = url.searchParams.get('room');
+  const boardId = url.searchParams.get('board');
+  if (!roomId && /^\d+$/.test(boardId || '')) {
+    closeDetail(false);
+    selectBoard(boardId, true);
+    await NiixyWorkspaceTrail.openMapBoard(boardId, list, url.searchParams.get('thread'));
+    return;
+  }
   if (/^\d+$/.test(roomId || '')) {
     selectRoom(roomId, true);
     if (!await openRoom(roomId, false)) {
@@ -1068,7 +1117,16 @@ openThreadCreate.addEventListener('click', () => {
   if (openThreadCreate.disabled) return;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   roomCreateForm.hidden = true;
+  boardCreateForm.hidden = true;
   createForm.hidden = false; detailTitle.textContent = 'Threadを作成';
+  setThreadStage('detail');
+});
+openBoardCreate.addEventListener('click', () => {
+  if (openBoardCreate.disabled) return;
+  NiixyWorkspaceTrail.prepare(boardCreateForm);
+  document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
+  createForm.hidden = true; roomCreateForm.hidden = true;
+  boardCreateForm.hidden = false; detailTitle.textContent = 'Boardを作成';
   setThreadStage('detail');
 });
 openRoomCreate.addEventListener('click', () => {
@@ -1076,6 +1134,7 @@ openRoomCreate.addEventListener('click', () => {
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = true; });
   createForm.hidden = true;
   roomCreateForm.hidden = false;
+  boardCreateForm.hidden = true;
   detailTitle.textContent = 'Roomを作成';
   setThreadStage('detail');
 });
@@ -1095,11 +1154,14 @@ searchForm.querySelectorAll('[data-search-select]').forEach((button) => button.a
   else openFieldSelector(null, 'search');
 }));
 document.getElementById('niimap-search-reset').addEventListener('click', () => restoreSearchState(emptySearchState()));
-searchForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const pending = NiixyUI.beginPendingAction(event.submitter || searchForm.querySelector('[type="submit"]'));
+async function runSpotSearch(initial = false) {
+  const pending = NiixyUI.beginPendingAction(searchForm.querySelector('[type="submit"]'));
   if (!pending) return;
+  const current = ++searchRequestId;
   const error = document.getElementById('niimap-search-error'); error.hidden = true; error.textContent = '';
+  const status = document.getElementById('niimap-list-status');
+  const retry = document.getElementById('niimap-list-retry');
+  if (initial) { list.hidden = true; status.hidden = false; status.textContent = '読み込み中...'; retry.hidden = true; }
   const data = new FormData(searchForm); const conditions = searchConditions();
   data.append('creator_include_groups', JSON.stringify(conditions.creator_include_groups));
   data.append('creator_exclude_groups', JSON.stringify(conditions.creator_exclude_groups));
@@ -1111,19 +1173,29 @@ searchForm.addEventListener('submit', async (event) => {
   try {
     const response = await fetch(workspace.dataset.searchUrl, {method: 'POST', body: data, headers: {'X-Requested-With': 'XMLHttpRequest'}});
     const result = await response.json();
-    if (!response.ok) { error.textContent = Object.values(result.errors || {}).flat().join(' '); error.hidden = false; return; }
+    if (current !== searchRequestId) return;
+    if (!response.ok) throw new Error(result.error || Object.values(result.errors || {}).flat().join(' ') || '検索に失敗しました。');
     appliedSearchIds = new Set(result.thread_ids.map(String));
     appliedRoomSearchIds = new Set((result.room_ids || []).map(String));
+    appliedBoardSearchIds = new Set((result.board_ids || []).map(String));
     appliedSpotOrder = (result.spot_order || []).map((spot) => ({kind: spot.kind, id: String(spot.id)}));
+    appliedSortKind = data.get('sort_kind'); searchReady = true;
     applyFilters();
-    spotControlWindows.set('search', false);
-  } catch {
-    error.textContent = '検索に失敗しました。'; error.hidden = false;
-  } finally {
-    pending.restore();
-  }
+    retry.hidden = mapReady || !mapFailed;
+    if (!initial) spotControlWindows.set('search', false);
+  } catch (exception) {
+    if (current !== searchRequestId) return;
+    error.textContent = exception.message || '検索に失敗しました。'; error.hidden = false;
+    if (initial) { status.hidden = false; status.textContent = error.textContent; retry.hidden = false; }
+  } finally { pending.restore(); }
+}
+searchForm.addEventListener('submit', (event) => { event.preventDefault(); runSpotSearch(!searchReady); });
+document.getElementById('niimap-list-retry').addEventListener('click', () => {
+  if (!mapReady && mapFailed) location.reload();
+  else runSpotSearch(true);
 });
 restoreSearchState(initialSearchState());
+runSpotSearch(true);
 list.addEventListener('click', (event) => {
   const roomSummary = event.target.closest('.room-summary');
   if (roomSummary) {
@@ -1227,6 +1299,21 @@ createForm.addEventListener('submit', async (event) => {
     if (!created) pending.restore();
   }
 });
+boardCreateForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const pending = NiixyUI.beginPendingAction(event.submitter || boardCreateForm.querySelector('[type="submit"]'));
+  if (!pending) return;
+  const error = boardCreateForm.querySelector('.event-form-error'); error.hidden = true;
+  try {
+    const response = await fetch(boardCreateForm.action, {method: 'POST', body: new FormData(boardCreateForm)});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || Object.values(result.errors || {}).flat().join(' '));
+    location.assign(result.redirect_url);
+  } catch (exception) {
+    error.textContent = exception.message || 'Boardの作成に失敗しました。'; error.hidden = false;
+    pending.restore();
+  }
+});
 roomCreateForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const pending = NiixyUI.beginPendingAction(event.submitter || roomCreateForm.querySelector('[type="submit"]'));
@@ -1286,11 +1373,9 @@ map.on('click', (event) => {
   const coordinates = [event.lngLat.lng, event.lngLat.lat]; draftMarker?.remove(); draftMarker = new geolonia.Marker({color: '#d05b32'}).setLngLat(coordinates).addTo(map);
   const latitude = event.lngLat.lat.toFixed(6);
   const longitude = event.lngLat.lng.toFixed(6);
-  document.getElementById('thread-latitude').value = latitude;
-  document.getElementById('thread-longitude').value = longitude;
-  document.getElementById('room-latitude').value = latitude;
-  document.getElementById('room-longitude').value = longitude;
-  ['thread', 'room'].forEach((kind) => {
+  ['thread', 'room', 'board'].forEach((kind) => {
+    document.getElementById(`${kind}-latitude`).value = latitude;
+    document.getElementById(`${kind}-longitude`).value = longitude;
     const placementLink = document.getElementById(`${kind}-create-placement-link`);
     const placementUrl = new URL(placementLink.href, location.href);
     placementUrl.searchParams.set('latitude', latitude);
@@ -1303,9 +1388,19 @@ map.on('click', (event) => {
   });
   document.getElementById('niimap-create-location-status').textContent = '地点を選択しました。';
   openThreadCreate.disabled = false;
+  openBoardCreate.disabled = false;
   openRoomCreate.disabled = workspace.dataset.authenticated !== 'true';
 });
+map.on('error', () => {
+  if (mapReady) return;
+  mapFailed = true;
+  const status = document.getElementById('niimap-list-status');
+  status.hidden = false; status.textContent = '地図の読み込みに失敗しました。';
+  document.getElementById('niimap-list-retry').hidden = false;
+});
 map.on('load', () => {
+  mapReady = true;
+  mapFailed = false;
   if (!focusMapFromUrl()) restoreMapView();
   markers.forEach((thread) => {
     const marker = new geolonia.Marker({color: threadMarkerColor}).setLngLat([thread.longitude, thread.latitude]).addTo(map);
@@ -1325,6 +1420,14 @@ map.on('load', () => {
     });
     markerById.set(`room:${room.id}`, marker);
   });
+  boardMarkers.forEach((board) => {
+    const marker = new geolonia.Marker({color: boardMarkerColor}).setLngLat([board.longitude, board.latitude]).addTo(map);
+    marker.getElement().classList.add('event-map-marker', 'board-map-marker');
+    marker.getElement().addEventListener('click', (event) => {
+      event.stopPropagation(); selectBoard(board.id, true);
+    });
+    markerById.set(`board:${board.id}`, marker);
+  });
   applyFilters();
   map.on('moveend', () => {
     applyFilters();
@@ -1332,7 +1435,7 @@ map.on('load', () => {
   if (initialThreadPane) selectThread(initialThreadId);
 });
 window.addEventListener('popstate', applyThreadStateFromUrl);
-if (/^\d+$/.test(initialRoomId || '')) {
+if (/^\d+$/.test(initialRoomId || '') || /^\d+$/.test(initialBoardId || '')) {
   applyThreadStateFromUrl().finally(() => requestAnimationFrame(() => requestAnimationFrame(() => {
     document.documentElement.classList.remove('has-restored-niimap-workspace');
   })));

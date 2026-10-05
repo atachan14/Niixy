@@ -13,6 +13,15 @@ from .models import Board, BoardPlacement, BoardPolicyCondition, Collection, Roo
 
 
 def default_board_policy_conditions(board, room=None, *, account=None):
+    if room is None and account is None:
+        return [
+            BoardPolicyCondition(
+                board=board, capability=capability, decision=BoardPolicyCondition.ALLOW,
+                kind='default', definition={'code': code}, label=label,
+            )
+            for capability, _ in BoardPolicyCondition.CAPABILITY_CHOICES
+            for code, label in [('guest', 'Guest'), ('account', 'NiixyAccount')]
+        ]
     if account is not None:
         kind, definition, label = _board_policy_condition_snapshot(
             {'kind': 'account', 'definition': {'account_id': account.pk}}, None, account,
@@ -220,10 +229,21 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
     return run_once(Room, submission_id, operation)
 
 
-def create_board(*, submission_id, collection, name, description='', policy_data=None, actor=None):
+def create_board(*, submission_id, name, collection=None, latitude=None, longitude=None, description='', policy_data=None, actor=None):
+    placement = BoardPlacement(
+        kind=BoardPlacement.COLLECTION if collection is not None else BoardPlacement.NII_MAP,
+        collection=collection, latitude=latitude, longitude=longitude,
+    )
+    # Validate coordinates/target even when called outside the HTTP form.
+    placement.full_clean(exclude=['board'], validate_unique=False, validate_constraints=False)
+    if collection is None and (latitude is None or longitude is None):
+        raise ValueError('NiiMapへのBoard作成には座標が必要です。')
+    if collection is not None and (latitude is not None or longitude is not None):
+        raise ValueError('CollectionのBoardには座標を指定できません。')
+
     def operation():
         with transaction.atomic():
-            target = Collection.objects.select_for_update().get(pk=collection.pk)
+            target = Collection.objects.select_for_update().get(pk=collection.pk) if collection else None
             board = Board.objects.create(
                 submission_id=submission_id,
                 name=name,
@@ -231,18 +251,18 @@ def create_board(*, submission_id, collection, name, description='', policy_data
             )
             BoardPlacement.objects.create(
                 board=board,
-                kind=BoardPlacement.COLLECTION,
-                collection=target,
+                kind=placement.kind,
+                collection=target, latitude=placement.latitude, longitude=placement.longitude,
             )
             if policy_data is None:
-                seed_board_policy(board, target.room, account=target.account)
+                seed_board_policy(board, target.room if target else None, account=target.account if target else None)
             else:
-                update_board_policy(board, target.room, policy_data, actor, account=target.account)
+                update_board_policy(board, target.room if target else None, policy_data, actor, account=target.account if target else None)
             return board
 
     board, created = run_once(Board, submission_id, operation)
-    if board.placement.collection_id != collection.pk:
-        raise ValueError('この送信IDは別のCollectionで使用されています。')
+    if board.placement.kind != placement.kind or board.placement.collection_id != (collection.pk if collection else None):
+        raise ValueError('この送信IDは別の配置先で使用されています。')
     return board, created
 
 

@@ -4,7 +4,7 @@
 
 NiiMap はコンテンツを発見・作成する地図上の入口である。地図マーカーは独立した Pin ではなく、NiiMap へ直接配置された対象を表す。
 
-現行の NiiMap は地図に直接掲載された Thread を表示する。将来は Room、Board、Thread、Timeline、Tweet を NiiMap の座標へ配置できるようにする。Room や Timeline の内部にあるコンテンツを NiiMap でどのように表示するかは、それぞれの公開範囲と掲載関係を踏まえて実装時に決める。
+NiiMapは地図に直接配置されたThread、Room、Boardを表示する。Guest／Accountとも地点を選んでBoardを直接作成できる。Timeline、TweetのNiiMap配置は後続実装で扱う。Room や Timeline の内部にあるコンテンツを NiiMap でどのように表示するかは、それぞれの公開範囲と掲載関係を踏まえて実装時に決める。
 
 一覧PaneにはMapの表示範囲内にある対象だけを表示する。「検索」では基本情報、実効Policy、Field、Interfaceを組み合わせて絞り込み、「新規作成」では先に地点と対象種別を選び、対象の作成Paneへ遷移する。検索窓は実行後も条件を保持したままアコーディオンとして収納する。
 

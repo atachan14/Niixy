@@ -20,6 +20,11 @@ class BoardForm(forms.Form):
     description = forms.CharField(required=False, max_length=10000, widget=forms.Textarea)
 
 
+class MapBoardForm(BoardForm):
+    latitude = forms.DecimalField(max_digits=9, decimal_places=6, min_value=-90, max_value=90)
+    longitude = forms.DecimalField(max_digits=9, decimal_places=6, min_value=-180, max_value=180)
+
+
 class CollectionForm(forms.Form):
     name = forms.CharField(max_length=120)
 

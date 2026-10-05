@@ -20,7 +20,7 @@
 html.has-restored-room-workspace .room-track { transition: none; visibility: hidden; }
 .room-overview-pane { background: var(--panel); flex: 0 0 100vw; overflow-y: auto; width: 100vw; }
 .room-overview-content { min-width: 0; }
-.room-overview-content > .ui-placement-row { margin: 0 auto; max-width: 1280px; padding: 0 48px; }
+
 .room-controls { display: grid; gap: 12px; min-width: 0; }
 .room-control-row { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .room-control-row .button, .room-wide-control, .room-participation-action .button, .room-participation-action form { box-sizing: border-box; width: 100%; }
@@ -98,15 +98,13 @@ html.has-restored-room-workspace .room-track { transition: none; visibility: hid
 .room-track[data-ui-workspace-stage="account-condition-history-edit"] > .account-condition-detail-pane { display: block; }
 .room-track[data-account-condition-return-stage="list"] > .room-thread-detail-pane,
 .room-track[data-account-condition-return-stage="thread-list"] > .room-thread-detail-pane { display: none; }
-.thread-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row,
-.account-room-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row { padding-left: 0; padding-right: 0; }
+
 .thread-detail-pane .room-detail-fragment .identity-overview-content,
 .account-room-detail-pane .room-detail-fragment .identity-overview-content { padding: 32px 0 40px; }
 
 @media (max-width: 780px) {
-  .room-overview-content > .ui-placement-row { padding: 0 16px; }
-  .thread-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row,
-  .account-room-detail-pane .room-detail-fragment .room-overview-content > .ui-placement-row { padding-left: 0; padding-right: 0; }
+
+
   .thread-detail-pane .room-detail-fragment .identity-overview-content,
   .account-room-detail-pane .room-detail-fragment .identity-overview-content { padding: 20px 0 40px; }
   .room-controls { gap: 6px; }

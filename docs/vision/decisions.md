@@ -385,4 +385,12 @@ AccountPage専用ではなく、Account・Room・Board・ThreadなどのWorkspac
 
 既存内容の旧版表示を保持しつつ、新規作成・適用・編集（適用済みField値編集を含む）を最新版へ揃える。同一定義の複数版を対象へ併用しない。依存Field最新版に未対応のIFは凍結し、表示参照と有効判定を分離する。凍結IFの制約は他の共有Field値更新を妨げず、値・Fieldを保持する。対応IF版公開後、既存の最新版Fieldと現値だけで確認不要に復帰できる場合のみ自動復帰し、不足Field・矛盾・統合確認があれば復帰待ちとする。取り外したIFは戻さない。
 
-Layout依存IFの凍結でも適用済みLayoutの表示を保持し、新規適用・編集だけ最新版条件を要求する。投稿時の表示名／表示値Snapshotと不変FieldVersion／LayoutVersion参照はThreadPostの`#1`・Response・defaultLayout共通の後続契約とする。同一定義のField型変更禁止は継続する。詳細と段階別実装範囲は[未割当要件](../interface-version-foundation.md)。
+Layout依存IFの凍結でも適用済みLayoutの表示を保持し、新規適用・編集だけ最新版条件を要求する。投稿時の表示名／表示値Snapshotと不変FieldVersion／LayoutVersion参照はThreadPostの`#1`・Response・defaultLayout共通の後続契約とする。同一定義のField型変更禁止は継続する。詳細と段階別実装範囲は[v0.14要件](../interface-version-foundation.md)。
+
+## 2026-10-05 - NiiMapへBoardを直接作成する
+
+状態: 採用 / v0.15
+
+Guest／Accountとも、NiiMap新規作成から地点を選びBoardを直接配置できる。独立Ownerも配置先管理者も付与しない。初期BoardPolicyは閲覧とThread作成がGuest OR NiixyAccount、deny空。作成時は共通4欄のAccount条件を変更できるが、保存後はPolicyを含め編集・削除・座標変更・未配置化を認めない。
+
+Mapmarker、SummaryList、検索からBoard詳細／Thread作成／Responseまで既存の共通処理で接続する。Thread作成はBoard閲覧と作成条件を再判定する。既存Threadの閲覧／返信はThreadPolicy自身で判定し、Board作成条件を追加制限にしない。実装・隔離QA・公開前互換性は[v0.15作業記録](../niimap-boards-and-pane-ui.md)に残す。

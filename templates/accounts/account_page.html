@@ -3,14 +3,14 @@
 
 {% block title %}{{ account.niixy_profile.display_label }} | Niixy{% endblock %}
 {% block main_class %}account-main{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261004-5"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261004-19">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/account.css' %}?v=20261005-map-board-ui"><link rel="stylesheet" href="{% static 'accounts/mypage.css' %}?v=20261002-3"><link rel="stylesheet" href="{% static 'rooms/room.css' %}?v=20261005-map-board-ui">{% endblock %}
 {% block site_brand %}<div class="brand account-brand" aria-label="Niixy"><a class="service-brand" href="{% url 'events:map' %}">Niixy</a></div>{% endblock %}
 {% block footer %}{% endblock %}
 
 {% block content %}
 <script>if (['account-if', 'people', 'thread', 'response', 'room', 'module', 'board'].includes(new URLSearchParams(location.search).get('pane'))) document.documentElement.classList.add('has-restored-account-thread-pane');</script>
 <section class="account-page" data-account-id="{{ account.username }}" data-account-page-url="{% url 'accounts:detail' account.username %}" data-boards-url="{% url 'accounts:boards' account.username %}" data-board-thread-detail-template="{% url 'accounts:board-thread-detail' account.username 0 %}" data-current-account="{{ user.username }}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-account-condition-list-url="{% url 'accounts:account-condition-list' %}" data-account-search-url="{% url 'accounts:account-condition-search' %}" data-account-condition-room-search-url="{% url 'accounts:account-condition-room-search' %}" data-account-condition-save-url="{% url 'accounts:account-condition-save' %}" data-account-condition-delete-url="{% url 'accounts:account-condition-delete' 0 %}" data-room-pane-url="{% url 'accounts:room-pane' account.username %}" data-room-detail-template="{% url 'rooms:pane' 0 %}" data-applied-url="{% url 'accounts:applied' account.username %}" data-module-pane-url="{% url 'accounts:module-pane' account.username %}" data-module-field-detail-template="{% url 'accounts:module-field-detail' account.username 0 %}" data-module-interface-detail-template="{% url 'accounts:module-interface-detail' account.username 0 %}">
-  <header class="account-page-header"><h1><button id="account-page-identity" type="button" disabled>{{ account.niixy_profile.display_label }}</button><span> のプロフィール</span></h1></header>
+  <header class="account-page-header"><h1><button id="account-page-identity" type="button" disabled>{{ account.niixy_profile.display_label }}</button><span> のプロフィール</span></h1><time class="ui-identity-created" datetime="{{ account.date_joined|date:'c' }}">作成 {{ account.date_joined|date:'Y/m/d' }}</time></header>
   <div class="account-workspace">
     <div class="account-track ui-workspace-track">
       {{ thread_field_catalog|json_script:"board-pane-field-catalog" }}

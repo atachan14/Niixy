@@ -18,6 +18,7 @@
       {% endif %}
     </section>
   {% else %}
+    {% if map_board %}{% load l10n %}{% url 'events:map' as niimap_url %}{% with latitude=board.placement.latitude|unlocalize longitude=board.placement.longitude|unlocalize %}{% include 'shared/placement_row.html' with placement_url=niimap_url|add:'?latitude='|add:latitude|add:'&longitude='|add:longitude|add:'&zoom=15' placement_on_map=True placement_latitude=board.placement.latitude placement_longitude=board.placement.longitude %}{% endwith %}{% endif %}
     <div class="room-board-window-actions">
       <button class="button secondary" type="button" data-board-information-toggle aria-controls="board-information-{{ board.pk }}" aria-expanded="false">詳細情報</button>
       <button class="button secondary" type="button" data-board-create-toggle aria-controls="board-thread-create-{{ board.pk }}" aria-expanded="false"{% if not board.can_create_thread %} disabled title="BoardのThread作成条件を満たしていません"{% endif %}>Thread作成</button>

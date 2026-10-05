@@ -16,6 +16,8 @@
   border-bottom: 1px solid var(--line);
   display: flex;
   height: var(--account-header-height);
+  gap: 12px;
+  justify-content: space-between;
   padding: 0 24px;
 }
 
@@ -224,7 +226,7 @@
   border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
-  min-height: 52px;
+  min-height: var(--pane-header-height);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -309,3 +311,5 @@
     padding: 0 16px calc(24px + env(safe-area-inset-bottom));
   }
 }
+
+.account-page-header h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

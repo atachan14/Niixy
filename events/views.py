@@ -22,7 +22,8 @@ from interfaces.services import (
     thread_field_catalog,
     thread_interface_catalog,
 )
-from rooms.models import Room
+from rooms.models import Board, BoardPlacement, BoardPolicyCondition, Room
+from rooms.services import board_policy_editor_rows, default_board_policy_conditions
 
 from .forms import ThreadCreateForm, ThreadPostForm
 from .idempotency import run_once, submission_id_from
@@ -45,6 +46,10 @@ def map_view(request):
     rooms = list(Room.objects.select_related('owner__niixy_profile', 'placement'))
     for thread in threads:
         prepare_thread_for_view(thread, request.user)
+
+    boards = list(Board.objects.filter(placement__kind=BoardPlacement.NII_MAP).select_related('placement').prefetch_related('policy_conditions'))
+    for board in boards:
+        board.can_view = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW).allowed
 
     markers = []
     for thread in threads:
@@ -74,6 +79,13 @@ def map_view(request):
 
     return render(request, 'events/map.html', {
         'threads': threads,
+        'boards': boards,
+        'board_markers': [
+            {'id': board.pk, 'name': board.name, 'latitude': float(board.placement.latitude), 'longitude': float(board.placement.longitude)}
+            for board in boards if board.can_view
+        ],
+        'board_submission_id': uuid.uuid4(),
+        'board_policy_editor_rows': board_policy_editor_rows(Board(), None, conditions=default_board_policy_conditions(Board()), target_prefix='board-policy-map-create'),
         'rooms': rooms,
         'thread_markers': markers,
         'room_markers': room_markers,
@@ -398,6 +410,26 @@ def thread_search(request):
 
     target_type = request.POST.get('target_type', 'all')
     filtered_rooms = []
+    filtered_boards = []
+    # Board has no creator and no Field/Interface modules. Filter its own
+    # metadata; do not expose hidden descriptions or search its child Threads.
+    board_search_allowed = target_type in {'all', 'board'} and not (
+        creator_include_groups or creator_exclude_groups or include_creators or exclude_creators
+        or policy_conditions or resolved_field_conditions or interface_conditions
+        or request.POST.get('sort_kind') == 'field'
+    )
+    if board_search_allowed:
+        boards = Board.objects.filter(placement__kind=BoardPlacement.NII_MAP).select_related('placement').prefetch_related('policy_conditions')
+        for board in boards:
+            if updated_date:
+                board_date = board.last_activity_at.date()
+                if (updated_operator == 'before' and board_date > updated_date) or (updated_operator != 'before' and board_date < updated_date):
+                    continue
+            can_view = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW).allowed
+            text = (board.name + (' ' + board.description if can_view else '')).casefold()
+            if any(term not in text for term in include_words) or any(term in text for term in exclude_words):
+                continue
+            filtered_boards.append(board)
     room_search_allowed = target_type in {'all', 'room'} and not (
         policy_conditions or resolved_field_conditions or interface_conditions
         or request.POST.get('sort_kind') == 'field'
@@ -485,17 +517,18 @@ def thread_search(request):
     spot_order = [
         {'kind': kind, 'id': item.pk}
         for kind, item in sorted(
-            [('thread', thread) for thread in filtered] + [('room', room) for room in filtered_rooms],
+            [('thread', thread) for thread in filtered] + [('room', room) for room in filtered_rooms] + [('board', board) for board in filtered_boards],
             key=lambda pair: (pair[1].last_activity_at, pair[1].pk),
             reverse=reverse,
         )
-    ] if sort_kind == 'updated' else []
+    ] if sort_kind == 'updated' else ([{'kind': 'thread', 'id': thread.pk} for thread in filtered] if sort_kind == 'field' else [])
 
     return JsonResponse({
         'thread_ids': [thread.pk for thread in filtered],
         'room_ids': [room.pk for room in filtered_rooms],
+        'board_ids': [board.pk for board in filtered_boards],
         'spot_order': spot_order,
-        'count': len(filtered) + len(filtered_rooms),
+        'count': len(filtered) + len(filtered_rooms) + len(filtered_boards),
     })
 
 

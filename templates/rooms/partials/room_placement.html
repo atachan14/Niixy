@@ -1,0 +1,5 @@
+{% load l10n %}
+  {% url 'events:map' as niimap_url %}
+  {% with latitude=room.placement.latitude|unlocalize longitude=room.placement.longitude|unlocalize %}
+    {% include 'shared/placement_row.html' with placement_url=niimap_url|add:'?latitude='|add:latitude|add:'&longitude='|add:longitude|add:'&zoom=15' placement_label=latitude|add:', '|add:longitude placement_sticky=True placement_on_map=True placement_latitude=room.placement.latitude placement_longitude=room.placement.longitude %}
+  {% endwith %}

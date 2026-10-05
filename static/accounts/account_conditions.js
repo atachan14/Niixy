@@ -172,6 +172,11 @@ window.NiixyAccountConditions = (() => {
       if (revision !== catalogRequestId) return;
       catalog = copyGroups([result.conditions || []])[0];
       availableCatalog = copyGroups([result.available_conditions || []])[0];
+      for (const code of options.extraDefaultCodes?.(activeTarget) || []) {
+        if (!availableCatalog.some((condition) => condition.kind === 'default' && condition.definition.code === code)) {
+          availableCatalog.push(builtInDefaultCondition(code));
+        }
+      }
     }
 
     function builtInDefaultCondition(code) {

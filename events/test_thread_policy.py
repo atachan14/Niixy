@@ -22,7 +22,7 @@ class ThreadPolicyTests(TestCase):
         self.other = users.create_user('policy_other')
         self.room, _ = create_room(submission_id=uuid4(), owner=self.owner, name='Policy Room',
                                   description='', latitude='35', longitude='139')
-        self.board = Board.objects.get(placement__collection__room=self.room)
+        self.board = Board.objects.get(placement__collection__room=self.room, name='掲示板')
         self.guest = AnonymousUser()
 
     def condition(self, code):

@@ -36,7 +36,7 @@ Collection を削除する場合、その Collection に配置されている Bo
 
 Board は Thread をテーマや用途ごとにまとめるコンテナである。会話、告知、日記、ブログ、料理レシピ、ゲームレビューなどを、独立した投稿モデルではなく Board 内の Thread として表す。用途ごとの差は BoardPolicy、ThreadPostLayout、Board の表示方法で表現する。
 
-Board は独立した Owner を持たず、一つの配置先を持つ。配置先は Account または Room に属する Collection、もしくは NiiMap の座標とする。Collection に配置された Board は、その Collection が属する Account または Room の管理者が管理する。NiiMap に直接配置された Board には配置先管理者が存在せず、配置後の編集と削除を認めない。
+Board は独立した Owner を持たず、一つの配置先を持つ。配置先は Account または Room に属する Collection、もしくは NiiMap の座標とする。Collection に配置された Board は、その Collection が属する Account または Room の管理者が管理する。NiiMap に直接配置された Board には配置先管理者が存在せず、配置後の編集と削除を認めない。Guest／Accountとも直接作成でき、初期BoardPolicyは閲覧／Thread作成がGuest OR NiixyAccount、deny空とする。共通4欄のAccount条件は作成時に変更でき、保存後のBoardPolicyも変更不可とする。
 
 Room 作成時には、Room の Main Collection 内に `最初のBoard`を自動作成する。Board を使用しない Room も認め、Board 管理機能の実装後は最後の Board も削除できるようにする。Account の初期 Main Collectionにはブログ用 Board を用意する方向とするが、Account側の導入時期と詳細は実装時に決める。
 

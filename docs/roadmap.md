@@ -211,6 +211,16 @@ Accountの最新版編集・保存前確認、IF定義の対応可否とAccount�
 
 ---
 
+## v0.15 - Pane UI / NiiMap Board
+
+Status: Complete (implementation / isolated verification; release approved)
+
+Account／Room作成日、細いPaneHeader／座標行、Room座標sticky、Pane端までのborder、NiiMap初期sortのloading／retryを整える。Guest／AccountによるNiiMap Board直接作成から検索・BoardPane・Thread作成・Responseまで接続する。Boardは独立Ownerなし、作成時4欄Policy、保存後変更不可。Thread閲覧／返信はThreadPolicyで判定する。
+
+詳細: [実装と隔離QA](niimap-boards-and-pane-ui.md)。追加migrationはなく、v0.14のinterfaces0008と合わせて一度のpushで公開する。AccountLayout本体・Thread版編集・Snapshotは後続。
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。

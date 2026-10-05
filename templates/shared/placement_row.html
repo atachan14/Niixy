@@ -3,6 +3,6 @@
   {% if placement_room_url %}
     <a href="{{ placement_room_url }}">{{ placement_room_label }}</a><span class="ui-placement-separator" aria-hidden="true">&gt;</span><a href="{{ placement_room_url }}?boards=1">{{ placement_collection_label }}</a><span class="ui-placement-separator" aria-hidden="true">&gt;</span><a href="{{ placement_room_url }}?board={{ placement_board_id }}">{{ placement_board_label }}</a>
   {% else %}
-    <a href="{{ placement_url }}{% if placement_board_id %}?board={{ placement_board_id }}{% endif %}"{% if placement_on_map %} data-thread-placement-link data-latitude="{{ placement_latitude|unlocalize }}" data-longitude="{{ placement_longitude|unlocalize }}" data-zoom="{{ placement_zoom|default:'15' }}" aria-label="NiiMapでこの座標を表示"{% endif %}>{% if placement_on_map %}緯度 {{ placement_latitude|unlocalize }} / 経度 {{ placement_longitude|unlocalize }}{% else %}{{ placement_label }}{% endif %}</a>
+    <a href="{{ placement_url }}{% if placement_target_board_id %}{{ placement_target_board_id }}{% endif %}{% if placement_board_id %}?board={{ placement_board_id }}{% endif %}"{% if placement_on_map %} data-thread-placement-link data-latitude="{{ placement_latitude|unlocalize }}" data-longitude="{{ placement_longitude|unlocalize }}" data-zoom="{{ placement_zoom|default:'15' }}" aria-label="NiiMapでこの座標を表示"{% endif %}>{% if placement_on_map %}緯度 {{ placement_latitude|unlocalize }} / 経度 {{ placement_longitude|unlocalize }}{% else %}{{ placement_label }}{% endif %}</a>
   {% endif %}
 </div>
