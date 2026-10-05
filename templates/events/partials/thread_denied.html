@@ -1,0 +1,17 @@
+<section class="thread-view-unavailable" data-thread-view-unavailable>
+  <p><strong>「{{ thread.title }}」を閲覧できません。</strong></p>
+  {% if thread.view_policy.unmet_allow_labels %}
+    <div class="thread-write-reasons">
+      <p>次の条件グループのいずれかを満たす必要があります。</p>
+      <div class="thread-write-condition-list">{% for label in thread.view_policy.unmet_allow_labels %}<span class="thread-write-condition">{{ label }}</span>{% endfor %}</div>
+    </div>
+  {% elif not thread.view_policy.has_allow_conditions %}
+    <p>現在、閲覧可能な条件が設定されていません。</p>
+  {% endif %}
+  {% if thread.view_policy.matched_deny_labels %}
+    <div class="thread-write-reasons">
+      <p>また、以下の閲覧不可条件に該当しています。</p>
+      <div class="thread-write-condition-list">{% for label in thread.view_policy.matched_deny_labels %}<span class="thread-write-condition">{{ label }}</span>{% endfor %}</div>
+    </div>
+  {% endif %}
+</section>

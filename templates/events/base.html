@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}NiiMap{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'events/styles.css' %}?v=20261004-25">
+  <link rel="stylesheet" href="{% static 'events/styles.css' %}?v=20261005-v10">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -59,8 +59,8 @@
   {% include 'accounts/partials/account_condition_workspace.html' %}
 
   {% include 'shared/ui_script.html' %}
-  <script src="{% static 'rooms/forms.js' %}?v=20261004-6"></script>
-  <script src="{% static 'accounts/account_conditions.js' %}?v=20261004-8"></script>
+  <script src="{% static 'rooms/forms.js' %}?v=20261005-v10"></script>
+  <script src="{% static 'accounts/account_conditions.js' %}?v=20261005-v10"></script>
   <script src="{% static 'shared/workspace_trail.js' %}?v=20261004-3"></script>
   {% block scripts %}{% endblock %}
   {% if not user.is_authenticated %}

@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 from events.idempotency import run_once, submission_id_from
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from events.services import prepare_thread_for_view, prepare_thread_modules, thread_queryset
+from events.policies import prepare_thread_policy, save_thread_policy, default_thread_policy_groups, thread_policy_editor_rows
 from interfaces.services import save_thread_fields, thread_field_catalog, thread_interface_catalog
 
 from .forms import BoardForm, BoardThreadCreateForm, CollectionForm, RoomCreateForm, RoomEditForm
@@ -301,9 +302,8 @@ def board_threads(request, room_id, board_id):
     if board.can_view:
         board_threads = list(thread_queryset().filter(placements__kind=ThreadPlacement.BOARD, placements__board=board))
         for thread in board_threads:
-            thread.can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
-            thread.can_write = room.is_member and thread.allows(request.user, ThreadAccessRule.WRITE)
-        threads = [thread for thread in board_threads if thread.can_view]
+            prepare_thread_for_view(thread, request.user)
+        threads = board_threads
     return render(request, 'rooms/partials/board_threads.html', {
         'room': room,
         'board': board,
@@ -313,6 +313,7 @@ def board_threads(request, room_id, board_id):
         'view_policy': view_policy,
         'create_policy': create_policy,
         'thread_submission_id': uuid.uuid4(),
+        'thread_policy_editor_rows': thread_policy_editor_rows(f'board-{board.pk}-{uuid.uuid4().hex}', default_thread_policy_groups()),
         'rule_capabilities': [
             (ThreadAccessRule.VIEW, '閲覧制限', 'guest account'),
             (ThreadAccessRule.WRITE, '書込制限', 'account'),
@@ -347,6 +348,7 @@ def board_thread_create(request, room_id, board_id):
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
     try:
         prepared_direct_fields, prepared_interfaces = prepare_thread_modules(request.POST)
+        prepared_policy = prepare_thread_policy(request.POST, request.user)
     except ValidationError as error:
         return JsonResponse({'errors': error.message_dict}, status=400)
     submission_id = submission_id_from(request.POST.get('submission_id'))
@@ -365,12 +367,7 @@ def board_thread_create(request, room_id, board_id):
                 body=form.cleaned_data['body'],
             )
             ThreadPlacement.objects.create(thread=thread, kind=ThreadPlacement.BOARD, board=board)
-            ThreadAccessRule.objects.bulk_create([
-                ThreadAccessRule(thread=thread, capability=capability, audience=audience)
-                for capability in (ThreadAccessRule.VIEW, ThreadAccessRule.WRITE)
-                for audience in (ThreadAccessRule.GUEST, ThreadAccessRule.ACCOUNT)
-                if request.POST.get(f'{capability}_{audience}') == 'true'
-            ])
+            save_thread_policy(thread, prepared_policy)
             save_thread_fields(thread, prepared_direct_fields, prepared_interfaces)
             touch_thread_containers(thread)
             return thread

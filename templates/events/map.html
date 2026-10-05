@@ -33,7 +33,7 @@
       </div>
       <div id="thread-list" class="thread-list">
       {% for room in rooms %}<article class="room-item" data-room-id="{{ room.pk }}" data-owner-id="{{ room.owner.username }}"><a class="ui-summary-item spot-summary room-summary" href="{% url 'rooms:detail' room.pk %}" data-summary-kind="room"><span class="ui-summary-item-context" aria-hidden="true"></span><span class="ui-summary-item-title">{{ room.name }}</span><small class="ui-summary-item-updated">最終更新 {{ room.last_activity_at|date:'Y/m/d H:i' }}</small></a></article>{% endfor %}
-      {% for thread in threads %}<article class="thread-item" data-thread-id="{{ thread.pk }}" data-creator-id="{% if thread.creator %}{{ thread.creator.username }}{% endif %}"><button class="ui-summary-item spot-summary thread-summary" type="button" data-summary-kind="thread"><span class="ui-summary-item-context" aria-hidden="true"></span><span class="ui-summary-item-title">{{ thread.title }} ({{ thread.posts.all|length }})</span><small class="ui-summary-item-updated">最終更新 {{ thread.last_activity_at|date:'Y/m/d H:i' }}</small></button></article>{% endfor %}{% if not threads and not rooms %}<p class="empty">まだSpotはありません。</p>{% endif %}</div>
+      {% for thread in threads %}<article class="thread-item" data-thread-id="{{ thread.pk }}" data-thread-viewable="{{ thread.can_view|yesno:'true,false' }}" data-creator-id="{% if thread.can_view and thread.creator %}{{ thread.creator.username }}{% endif %}"><button class="ui-summary-item spot-summary thread-summary" type="button" data-summary-kind="thread"><span class="ui-summary-item-context" aria-hidden="true"></span><span class="ui-summary-item-title">{% if not thread.can_view %}閲覧不可 · {% endif %}{{ thread.title }}{% if thread.can_view %} ({{ thread.posts.all|length }}){% endif %}</span><small class="ui-summary-item-updated">最終更新 {{ thread.last_activity_at|date:'Y/m/d H:i' }}</small></button></article>{% endfor %}{% if not threads and not rooms %}<p class="empty">まだSpotはありません。</p>{% endif %}</div>
       <p id="thread-search-empty" class="empty" hidden>条件に一致するSpotはありません。</p>
     </aside>
     </div>
@@ -81,4 +81,4 @@
 {{ thread_field_catalog|json_script:'thread-field-catalog-data' }}
 {{ niimap_search_state|json_script:'niimap-search-state-data' }}
 {% endblock %}
-{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'events/map.js' %}?v=20261004-33"></script>{% endblock %}
+{% block scripts %}<script src="https://cdn.geolonia.com/embed/v5/embed?geolonia-api-key={{ geolonia_api_key }}"></script><script src="{% static 'events/map.js' %}?v=20261005-v10"></script>{% endblock %}

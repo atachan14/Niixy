@@ -1087,8 +1087,8 @@ html.has-restored-niimap-workspace .thread-track { transition: none; visibility:
 .thread-reply-form { display: grid; gap: 10px; min-width: 0; }
 .thread-reply-form textarea { border: 1px solid var(--line); border-radius: 6px; font: inherit; max-width: 100%; min-height: 110px; min-width: 0; padding: 10px; resize: vertical; width: 100%; }
 .thread-reply-form .button { justify-self: end; }
-.thread-reply-unavailable { background: #f7f7f6; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 12px; min-width: 0; padding: 14px; }
-.thread-reply-unavailable p { line-height: 1.6; margin: 0; }
+.thread-reply-unavailable, .thread-view-unavailable { background: #f7f7f6; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 12px; min-width: 0; padding: 14px; }
+.thread-reply-unavailable p, .thread-view-unavailable p { line-height: 1.6; margin: 0; }
 .thread-write-reasons { display: grid; gap: 7px; }
 .thread-write-condition-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .thread-write-condition { background: #eef6f4; border: 1px solid #b8ddd6; border-radius: 4px; color: var(--accent-dark); font-size: 13px; padding: 4px 7px; }

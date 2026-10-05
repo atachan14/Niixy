@@ -161,6 +161,16 @@ RoomPolicy、既存ThreadPolicyの共通基盤への移行、TemplateとLayout�
 
 ---
 
+## v0.10 - ThreadPolicy Foundation
+
+Status: Complete (local implementation / isolated SQLite verification)
+
+Threadの閲覧とResponse投稿を共通Account条件・Policy評価器へ移行し、条件設定と不可表示を各導線で揃える。Templateは別Versionで扱う。移行、初期値、閲覧不可時のメタ情報公開範囲は合意済み。共有DBへのmigrationは未実施。
+
+詳細: [v0.10要件](v0.10/requirements.md)
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。
@@ -199,6 +209,8 @@ v0.1以降のVersion番号や実装順序は固定しない。
 * BoardPolicy
 * BoardとCollectionの管理・参照
 * Room内部コンテンツを対象にしたNiiMap検索
+
+長期構想は[Vision: Account条件のRoom関係・選択UI](vision/access-policy.md#account条件のroom関係選択uiの長期構想)と[Vision: RoomTag](vision/room-and-niimap.md#roomtagの長期構想)で、Version未割当・未確定事項として管理する。
 
 ### Service Integration
 

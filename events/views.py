@@ -28,6 +28,7 @@ from .forms import ThreadCreateForm, ThreadPostForm
 from .idempotency import run_once, submission_id_from
 from .models import Locality, NiiMapFilterPreference, Station, Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from .services import prepare_thread_for_view, prepare_thread_modules, thread_queryset
+from .policies import prepare_thread_policy, save_thread_policy, default_thread_policy_groups, thread_policy_editor_rows
 
 
 CAPABILITIES = (ThreadAccessRule.VIEW, ThreadAccessRule.WRITE)
@@ -47,6 +48,8 @@ def map_view(request):
 
     markers = []
     for thread in threads:
+        if not thread.can_view:
+            continue
         for placement in thread.placements.all():
             if placement.kind != ThreadPlacement.NII_MAP:
                 continue
@@ -76,6 +79,7 @@ def map_view(request):
         'room_markers': room_markers,
         'geolonia_api_key': settings.GEOLONIA_API_KEY,
         'thread_submission_id': uuid.uuid4(),
+        'thread_policy_editor_rows': thread_policy_editor_rows('niimap', default_thread_policy_groups()),
         'room_submission_id': uuid.uuid4(),
         'rule_capabilities': [
             (ThreadAccessRule.VIEW, '閲覧制限', 'guest account'),
@@ -101,15 +105,6 @@ def healthcheck(request):
     return HttpResponse('ok', content_type='text/plain')
 
 
-def rules_from_request(request):
-    rules = []
-    for capability in CAPABILITIES:
-        for audience in (ThreadAccessRule.GUEST, ThreadAccessRule.ACCOUNT):
-            if request.POST.get(f'{capability}_{audience}') == 'true':
-                rules.append(ThreadAccessRule(capability=capability, audience=audience))
-    return rules
-
-
 @require_POST
 def thread_create(request):
     submission_id = submission_id_from(request.POST.get('submission_id'))
@@ -120,6 +115,7 @@ def thread_create(request):
 
     try:
         prepared_direct_fields, prepared_interfaces = prepare_thread_modules(request.POST)
+        prepared_policy = prepare_thread_policy(request.POST, request.user)
     except ValidationError as error:
         return JsonResponse({'errors': error.message_dict}, status=400)
 
@@ -135,10 +131,7 @@ def thread_create(request):
                 latitude=form.cleaned_data['latitude'],
                 longitude=form.cleaned_data['longitude'],
         )
-        ThreadAccessRule.objects.bulk_create([
-                ThreadAccessRule(thread=thread, capability=rule.capability, audience=rule.audience)
-                for rule in rules_from_request(request)
-        ])
+        save_thread_policy(thread, prepared_policy)
         save_thread_fields(thread, prepared_direct_fields, prepared_interfaces)
         return thread
 
@@ -149,17 +142,11 @@ def thread_create(request):
 
 @require_POST
 def thread_post_create(request, thread_id):
-    thread = get_object_or_404(Thread.objects.prefetch_related('access_rules'), pk=thread_id)
+    thread = get_object_or_404(Thread.objects.prefetch_related('access_rules', 'policy_conditions'), pk=thread_id)
     if not thread.allows(request.user, ThreadAccessRule.VIEW):
         return JsonResponse({'error': 'このThreadは閲覧できません。'}, status=403)
     if not thread.allows(request.user, ThreadAccessRule.WRITE):
         return JsonResponse({'error': 'このThreadには書き込めません。'}, status=403)
-    from rooms.services import room_for_thread
-
-    room = room_for_thread(thread)
-    if room is not None and not room.has_member(request.user):
-        return JsonResponse({'error': 'このThreadへの書き込みにはRoomへの参加が必要です。'}, status=403)
-
     form = ThreadPostForm(request.POST)
     if not form.is_valid():
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
@@ -304,9 +291,12 @@ def _policy_matches(thread, user, condition):
         if not valid:
             continue
         if subject == ThreadAccessRule.ACCOUNT:
+            # A generic Account group searches for a matching current Account.
+            # Evaluate the saved policy, including AND and deny conditions.
             allowed = any(
-                rule.capability == capability and rule.audience == ThreadAccessRule.ACCOUNT
-                for rule in thread.access_rules.all()
+                _account_group_matches(account, user, group)
+                and thread.allows(account, capability)
+                for account in get_user_model().objects.all().iterator()
             )
         else:
             allowed = thread.allows(subject, capability)
@@ -348,6 +338,12 @@ def thread_search(request):
 
     filtered = []
     for thread in threads:
+        can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
+        # Only Title and update time are searchable when the Thread is denied.
+        if not can_view and (creator_include_groups or creator_exclude_groups or include_creators
+                             or exclude_creators or policy_conditions or resolved_field_conditions
+                             or interface_conditions):
+            continue
         if creator_include_groups and not _account_groups_match(thread.creator, request.user, creator_include_groups):
             continue
         if creator_exclude_groups and _account_groups_match(thread.creator, request.user, creator_exclude_groups):
@@ -362,7 +358,6 @@ def thread_search(request):
                 continue
             if updated_operator != 'before' and thread_date < updated_date:
                 continue
-        can_view = thread.allows(request.user, ThreadAccessRule.VIEW)
         searchable_text = thread.title
         if can_view:
             searchable_text += ' ' + ' '.join(post.body for post in thread.posts.all())

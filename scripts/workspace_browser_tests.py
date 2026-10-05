@@ -9,6 +9,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from scripts.browser_test_server import SharedSQLiteStaticFilesHandler
 
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from rooms.models import Board
@@ -16,6 +17,8 @@ from rooms.services import create_board, create_room
 
 
 class WorkspaceBrowserTests(StaticLiveServerTestCase):
+    static_handler = SharedSQLiteStaticFilesHandler
+
     def setUp(self):
         self.assertEqual(settings.DATABASES['default']['ENGINE'], 'django.db.backends.sqlite3')
         self.owner = get_user_model().objects.create_user('workspace_owner', password='test-only-password')
@@ -231,3 +234,15 @@ class WorkspaceBrowserTests(StaticLiveServerTestCase):
                             context.close()
             finally:
                 browser.close()
+
+    def test_browser_smoke_cli(self):
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, str(Path(settings.BASE_DIR) / 'scripts' / 'browser_smoke.py'),
+             '--base-url', self.live_server_url],
+            cwd=settings.BASE_DIR, capture_output=True, text=True, encoding='utf-8', timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        output = Path(settings.BASE_DIR) / '.artifacts' / 'browser-smoke'
+        (output / 'run.log').write_text(result.stdout + result.stderr, encoding='utf-8')

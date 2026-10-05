@@ -39,7 +39,7 @@ class ThreadViewTests(TestCase):
         self.assertEqual(response.json()['redirect_url'], f"{reverse('events:map')}?thread={thread.pk}")
         self.assertEqual(thread.posts.get().number, 1)
         self.assertEqual(thread.placements.get().kind, ThreadPlacement.NII_MAP)
-        self.assertEqual(thread.access_rules.count(), 4)
+        self.assertEqual(thread.policy_conditions.count(), 4)
 
     def test_duplicate_submission_creates_one_thread(self):
         payload = self.payload()
@@ -144,6 +144,7 @@ class ThreadViewTests(TestCase):
 
     def test_thread_detail_links_niimap_placement_coordinates(self):
         thread = Thread.objects.create(title='配置付きThread')
+        ThreadAccessRule.objects.create(thread=thread, capability='view', audience='guest')
         ThreadPost.objects.create(thread=thread, number=1, body='Opening post')
         ThreadPlacement.objects.create(
             thread=thread,
@@ -235,7 +236,7 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, '公開Thread')
         self.assertContains(response, '非公開Thread')
         self.assertContains(response, 'data-summary-kind="thread"', count=2)
-        self.assertContains(response, 'このThreadは閲覧できません。')
+        self.assertContains(response, 'data-thread-view-unavailable')
 
     def test_map_and_search_exclude_unplaced_threads(self):
         placed = Thread.objects.create(title='配置済みThread')
@@ -279,7 +280,7 @@ class ThreadViewTests(TestCase):
         self.assertContains(response, 'data-account-selector-pane-template')
         self.assertContains(response, 'data-account-condition-list-url="/accounts/account-conditions/"')
         self.assertNotContains(response, 'id="account-condition-catalog-data"')
-        self.assertContains(response, 'accounts/account_conditions.js?v=20261004-8')
+        self.assertContains(response, 'accounts/account_conditions.js?v=20261005-v10')
         self.assertContains(response, 'data-account-condition-kind="default"')
         self.assertContains(response, 'data-account-condition-kind="account_interface"')
         self.assertContains(response, 'data-account-condition-kind="field"')
@@ -322,7 +323,7 @@ class ThreadViewTests(TestCase):
         self.assertLess(search_toggle, create_toggle)
         self.assertLess(search_controls, create_controls)
         self.assertLess(create_controls, thread_list)
-        self.assertContains(response, 'map.js?v=20261004-33')
+        self.assertContains(response, 'map.js?v=20261005-v10')
         self.assertNotContains(response, 'class="map-filter"')
         self.assertContains(response, 'niixy:resume:niimap')
         self.assertNotContains(response, 'niimap:open-thread')
@@ -392,6 +393,7 @@ class ThreadViewTests(TestCase):
         self.place_on_map(owner_thread, other_thread, guest_thread)
         for thread in (owner_thread, other_thread, guest_thread):
             ThreadAccessRule.objects.create(thread=thread, capability='view', audience='guest')
+            ThreadAccessRule.objects.create(thread=thread, capability='view', audience='account')
         self.client.force_login(owner)
         account = lambda account_id: {'kind': 'account', 'definition': {'account_id': account_id}, 'label': 'Account'}
         default = lambda code: {'kind': 'default', 'definition': {'code': code}, 'label': code}

@@ -132,7 +132,7 @@ Repository StructureとNaming Policyを管理する。
 
 将来的に実現したいConceptやServiceごとのVisionを管理する。
 
-現在のVersionで実装することを保証するものではない。
+採用済みの方針と未確定案を区別して残す。長期構想は未確定・Version未割当として保存し、現在のVersionで実装することを保証しない。
 
 ### memo/
 
@@ -140,13 +140,17 @@ Repository StructureとNaming Policyを管理する。
 
 ここに書かれた内容はSpecificationではない。
 
+### backlog.md（Version未割当・任意）
+
+実装Versionが未確定の具体的な未対応Bug・Improvement・Taskがある場合は、必要に応じてdocs/backlog.mdへ記録する。長期構想を置く場所にはせず、登録だけで実装や優先順を確定しない。Versionが決まった実装範囲は、そのVersionのrequirements.mdへ記録する。空なら作成不要とする。
+
 ### v0.x/
 
 各Versionの実装対象に関するDocumentを管理する。
 
 #### requirements.md
 
-そのVersionを完成させるために必要なRequirementsを管理する。
+そのVersionで実装すると確定した範囲と、完成させるために必要なRequirementsを管理する。
 
 #### decisions.md
 
@@ -154,9 +158,9 @@ ArchitectureやProduct Design等の重要なDecisionと、そのReasonを記録�
 
 #### backlog.md
 
-そのVersionで検討可能なFeature、Improvement、Bug、Technical Task等を管理する。
+具体的な未対応Bug、Improvement、Technical Task等がある場合にだけ、必要に応じて任意作成する。空なら作成不要とする。長期構想はVisionへ、実装すると確定した範囲はVersion別requirements.mdへ記録する。
 
-Backlogに存在すること自体は、そのVersionでの実装を必須としない。
+Backlogに存在すること自体は、そのVersionでの実装を必須としない。過去VersionのBacklogは当時の検討記録として保持する。
 
 ---
 

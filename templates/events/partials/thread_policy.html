@@ -2,10 +2,8 @@
   <summary>Policy</summary>
   <dl class="thread-policy-list">
     {% for row in thread.access_policy_rows %}
-      <div>
-        <dt>{{ row.label }}</dt>
-        <dd>{% for audience in row.audiences %}{{ audience }}{% if not forloop.last %} / {% endif %}{% empty %}許可なし{% endfor %}</dd>
-      </div>
+      <div><dt>{{ row.label }}可能</dt><dd>{% for label in row.allow_labels %}{{ label }}{% if not forloop.last %} OR {% endif %}{% empty %}許可なし{% endfor %}</dd></div>
+      <div><dt>{{ row.label }}不可</dt><dd>{% for label in row.deny_labels %}{{ label }}{% if not forloop.last %} OR {% endif %}{% empty %}条件なし{% endfor %}</dd></div>
     {% endfor %}
   </dl>
 </details>

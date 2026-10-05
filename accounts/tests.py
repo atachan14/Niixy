@@ -311,7 +311,7 @@ class AccountPageTests(TestCase):
         self.assertContains(response, '>AccountListB</button>')
         self.assertContains(response, '>Love</button>')
         self.assertContains(response, '>Hate</button>')
-        self.assertContains(response, 'account.js?v=20261004-6')
+        self.assertContains(response, 'account.js?v=20261005-v10')
         self.assertContains(response, 'class="account-overview-content identity-overview-content"')
         self.assertContains(response, 'class="account-hero identity-overview-hero"')
         self.assertContains(response, '<h2>評価</h2>')
@@ -535,7 +535,7 @@ class AccountPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '見出しだけのThread')
-        self.assertContains(response, 'このThreadは閲覧できません。')
+        self.assertContains(response, 'data-thread-view-unavailable')
         self.assertNotContains(response, '隠す返信本文')
 
     def test_response_pane_paginates_ten_responses(self):

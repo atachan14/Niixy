@@ -239,6 +239,7 @@ window.NiixyAccountConditions = (() => {
         if (!groupsByTarget.has(target)) setGroups(target, []);
         return;
       }
+      input.dataset.accountConditionInitialGroups ??= input.value || '[]';
       try { setGroups(target, JSON.parse(input.value || '[]')); }
       catch { setGroups(target, []); }
     }
@@ -509,6 +510,9 @@ window.NiixyAccountConditions = (() => {
       }
     };
     const handleRootReset = (event) => {
+      event.target.querySelectorAll('[data-account-condition-groups-input]').forEach((input) => {
+        input.value = input.dataset.accountConditionInitialGroups || '[]';
+      });
       window.setTimeout(() => initializeTargets(event.target), 0);
     };
     root.addEventListener('click', handleRootClick);

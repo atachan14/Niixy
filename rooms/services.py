@@ -46,34 +46,8 @@ def seed_board_policy(board, room):
 
 
 def _board_policy_condition_snapshot(condition, room, actor):
-    if not isinstance(condition, dict):
-        raise ValueError('Account条件が正しくありません。')
-    kind = condition.get('kind')
-    definition = condition.get('definition') or {}
-    if kind == 'default':
-        code = definition.get('code')
-        if code == 'self':
-            if not actor.is_authenticated:
-                raise ValueError('自分のNiixyIDはLogin中のみ利用できます。')
-            return 'account', {'account_id': actor.pk}, f'@{actor.username}'
-        if code not in {'guest', 'account'}:
-            raise ValueError('このDefault条件はまだPolicyで利用できません。')
-        return kind, {'code': code}, 'Guest' if code == 'guest' else 'NiixyAccount'
-    if kind == 'account':
-        try:
-            account = get_user_model().objects.select_related('niixy_profile').get(pk=definition.get('account_id'))
-        except (get_user_model().DoesNotExist, TypeError, ValueError) as error:
-            raise ValueError('Accountが見つかりません。') from error
-        return kind, {'account_id': account.pk}, account.niixy_profile.display_label
-    if kind == 'room':
-        try:
-            target = Room.objects.get(pk=definition.get('room_id'))
-        except (Room.DoesNotExist, TypeError, ValueError) as error:
-            raise ValueError('Roomが見つかりません。') from error
-        if definition.get('relation', 'member') != 'member':
-            raise ValueError('Room条件が正しくありません。')
-        return kind, {'room_id': target.pk, 'relation': 'member'}, f'{target.name}に参加'
-    raise ValueError('このAccount条件はまだPolicyで利用できません。')
+    from accounts.policies import snapshot_policy_condition
+    return snapshot_policy_condition(condition, actor)
 
 
 def _policy_groups_from_data(data, capability, decision):
@@ -256,7 +230,7 @@ def delete_collection(collection):
 
 
 def board_for_thread(thread):
-    placements = thread._prefetched_objects_cache.get('placements')
+    placements = getattr(thread, '_prefetched_objects_cache', {}).get('placements')
     if placements is None:
         placements = thread.placements.select_related(
             'board__placement__collection__room',

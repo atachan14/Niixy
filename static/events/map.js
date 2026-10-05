@@ -99,9 +99,9 @@ const accountConditions = NiixyAccountConditions.create({
   accountSearchUrl: workspace.dataset.accountSearchUrl,
   roomSearchUrl: workspace.dataset.accountConditionRoomSearchUrl,
   csrfToken: () => searchForm.querySelector('[name="csrfmiddlewaretoken"]').value,
-  conditionKindAllowed: (kind, target) => !target?.startsWith('board-policy-')
+  conditionKindAllowed: (kind, target) => !(target?.startsWith('board-policy-') || target?.startsWith('thread-policy-'))
     || ['default', 'account', 'room'].includes(kind),
-  conditionAllowed: (condition, target) => !target?.startsWith('board-policy-')
+  conditionAllowed: (condition, target) => !(target?.startsWith('board-policy-') || target?.startsWith('thread-policy-'))
     || condition.kind !== 'default'
     || ['guest', 'account', 'self'].includes(condition.definition.code),
 });
@@ -202,7 +202,7 @@ if (initialThreadPane) {
     workspace.classList.add('is-restoring-detail');
   }
   initialThreadPane.hidden = false;
-  detailTitle.textContent = `${initialThreadPane.dataset.threadTitle} (${initialThreadPane.dataset.threadPostCount})`;
+  detailTitle.textContent = `${initialThreadPane.dataset.threadTitle}${initialThreadPane.dataset.threadPostCount === undefined ? '（閲覧不可）' : ` (${initialThreadPane.dataset.threadPostCount})`}`;
 } else if (!initialRoomId) {
   const url = new URL(location.href);
   url.searchParams.delete('thread');
@@ -581,7 +581,7 @@ function applyFilters() {
   list.querySelectorAll('.thread-item').forEach((item) => {
     const thread = markers.find((candidate) => String(candidate.id) === item.dataset.threadId);
     const inSearch = appliedSearchIds === null || appliedSearchIds.has(item.dataset.threadId);
-    const inBounds = thread && bounds.contains([thread.longitude, thread.latitude]);
+    const inBounds = item.dataset.threadViewable === 'false' || (thread && bounds.contains([thread.longitude, thread.latitude]));
     const visible = inSearch && inBounds;
     item.hidden = !visible;
     if (visible) visibleCount += 1;
@@ -609,7 +609,7 @@ function applyFilters() {
 }
 function sortByDistance() {
   const center = map.getCenter();
-  const distance = (spot) => (spot.latitude - center.lat) ** 2 + (spot.longitude - center.lng) ** 2;
+  const distance = (spot) => spot ? (spot.latitude - center.lat) ** 2 + (spot.longitude - center.lng) ** 2 : Infinity;
   const spotFor = (item) => item.classList.contains('room-item')
     ? roomMarkers.find((room) => String(room.id) === item.dataset.roomId)
     : markers.find((thread) => String(thread.id) === item.dataset.threadId);
@@ -985,7 +985,7 @@ function openDetail(id, shouldUpdateUrl = true) {
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => {
     const selected = pane.dataset.threadDetailPane === String(id);
     pane.hidden = !selected;
-    if (selected) detailTitle.textContent = `${pane.dataset.threadTitle} (${pane.dataset.threadPostCount})`;
+    if (selected) detailTitle.textContent = `${pane.dataset.threadTitle}${pane.dataset.threadPostCount === undefined ? '（閲覧不可）' : ` (${pane.dataset.threadPostCount})`}`;
   });
   document.querySelector('.thread-detail-pane').scrollTo({top: 0});
   if (shouldUpdateUrl) updateThreadUrl(id);

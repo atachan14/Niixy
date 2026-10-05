@@ -12,9 +12,4 @@
     <button{% if interface_button_id %} id="{{ interface_button_id }}"{% endif %} class="button secondary" type="button" data-open-thread-interface-selector>ThreadIFを追加</button>
   </div>
 </details>
-<details class="thread-interface-input">
-  <summary>Policy</summary>
-  <div class="thread-rules">
-    {% for capability, label, default_audiences in rule_capabilities %}<section class="thread-rule" data-capability="{{ capability }}" data-default-audiences="{{ default_audiences }}"><strong>{{ label }}</strong><div class="thread-rule-list"></div><button class="thread-rule-add" type="button">＋ 条件を追加</button></section>{% endfor %}
-  </div>
-</details>
+{% include 'events/partials/thread_policy_editor.html' %}

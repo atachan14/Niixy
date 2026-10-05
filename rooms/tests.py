@@ -371,8 +371,8 @@ class RoomViewTests(TestCase):
         self.assertContains(member_response, 'disabled title="BoardのThread作成条件を満たしていません"')
         self.assertNotContains(member_response, 'data-board-create-window')
         self.assertContains(board_response, 'Boardの削除は取り消せません。')
-        self.assertContains(board_response, 'data-open-account-conditions', count=4)
-        self.assertContains(board_response, 'data-account-condition-groups-input', count=4)
+        self.assertContains(board_response, 'data-open-account-conditions', count=8)
+        self.assertContains(board_response, 'data-account-condition-groups-input', count=8)
 
     def test_room_page_includes_shared_account_condition_workspace(self):
         self.client.force_login(self.owner)
@@ -387,7 +387,7 @@ class RoomViewTests(TestCase):
         self.assertContains(response, 'data-account-selector-pane-template')
         self.assertContains(response, 'data-account-condition-list-url="/accounts/account-conditions/"')
         self.assertNotContains(response, 'id="room-account-condition-catalog"')
-        self.assertContains(response, 'accounts/account_conditions.js?v=20261004-8')
+        self.assertContains(response, 'accounts/account_conditions.js?v=20261005-v10')
         self.assertContains(response, 'room.js?v=20261004-17')
 
     def test_board_policy_supports_and_groups_and_deny_precedence(self):
@@ -637,7 +637,7 @@ class RoomViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         thread = Thread.objects.get(title='Field付き')
         self.assertEqual(ThreadDirectField.objects.get(thread=thread).binding.value.value, 5)
-        self.assertEqual(thread.access_rules.count(), 3)
+        self.assertEqual(thread.policy_conditions.count(), 3)
 
     def test_member_board_form_exposes_existing_thread_features(self):
         self.client.force_login(self.owner)
@@ -653,8 +653,15 @@ class RoomViewTests(TestCase):
         self.assertContains(pane_response, 'data-open-thread-interface-selector')
         self.assertContains(pane_response, 'class="thread-interface-input"', count=3)
         self.assertContains(pane_response, '<summary>Policy</summary>')
-        self.assertContains(pane_response, 'data-capability="view" data-default-audiences="guest account"')
-        self.assertContains(pane_response, 'data-capability="write" data-default-audiences="account"')
+        self.assertContains(pane_response, 'data-thread-policy-editor')
+        for capability in ('view', 'write'):
+            for decision in ('allow', 'deny'):
+                self.assertContains(pane_response, f'name="policy_{capability}_{decision}_groups"')
+        rows = pane_response.context['thread_policy_editor_rows']
+        for row in rows:
+            groups = json.loads(row['groups_json'])
+            self.assertEqual([group[0]['definition']['code'] for group in groups],
+                             ['guest', 'account'] if row['decision'] == 'allow' else [])
 
     def test_board_thread_summary_uses_thread_color_kind(self):
         thread = Thread.objects.create(creator=self.owner, title='色分けThread')
@@ -705,12 +712,16 @@ class RoomViewTests(TestCase):
         self.assertContains(response, 'id="room-pane-interface-catalog"')
         self.assertContains(response, 'ui-placement-row')
 
-    def test_only_room_member_can_reply_to_board_thread(self):
+    def test_explicit_thread_room_condition_controls_reply(self):
         thread = Thread.objects.create(creator=self.owner, title='Membership Gate')
         ThreadPost.objects.create(thread=thread, number=1, creator=self.owner, body='本文')
         ThreadPlacement.objects.create(thread=thread, kind=ThreadPlacement.BOARD, board=self.board)
         ThreadAccessRule.objects.create(thread=thread, capability='view', audience='account')
-        ThreadAccessRule.objects.create(thread=thread, capability='write', audience='account')
+        from events.policies import prepare_thread_policy, save_thread_policy
+        save_thread_policy(thread, prepare_thread_policy({
+            'policy_view_allow_groups': json.dumps([[{'kind': 'default', 'definition': {'code': 'account'}}]]),
+            'policy_write_allow_groups': json.dumps([[{'kind': 'room', 'definition': {'room_id': self.room.pk, 'relation': 'member'}}]]),
+        }, self.owner))
         url = reverse('events:thread-post-create', args=[thread.pk])
 
         self.client.force_login(self.outsider)
@@ -722,12 +733,16 @@ class RoomViewTests(TestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(thread.posts.count(), 2)
 
-    def test_board_thread_uses_shared_detail_and_membership_from_account_page(self):
+    def test_shared_detail_uses_explicit_thread_room_condition_from_account_page(self):
         thread = Thread.objects.create(creator=self.owner, title='Shared Detail')
         ThreadPost.objects.create(thread=thread, number=1, creator=self.owner, body='本文')
         ThreadPlacement.objects.create(thread=thread, kind=ThreadPlacement.BOARD, board=self.board)
         ThreadAccessRule.objects.create(thread=thread, capability='view', audience='account')
-        ThreadAccessRule.objects.create(thread=thread, capability='write', audience='account')
+        from events.policies import prepare_thread_policy, save_thread_policy
+        save_thread_policy(thread, prepare_thread_policy({
+            'policy_view_allow_groups': json.dumps([[{'kind': 'default', 'definition': {'code': 'account'}}]]),
+            'policy_write_allow_groups': json.dumps([[{'kind': 'room', 'definition': {'room_id': self.room.pk, 'relation': 'member'}}]]),
+        }, self.owner))
         account_url = reverse('accounts:thread-detail', args=[self.owner.username, thread.pk])
         room_url = reverse('rooms:thread-detail', args=[self.room.pk, thread.pk])
 
@@ -743,7 +758,7 @@ class RoomViewTests(TestCase):
         self.assertContains(outsider_response, f'href="{reverse("rooms:detail", args=[self.room.pk])}?board={self.board.pk}"')
         self.assertNotContains(outsider_response, 'class="thread-reply-form"')
         self.assertContains(outsider_response, 'class="thread-reply-unavailable"')
-        self.assertContains(outsider_response, '以下の必要条件を満たしていません。')
+        self.assertContains(outsider_response, '次の条件グループのいずれかを満たす必要があります。')
         self.assertContains(outsider_response, f'<span class="thread-write-condition">{self.room.name}に参加</span>')
         self.assertContains(outsider_response, 'data-open-thread-policy')
 

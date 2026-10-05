@@ -11,6 +11,7 @@ def thread_queryset():
         Thread.objects.select_related('creator__niixy_profile')
         .prefetch_related(
             'access_rules',
+            'policy_conditions',
             Prefetch(
                 'placements',
                 queryset=ThreadPlacement.objects.select_related(
@@ -28,35 +29,14 @@ def thread_queryset():
 
 
 def prepare_thread_for_view(thread, viewer):
-    from rooms.services import room_for_thread
-
+    view_policy = thread.evaluate_policy(viewer, ThreadAccessRule.VIEW)
+    write_policy = thread.evaluate_policy(viewer, ThreadAccessRule.WRITE)
     thread.can_view = thread.allows(viewer, ThreadAccessRule.VIEW)
-    room = room_for_thread(thread)
-    policy_allows_write = thread.allows(viewer, ThreadAccessRule.WRITE)
-    room_allows_write = room is None or room.has_member(viewer)
-    thread.can_write = policy_allows_write and room_allows_write
-
-    unmet_requirements = []
-    if not policy_allows_write:
-        rules = thread._prefetched_objects_cache.get('access_rules')
-        if rules is None:
-            rules = list(thread.access_rules.all())
-        enabled_audiences = {
-            rule.audience
-            for rule in rules
-            if rule.capability == ThreadAccessRule.WRITE
-        }
-        unmet_requirements.extend(
-            label
-            for audience, label in ThreadAccessRule.AUDIENCE_CHOICES
-            if audience in enabled_audiences
-        )
-    if room is not None and not room_allows_write:
-        unmet_requirements.append(f'{room.name}に参加')
-
-    thread.unmet_write_requirements = unmet_requirements
-    # Deny rules are a future Policy feature. Keep the view contract ready now.
-    thread.matched_write_denials = []
+    thread.can_write = thread.can_view and write_policy.allowed
+    thread.view_policy = view_policy
+    thread.write_policy = write_policy
+    thread.unmet_write_requirements = write_policy.unmet_allow_labels
+    thread.matched_write_denials = write_policy.matched_deny_labels
     return thread
 
 

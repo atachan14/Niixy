@@ -31,33 +31,32 @@ class Thread(IdempotentSubmission):
     def __str__(self):
         return self.title
 
+    def policy_conditions_for_evaluation(self):
+        from .policies import legacy_conditions
+        conditions = getattr(self, '_prefetched_objects_cache', {}).get('policy_conditions')
+        if conditions is None:
+            conditions = list(self.policy_conditions.all())
+        if conditions:
+            return conditions
+        # Empty new policies have no legacy rows and correctly deny access.
+        return legacy_conditions(self)
+
+    def evaluate_policy(self, user, capability):
+        from accounts.policies import evaluate_policy
+        return evaluate_policy(
+            (item for item in self.policy_conditions_for_evaluation() if item.capability == capability),
+            user,
+        )
+
     def allows(self, user, capability):
         if user.is_authenticated and self.creator_id == user.id and capability == ThreadAccessRule.VIEW:
             return True
-        audience = ThreadAccessRule.ACCOUNT if user.is_authenticated else ThreadAccessRule.GUEST
-        prefetched_rules = self._prefetched_objects_cache.get('access_rules')
-        if prefetched_rules is not None:
-            return any(rule.capability == capability and rule.audience == audience for rule in prefetched_rules)
-        return self.access_rules.filter(capability=capability, audience=audience).exists()
+        return self.evaluate_policy(user, capability).allowed
 
     @property
     def access_policy_rows(self):
-        rules = self._prefetched_objects_cache.get('access_rules')
-        if rules is None:
-            rules = list(self.access_rules.all())
-
-        enabled = {(rule.capability, rule.audience) for rule in rules}
-        return [
-            {
-                'label': capability_label,
-                'audiences': [
-                    audience_label
-                    for audience, audience_label in ThreadAccessRule.AUDIENCE_CHOICES
-                    if (capability, audience) in enabled
-                ],
-            }
-            for capability, capability_label in ThreadAccessRule.CAPABILITY_CHOICES
-        ]
+        from .policies import policy_rows
+        return policy_rows(self.policy_conditions_for_evaluation())
 
 
 class ThreadPost(IdempotentSubmission):
@@ -152,6 +151,27 @@ class ThreadAccessRule(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['thread', 'capability', 'audience'], name='unique_thread_access_rule')]
+
+
+class ThreadPolicyCondition(models.Model):
+    VIEW = 'view'
+    WRITE = 'write'
+    ALLOW = 'allow'
+    DENY = 'deny'
+    CAPABILITY_CHOICES = [(VIEW, '閲覧'), (WRITE, '書込')]
+    DECISION_CHOICES = [(ALLOW, '可能'), (DENY, '不可')]
+
+    thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='policy_conditions')
+    capability = models.CharField(max_length=16, choices=CAPABILITY_CHOICES)
+    decision = models.CharField(max_length=8, choices=DECISION_CHOICES)
+    group_key = models.UUIDField(default=uuid.uuid4)
+    position = models.PositiveSmallIntegerField(default=0)
+    kind = models.CharField(max_length=24)
+    definition = models.JSONField(default=dict)
+    label = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ['capability', 'decision', 'group_key', 'position', 'pk']
 
 
 class NiiMapFilterPreference(models.Model):

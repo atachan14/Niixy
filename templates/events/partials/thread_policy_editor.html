@@ -1,0 +1,13 @@
+<details class="thread-interface-input">
+  <summary>Policy</summary>
+  <div class="thread-policy-editor" data-thread-policy-editor>
+    {% for row in thread_policy_editor_rows %}
+      <section class="thread-rule">
+        <strong>{{ row.label }}</strong>
+        <div class="niimap-selected-account-conditions" data-account-condition-target="{{ row.target }}"></div>
+        <input name="policy_{{ row.capability }}_{{ row.decision }}_groups" type="hidden" value="{{ row.groups_json|escape }}" data-account-condition-groups-input="{{ row.target }}">
+        <button class="button secondary" type="button" data-open-account-conditions="{{ row.target }}">条件を追加</button>
+      </section>
+    {% endfor %}
+  </div>
+</details>

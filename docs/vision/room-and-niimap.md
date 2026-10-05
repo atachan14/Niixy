@@ -28,7 +28,7 @@ Room作成時には`Main`という名称の通常Collection、システムCollec
 
 Room内の会話はBoardに配置したThreadで行う。Boardは独立したOwnerを持たず、配置先Collectionが属するRoomの管理者が管理する。Collectionを削除した場合、そこに配置されているBoardは同じRoom内のシステムCollection「未分類」へ移す。「未分類」は固定名、削除不可、並び替え不可とするが、Boardの作成先には指定できる。Collectionのうちシステム上の特別な識別を持つのは「未分類」だけとする。
 
-RoomPolicyはRoom自体の閲覧、参加、管理を制限する。BoardPolicyはBoard自体の閲覧やThread作成を制限する。RoomのBoardTemplateとBoardのThreadTemplateは子対象の作成時にだけ作用し、推奨値または強制値を子対象へ確定保存する。作成済みのBoardやThreadは親Templateを継続参照せず、親の変更や削除の影響を受けない。
+RoomPolicyはRoom自体の閲覧、参加、管理を制限する。BoardPolicyはBoard自体の閲覧やThread作成を制限する。RoomのBoardTemplateとBoardのThreadTemplateは子対象の作成時に推奨値または強制値を確定保存し、作成後も編集可能な設定を編集する場合はその時点の強制値を再適用する。対象が親Templateを継続参照する構造にはしない。ThreadPolicyは作成後変更不可なので作成時にだけ確定し、親の変更や削除の影響を受けない。Templateは後続Versionで実装する。
 
 ## 配置と参照
 
@@ -41,3 +41,13 @@ Boardの配置先変更は、異なるRoomやAccountの管理者間で申請・�
 v0.6ではRoomの作成とNiiMap配置、RoomPage、Main Collectionと`最初のBoard`、ログイン済みAccountの即時参加、参加者によるThread作成とResponse投稿を実装する。参加申請、参加条件、Owner譲渡、Room内Tag、BoardPolicy、Collection管理、ProfileAreaは後続Versionへ回す。
 
 NiiMapではRoom自体をSpotとして表示・検索する。Room内部のThreadを検索一致理由として利用する機能は後続Versionへ回す。
+
+## RoomTagの長期構想
+
+状態: 長期構想 / Version未割当 / 未確定設計。v0.10・v0.11では実装しない。
+
+Room管理者らが自由にRoomTagを作成し、Memberへ適用してAccount条件に利用する案を保存する。初期作成され削除不可のTag「管理者」も構想する。
+
+Tagの付与・剥奪権限、Ownerとの関係、「管理者」Tagが与える権限は未設計である。自由なTagと管理権限を同一視しない。Owner変更操作、複数管理者、既存データ移行の詳細も未設計であり、既存構想を確定・置換するものではない。
+
+Room参加者・Room管理者・RoomOwner・各RoomTag適用者をAccount条件として選ぶ導線は、[Account条件の長期構想](access-policy.md#account条件のroom関係選択uiの長期構想)と合わせて検討する。

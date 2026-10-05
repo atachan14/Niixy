@@ -447,7 +447,7 @@ async function openDetail(threadId, postNumber = null, shouldUpdateUrl = true) {
   if (!detail || requestId !== detailRequestId) return false;
   document.querySelectorAll('[data-thread-detail-pane]').forEach((pane) => { pane.hidden = pane !== detail; });
   detailEmpty.hidden = true;
-  detailTitle.textContent = `${detail.dataset.threadTitle} (${detail.dataset.threadPostCount})`;
+  detailTitle.textContent = `${detail.dataset.threadTitle}${detail.dataset.threadPostCount === undefined ? '（閲覧不可）' : ` (${detail.dataset.threadPostCount})`}`;
   const target = postNumber ? detail.querySelector(`[data-thread-post-number="${postNumber}"]`) : null;
   if (target) {
     target.classList.add('is-response-target');

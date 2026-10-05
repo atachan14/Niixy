@@ -141,6 +141,7 @@ def prepare_threads(queryset, viewer):
     threads = list(
         queryset.select_related('creator').prefetch_related(
             'access_rules',
+            'policy_conditions',
             Prefetch('placements', queryset=ThreadPlacement.objects.filter(kind=ThreadPlacement.NII_MAP)),
             Prefetch('posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
             'interface_implementations__version__interface__creator',
@@ -148,8 +149,7 @@ def prepare_threads(queryset, viewer):
         )
     )
     for thread in threads:
-        thread.can_view = thread.allows(viewer, ThreadAccessRule.VIEW)
-        thread.can_write = thread.allows(viewer, ThreadAccessRule.WRITE)
+        prepare_thread_for_view(thread, viewer)
     return threads
 
 
@@ -184,13 +184,22 @@ def account_response_pane(request, username):
         .select_related('thread', 'creator__niixy_profile')
         .prefetch_related(
             'thread__access_rules',
+            'thread__policy_conditions',
             Prefetch('thread__posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
         )
         .order_by('-created_at')
     )
+    visible_posts = []
+    denied_threads = set()
     for post in posts:
         post.thread.can_view = post.thread.allows(request.user, ThreadAccessRule.VIEW)
-    response_page = Paginator(posts, 10).get_page(request.GET.get('response_page'))
+        if not post.thread.can_view:
+            # Repeated denied summaries and pagination must not reveal reply counts.
+            if post.thread_id in denied_threads:
+                continue
+            denied_threads.add(post.thread_id)
+        visible_posts.append(post)
+    response_page = Paginator(visible_posts, 10).get_page(request.GET.get('response_page'))
     return render(request, 'accounts/partials/response_pane.html', {
         'account': account,
         'response_page': response_page,

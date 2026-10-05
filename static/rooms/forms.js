@@ -421,6 +421,7 @@ window.NiixyRoomForms = (() => {
   }
 
   function initializePolicy(form, suppliedDialog = null) {
+    if (form.querySelector('[data-thread-policy-editor]')) return;
     if (form.dataset.threadPolicyReady === 'true') return;
     form.dataset.threadPolicyReady = 'true';
     const dialog = ensurePolicyDialog(suppliedDialog);
