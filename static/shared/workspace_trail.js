@@ -445,7 +445,6 @@ window.NiixyWorkspaceTrail = (() => {
             accountSearchUrl: room.dataset.accountSearchUrl,
             roomSearchUrl: room.dataset.accountConditionRoomSearchUrl,
             csrfToken: () => boardEntry.body.querySelector('[name="csrfmiddlewaretoken"]')?.value || '',
-            extraDefaultCodes: () => ['guest', 'account'],
           conditionKindAllowed: (conditionKind) => ['default', 'account', 'room'].includes(conditionKind),
             conditionAllowed: (condition) => condition.kind !== 'default'
               || ['guest', 'account', 'self'].includes(condition.definition.code),

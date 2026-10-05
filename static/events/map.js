@@ -109,7 +109,7 @@ const accountConditions = NiixyAccountConditions.create({
   accountSearchUrl: workspace.dataset.accountSearchUrl,
   roomSearchUrl: workspace.dataset.accountConditionRoomSearchUrl,
   csrfToken: () => searchForm.querySelector('[name="csrfmiddlewaretoken"]').value,
-  extraDefaultCodes: (target) => /^(board-policy-|thread-policy-)/.test(target || '') ? ['guest', 'account'] : [],
+  extraDefaultCodes: (target) => target?.startsWith('board-policy-') ? ['guest', 'account'] : [],
   conditionKindAllowed: (kind, target) => !(target?.startsWith('board-policy-') || target?.startsWith('thread-policy-'))
     || ['default', 'account', 'room'].includes(kind),
   conditionAllowed: (condition, target) => !(target?.startsWith('board-policy-') || target?.startsWith('thread-policy-'))

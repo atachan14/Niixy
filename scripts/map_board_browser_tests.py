@@ -60,6 +60,12 @@ class MapBoardBrowserTests(StaticLiveServerTestCase):
                         row.locator('[data-open-account-conditions]').click()
                         history = page.locator('.account-condition-pane')
                         history.locator('[data-browse-account-conditions]').click()
+                        expect(page.locator('.account-selector-pane [data-account-selector-content] .ui-summary-item-title')).to_have_text(['Guest', 'NiixyAccount'])
+                        page.wait_for_function('''() => {
+                            const box = document.querySelector('.account-selector-pane')?.getBoundingClientRect();
+                            return box && box.left >= -1 && box.right <= window.innerWidth + 1;
+                        }''')
+                        page.screenshot(path=output / f'{name}-board-guest-candidates.png')
                         page.locator('.account-selector-pane .ui-summary-item').filter(has=page.locator('strong', has_text='NiixyAccount')).click()
                         history.locator('.ui-summary-item').filter(has=page.locator('strong', has_text='NiixyAccount')).click()
                         history.locator('[data-add-account-condition-group]').click()
@@ -77,6 +83,18 @@ class MapBoardBrowserTests(StaticLiveServerTestCase):
                         thread_form = pane.locator('[data-board-thread-create]')
                         thread_form.locator('[name="title"]').fill('Guest Board Thread ' + name)
                         thread_form.locator('[name="body"]').fill('Opening from map Board')
+                        thread_form.locator('details:has([data-thread-policy-editor]) > summary').click()
+                        thread_form.locator('[data-open-account-conditions]').nth(1).click()
+                        page.locator('[data-browse-account-conditions]').click()
+                        expect(page.locator('.account-selector-pane [data-account-selector-content] .ui-summary-item-title')).to_have_text(['Guest'])
+                        page.wait_for_function('''() => {
+                            const box = document.querySelector('.account-selector-pane')?.getBoundingClientRect();
+                            return box && box.left >= -1 && box.right <= window.innerWidth + 1;
+                        }''')
+                        page.screenshot(path=output / f'{name}-thread-guest-candidates.png')
+                        page.locator('[data-close-account-selector]').click()
+                        page.locator('[data-close-account-conditions]').click()
+                        expect(thread_form.locator('[name="title"]')).to_have_value('Guest Board Thread ' + name)
                         thread_form.locator('[type="submit"]').click()
                         wait_for_trail_count(page, 2)
                         detail = page.locator('.ui-workspace-trail-pane').last

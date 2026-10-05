@@ -2,7 +2,7 @@
 
 対象: local `436aa0afb4cec509a7c2d2c0b6dd871518ca5063`。公開基準は v0.16 / `80a39cf`。実行日は2026-10-05 UTC（翌6日JST）。Versionは変更しない。
 
-**未公開Review / Mute / AccountList / BoardList / InterfaceList / fav・badの今回の接続回帰は成功。広域ブラウザsuiteには、公開済みv0.15由来のGuest条件候補に関する1テストの不一致が残る。全件greenとは報告しない。** 製品コード・migration・asset markerは変更せず、接続回帰4件とこの結果文書を追加した。
+**未公開機能の接続回帰は成功。初回広域Browser16件で失敗したThreadPolicy1件は、承認範囲の回帰修正後に元の期待値のままPC/mobileで成功した。既知の失敗残件は0。修正後に全16件やDjango292件を再実行した記録ではない。** 初回QA checkpointは`29dcdb7`。追補でJS2か所の候補追加範囲を修正し、既存Board直接テストを補強した。migration・asset marker・Versionは変更しない。
 
 ## 実行境界と保全
 
@@ -18,9 +18,11 @@
 | 実行 | 結果 | 対象 / 証拠 |
 | --- | --- | --- |
 | `test accounts events interfaces rooms --noinput` | **292件成功**、214.184秒 | 4app全域、Review/Mute/Lists/評価/URL/CSRF/Policy/Field/IF/Applied/Layout/既存migration。`django-suite.log` |
-| 既存代表ブラウザ8module | **16件中15件成功、1件失敗（PC/mobileの2subtest）**、278.214秒 | Workspace、ThreadPolicy、Applied、Layout、Interface編集/公開、Module選択、NiiMap Board、Board作成。`browser-broad.log` |
+| 既存代表ブラウザ8module（初回、修正前） | **16件中15件成功、1件失敗（PC/mobileの2subtest）**、278.214秒 | Workspace、ThreadPolicy、Applied、Layout、Interface編集/公開、Module選択、NiiMap Board、Board作成。`browser-broad.log` |
 | `test scripts.nightly_qa_tests --noinput` | **追加4件成功**（直接2 + ブラウザ2）、28.623秒 | 今回の接続回帰。`nightly-integration.log` |
-| Policy後続の診断run | **1件成功**、24.216秒 | 下記のGuest候補数assertだけを実行時に回避。元suiteの成功扱いには加算しない。`policy-diagnostic.log` |
+| Policy後続の診断run（修正前） | **1件成功**、24.216秒 | 下記のGuest候補数assertだけを実行時に回避。元suiteの成功扱いには加算しない。`policy-diagnostic.log` |
+| 回帰修正後の限定run | **3件成功**、74.872秒 | 元ThreadPolicy失敗1件、Board候補直接回帰1件、AGENTS指定の既存smoke CLI1件。`policy-board-fix.log` |
+| 候補Pane撮影待機追加後 | **Board直接1件成功**、20.151秒 | 展開完了後のPC/mobile候補画像を確認。製品の追加変更なし。`board-candidate-render.log` |
 | 同じ隔離LiveServerへの既存`browser_smoke.py` CLI | PC/mobile各**17check、warning 0、browser error 0** | Workspace suite内で実行。`.artifacts/browser-smoke/run.log` |
 | Django check / makemigrations check dry-run | 問題0 / `No changes detected` | SQLite memoryをassertして実行。`checks.log` |
 
@@ -36,22 +38,25 @@
 
 全Djangoは既存の新規SQLiteテストDBへmigration graphを適用した。Review（0002→0003）、Mute/Board.creator、AccountList（0004→0005）、Board/InterfaceList（rooms0010/interfaces0009→最新）の保持テストも成功した。既存tableの全行/schema（Collectionは追加nullable token以外）、既存creator unknownのNULL保持、新table空、Layout/Account版基盤の既存migration保持を、用意されたfixtureの範囲で確認した。共有DBの実データを復元・移行した検証ではない。
 
-## 残った失敗と切り分け
+## 初回の失敗と承認範囲の回帰修正
 
-`scripts.thread_policy_browser_tests.ThreadPolicyBrowserTests.test_pc_mobile_policy_forms_and_denied_detail`の両viewportで、`check_editor`の61行目が失敗した。Guestの候補を1件と期待するが、実際は`['Guest', 'NiixyAccount']`の2件。HTTP失敗やJS例外ではなく、明示的な候補数assertの不一致。
+初回は`scripts.thread_policy_browser_tests.ThreadPolicyBrowserTests.test_pc_mobile_policy_forms_and_denied_detail`の両viewportで、`check_editor`の61行目が失敗した。Guestの候補を1件と期待するが、実際は`['Guest', 'NiixyAccount']`の2件。HTTP失敗やJS例外ではなく、明示的な候補数assertの不一致。
 
 - [v0.10要件](v0.10/requirements.md)はGuestのDefault候補をGuestのみとし、既定PolicyのGuest OR Accountとは区別する。一般Account条件APIもGuestのみを返す（今回の292件内で成功）。
 - [v0.15要件](niimap-boards-and-pane-ui.md)はGuestの**Board**作成でNiixyAccount候補を追加することを明記する。公開済み`28e9de6`で`extraDefaultCodes`が入り、`static/events/map.js:112`はBoardだけでなくThreadのPolicyにも`guest/account`を追加する。
 - このselector・Map側条件追加・ThreadPolicy・失敗testは`80a39cf..436aa0a`の未公開変更で変わっていない。今回のReview/Mute/Lists追加に起因する回帰ではない。
-- **既存の仕様文書とUI/テスト前提の不一致。製品バグかfixture陳腐化かの最終判断は保留。** Threadの候補をGuestのみへ戻すか、Threadにも拡張した仕様としてtest/docsを更新するかを親工程で確認する。承認済みBoard候補の変更を戻したり、期待件数だけ変えてgreenにする修正はしていない。
+- 追補指示で、明示済みv0.10要件とv0.15のBoard限定拡張に従う**承認範囲の製品回帰修正**として確定した。新仕様判断やfixture陳腐化ではない。ThreadのGuest候補はGuestのみ、Board作成はGuest/NiixyAccountを維持する。
+- `static/events/map.js`の`extraDefaultCodes`を`board-policy-`だけへ限定し、`static/shared/workspace_trail.js`のBoard内Thread編集に設定されていた追加候補を除去した。既定ThreadPolicyのGuest OR Account、一般条件API、認可処理は変更しない。JS file-content-only変更で、template/asset cache versionを変えていない。通常serverは触らず、隔離Edgeの新しいcontextで最新JSを取得した。
 
-後続検証をこのassertで止めないため、許可workspaceに置いた診断runnerがGuest候補**数**のassertだけを一時的に省き、元のPolicyテストを隔離再実行した。他のassertは維持。PC/mobileで4欄、reset、Guest条件選択、拒否Threadの本文/投稿欄/件数/座標行非露出、Header/Closeの画面内表示、6回reload後の復元、console/page error 0を確認した。runner・ログを`.artifacts/nightly-qa/`に残す。元test/製品は未変更で、通常suiteの1件失敗は解消していない。
+後続検証をこのassertで止めないため、許可workspaceに置いた診断runnerがGuest候補**数**のassertだけを一時的に省き、元のPolicyテストを隔離再実行した。他のassertは維持。PC/mobileで4欄、reset、Guest条件選択、拒否Threadの本文/投稿欄/件数/座標行非露出、Header/Closeの画面内表示、6回reload後の復元、console/page error 0を確認した。runner・ログを`.artifacts/nightly-qa/`に残す。これは初回の失敗を残したまま後続を調べた診断記録。追補では診断runnerを使わず、元testのGuest候補1件というassertを維持したまま再実行して成功した。
 
-今回、未公開承認機能の明確な製品バグや環境起因のテストブロッカーは見つからなかった。新規テスト4件は初回実行で成功。通常process確認を省いたことは今回の隔離QAの失敗原因ではない。
+修正後の元ThreadPolicyテストは、NiiMap/Board四欄・Guest候補1件・reset・拒否詳細・6回reload・CloseをPC/mobileで成功した。既存MapBoard直接テストには、Board作成候補`[Guest, NiixyAccount]`とそこから開くThread候補`[Guest]`の完全一致assertを追加し、PC/mobileで確認した。入力保持、Board→Thread→Response→reload/Closeも同じ直接ケースで成功。両テストのpage/console errorは0。AGENTS指定の既存smoke CLIも同じ隔離方式で成功した。
+
+**初回の広域16件は15件成功＋元失敗1件。追補はその元1件、Board直接1件、既存smoke1件だけの限定run。** 候補画像をPane展開後に撮る待機を追加した後はBoard直接1件だけを再確認した。全16件・全Django・追加接続4件を修正後に再走していない。初回の新規接続4件は成功した記録を維持する。通常process確認を省いたことは失敗原因ではない。
 
 ## 画像と未実施
 
-`.artifacts/browser-smoke/desktop-workspace.png`、`mobile-workspace.png`、`desktop.png`、`mobile.png`を目視確認した。今回のsmoke末尾画像はstandalone Room Thread状態。さらに`.artifacts/nightly-qa/`の3種類List Guest/History各PC/mobileと保持Review入力、`.artifacts/account-layout/`のdesktop Profileとmobile長文末尾を確認した。Workspace端、Close、mobile幅、入力/参照内容、自然高さの末尾表示に異常は見られなかった。Applied/版更新/条件UIの生成画像も保持する。
+`.artifacts/browser-smoke/desktop-workspace.png`、`mobile-workspace.png`、`desktop.png`、`mobile.png`を目視確認した。今回のsmoke末尾画像はstandalone Room Thread状態。さらに`.artifacts/nightly-qa/`の3種類List Guest/History各PC/mobileと保持Review入力、`.artifacts/account-layout/`のdesktop Profileとmobile長文末尾を確認した。Workspace端、Close、mobile幅、入力/参照内容、自然高さの末尾表示に異常は見られなかった。Applied/版更新/条件UIの生成画像も保持する。追補では`.artifacts/map-board-ui/desktop/mobile-board-guest-candidates.png`と`desktop/mobile-thread-guest-candidates.png`を、Paneが画面内へ展開した後に撮影・目視確認した。Boardの2候補とThreadの1候補を維持し、追補smokeのPC/mobile各17check・warning/error 0とWorkspace画像も確認した。
 
 未実施・保証しない範囲:
 
@@ -63,7 +68,7 @@
 
 ## 朝の手元確認
 
-1. この文書と残件を読む。`git log -1 --oneline`と`git status --short`でQA checkpointと残dirtyを確認する。inboxのdiff/内容を開かず、stageしない。
+1. この文書と未実施範囲を読む。`git log -1 --oneline`と`git status --short`でQA checkpointと残dirtyを確認する。inboxのdiff/内容を開かず、stageしない。
 2. 必要な手元再確認は次の隔離接続テストだけで行える。settingsの`test`分岐と各fixtureのSQLite assertを使い、通常serverは不要。UIを見たい場合は生成画像を開く。
 
    ```powershell
@@ -71,10 +76,10 @@
    ```
 
 3. `.artifacts/nightly-qa/`の`desktop/mobile-*-history-guest.png`と`desktop/mobile-late-drafts-retained.png`、browser-smokeのWorkspace画像を確認する。List owner操作の実データ確認を通常serverへ持ち込まない。
-4. Policy残件を再現する場合は次を実行する。現状の元testは候補数でPC/mobile両方失敗する見込み。診断runnerの成功をこの元testの成功に置き換えない。
+4. 候補回帰を手元で確認する場合は次の限定2件を実行する。ThreadはGuestのみ、Board作成はGuest/NiixyAccountが期待値。元ThreadPolicyは修正後成功済み。修正前の診断runnerは再確認に使わない。
 
    ```powershell
-   .\.venv\Scripts\python.exe -B manage.py test scripts.thread_policy_browser_tests --noinput --verbosity 2
+   .\.venv\Scripts\python.exe -B manage.py test scripts.thread_policy_browser_tests.ThreadPolicyBrowserTests.test_pc_mobile_policy_forms_and_denied_detail scripts.map_board_browser_tests.MapBoardBrowserTests.test_guest_board_create_thread_response_and_ui_edges --noinput --verbosity 2
    ```
 
 広域suiteを再度必要とする変更が出た時だけ、4app全Djangoと下記8moduleを実行する。`manage.py shell`や通常`migrate`でfixtureを作らない。
@@ -86,7 +91,7 @@
 
 ## 未公開commitと必要migration
 
-公開基準`80a39cf`以後のfeature checkpointは以下。今回のQA commitはこの上に通常のローカルcommitとして追加し、SHAは完了報告と`git log`で確認する。
+公開基準`80a39cf`以後のfeature checkpointは以下。初回QAは`29dcdb7b2b176d038f8c8773331c863836dd0cb0`。候補回帰修正checkpointはその上にローカルcommitで追加し、SHAは完了報告と`git log`で確認する。pushは行わない。
 
 | Commit | 内容 |
 | --- | --- |
@@ -109,4 +114,4 @@
 
 既存の`interfaces0009_account_layout`等を前提とし、公開工程でDjango graphに従って適用する。新templateは追加tableを読むため、未適用のまま新コードを通常/公開serverへ切り替えない。公開scope・Version・backup・migration担当と適用状況確認・AGENTSどおりの通常server切替・公開Guest確認は親工程に残す。データ作成後の逆migrationを自動実行せず、rollbackは旧コードへ戻して追加データを保持する既存方針を使う。
 
-本工程のcommit対象はこの文書と`scripts/nightly_qa_tests.py`のみ。終了時dirtyとしてinboxだけが残ることを確認する。
+初回QA commitはこの文書と`scripts/nightly_qa_tests.py`のみ。追補checkpointはこの文書、`static/events/map.js`、`static/shared/workspace_trail.js`、`scripts/map_board_browser_tests.py`の4ファイルだけ。終了時dirtyとしてinboxだけが残ることを確認する。
