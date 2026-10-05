@@ -354,7 +354,7 @@ Policyの許可条件ItemはOR、Item内のAccount条件はANDで評価する。
 
 ## 2026-10-04 - Page遷移までWorkspaceのPaneと状態を保持する
 
-状態: 採用
+状態: 更新済み（2026-10-05 の「Workspace遷移は起点Pane以降を置き換える」で追加・Closeの規則を更新。Page遷移までの状態保持とURLからの復元方針は継続）
 
 SiteHeaderからNiiMap、AccountPage、MyPageなどの起点を選ぶ操作をPage遷移とし、Page遷移時にはそれまでのWorkspaceを破棄して遷移先を初期状態で表示する。それ以外のコンテンツ間移動は原則としてWorkspace遷移とし、現在Paneの右へ新しいPaneを追加する。RoomからAccount、さらに別のRoomへ進むような循環も禁止せず、それぞれを別のPaneとして履歴へ積む。
 
@@ -366,7 +366,7 @@ Pane数の上限、画面外Paneの仮想化、状態だけを保存してDOMを
 
 ## 2026-10-05 - Workspace遷移は起点Pane以降を置き換える
 
-状態: 採用
+状態: 採用（2026-10-04 の「Page遷移までWorkspaceのPaneと状態を保持する」の追加・Close規則を更新）
 
 AccountPage専用ではなく、Account・Room・Board・ThreadなどのWorkspace遷移に共通適用する。Pane内から別のPaneを開くときは、操作の起点Paneとそれ以前を保持し、その後ろのPaneを閉じて新しい遷移先へ置き換える。末尾Paneからの操作は追加になる。専用のAccountNextPaneは設けない。
 
