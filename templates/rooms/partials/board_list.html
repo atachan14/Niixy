@@ -55,6 +55,8 @@
                   {% csrf_token %}
                   <input name="submission_id" type="hidden" value="{{ collection.board_submission_id }}">
                   <label>Board名<input name="name" maxlength="120" required></label>
+                  <input name="policy_present" type="hidden" value="true">
+                  {% include 'rooms/partials/board_policy_editor.html' with board_policy_editor_rows=collection.board_policy_editor_rows %}
                   <p class="room-form-error" hidden></p>
                   <button class="button primary" type="submit" data-pending-label="作成中...">作成する</button>
                 </form>

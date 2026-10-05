@@ -22,7 +22,7 @@ class ModuleSelectorBrowserTests(StaticLiveServerTestCase):
         InterfaceDraftField.objects.create(draft=draft,definition=field,position=0)
         publish_draft(draft.pk)
         self.room,_=create_room(submission_id=uuid4(),owner=self.owner,name='Selector Room',description='',latitude='35.681236',longitude='139.767125')
-        self.board=Board.objects.get()
+        self.board=Board.objects.get(name='掲示板')
         self.client.force_login(self.owner)
 
     def assert_origin_and_current(self,page,form,current,size):

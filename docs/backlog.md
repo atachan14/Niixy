@@ -5,12 +5,11 @@
 ## BL-001 - Board作成時にPolicyを設定可能にする
 
 - 種別: Improvement / Feature
-- 状態: 登録済み・未着手
-- 実装Version: 未割当（v0.10には追加しない）
+- 状態: v0.11実装・直接検証済み（checkpoint公開承認済み）
+- 実装Version: [v0.11](v0.11/requirements.md)
 - 依頼: Board作成フォームでBoardPolicyも設定できるようにする。
 - 既存との関係: v0.9はBoard詳細編集でのPolicy設定を実装済み。これは作成時の設定導線を追加する別タスクである。
-- 次の確認: 既存の共通Account条件UI・Snapshot保存・サーバー評価を使う範囲と、作成フォームの初期値・許可操作を確認する。
-- 今回は登録のみ。TemplateやRoom初期Board構成の実装を同時に追加しない。
+- 範囲: 共通Account条件UIの4欄、既存初期値、明示的な空allow、未送信payloadの互換性を維持し、認可・Snapshot検証・原子的保存を行う。Templateは対象外。
 
 ## BL-002 - Interface作成の「中断／公開」が反映されない報告
 
@@ -27,16 +26,16 @@
 ## BL-003 - 新規Roomの初期Board構成を「お知らせ／掲示板」にする
 
 - 種別: Feature
-- 状態: 要件整理済み・未着手
-- 実装Version: 未割当（v0.10には追加しない）
+- 状態: v0.11実装・直接検証済み（checkpoint公開承認済み）
+- 実装Version: [v0.11](v0.11/requirements.md)
 - 対象: 新規Room作成時のみ。既存RoomへBoardを追加しない。
 - 構成: Main Collection配下に「お知らせ」「掲示板」を初期作成する。
 - 閲覧: 両Boardとも誰でも閲覧可能（Guest OR NiixyAccount、不可なし）。
 - Thread作成: 「お知らせ」はRoom作成時の作成者NiixyID（特定Account Snapshot）に固定。「掲示板」はRoom参加者条件。動的RoomOwner/管理者条件は今回追加しない。
 - 作成後: 通常のBoard管理権限に従い、名前・Policy編集・削除を可能にする。誰でも閲覧可能であることは編集権限の付与を意味しない。
-- 並び順: Main内を「お知らせ → 掲示板」とするのは親の提案で、まだ確定していない。
+- 並び順: 初期表示は「お知らせ → 掲示板」。通常の最終活動日時による表示を維持する。
 - 実装: 既存Room初期生成トランザクションを利用する組込初期構成として扱う。Template基盤や既存Roomへのデータ移行を同時に追加しない。
-- 関連: 動的RoomOwnerへの将来移行は[Vision](vision/access-policy.md#動的roomowner条件)で管理する。今回は要件の文書反映だけで、アプリ実装・DB反映・公開更新の承認ではない。
+- 関連: 動的RoomOwnerへの将来移行は[Vision](vision/access-policy.md#動的roomowner条件)で管理する。今回のローカル実装は承認済み。共有DB変更・公開更新は別の承認で扱う。
 
 ## BL-004 - NiiMapのThread作成からThreadIF／Fieldを開くと逆走する
 
@@ -51,4 +50,4 @@
 
 ## 次作業の優先候補
 
-v0.10完了後は、既存操作を阻害する可能性があるBL-002の調査を、Room作成時の初期「お知らせ／掲示板」構成やBL-001より先に行う案を提案中。これは優先順・実装Versionの確定ではない。Room初期Board構成の確定事項はBL-003に記録する。Main内の並び順は提案段階である。
+BL-002／BL-004の修正を公開した後、承認済みv0.11のBL-001／BL-003を実装・直接検証済み。広域QAは直接関連の検証後、安全な区切りで行う。

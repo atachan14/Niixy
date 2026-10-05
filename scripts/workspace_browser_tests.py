@@ -26,7 +26,7 @@ class WorkspaceBrowserTests(StaticLiveServerTestCase):
             submission_id=uuid4(), owner=self.owner, name='Workspace Room', description='Test room',
             latitude='35.681236', longitude='139.767125',
         )
-        self.board = Board.objects.get()
+        self.board = Board.objects.get(name='掲示板')
         self.other_board, _ = create_board(
             submission_id=uuid4(), collection=self.room.collections.get(name='Main'), name='Second Board',
         )

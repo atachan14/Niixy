@@ -29,7 +29,7 @@ class ThreadPolicyBrowserTests(StaticLiveServerTestCase):
         self.owner = get_user_model().objects.create_user('policy_browser')
         self.room, _ = create_room(submission_id=uuid4(), owner=self.owner, name='Policy Browser Room',
                                   description='', latitude='35.681236', longitude='139.767125')
-        self.board = Board.objects.get()
+        self.board = Board.objects.get(name='掲示板')
         self.thread = Thread.objects.create(creator=self.owner, title='Denied Browser Thread')
         ThreadPost.objects.create(thread=self.thread, creator=self.owner, number=1, body='PRIVATE BROWSER BODY')
         ThreadPlacement.objects.create(thread=self.thread, kind='board', board=self.board)

@@ -22,6 +22,7 @@ from .services import (
     create_board,
     create_room,
     delete_collection,
+    default_board_policy_conditions,
     touch_thread_containers,
     update_board_policy,
 )
@@ -166,6 +167,10 @@ def room_boards(request, room_id):
             result = board.evaluate_policy(request.user, BoardPolicyCondition.VIEW)
             board.can_view = room.is_owner or result.allowed
         collection.board_submission_id = uuid.uuid4()
+        collection.board_policy_editor_rows = board_policy_editor_rows(
+            Board(), room, conditions=default_board_policy_conditions(Board(), room),
+            target_prefix=f'board-policy-create-{collection.pk}',
+        )
     return render(request, 'rooms/partials/board_list.html', {
         'room': room,
         'collections': collections,
@@ -240,12 +245,17 @@ def board_create(request, room_id, collection_id):
     if not form.is_valid():
         return JsonResponse({'errors': {name: list(errors) for name, errors in form.errors.items()}}, status=400)
     collection = _managed_collection(room, collection_id)
-    board, _ = create_board(
-        submission_id=submission_id_from(request.POST.get('submission_id')),
-        collection=collection,
-        name=form.cleaned_data['name'],
-        description=form.cleaned_data['description'],
-    )
+    try:
+        board, _ = create_board(
+            submission_id=submission_id_from(request.POST.get('submission_id')),
+            collection=collection,
+            name=form.cleaned_data['name'],
+            description=form.cleaned_data['description'],
+            policy_data=request.POST if request.POST.get('policy_present') == 'true' else None,
+            actor=request.user,
+        )
+    except ValueError as error:
+        return JsonResponse({'error': str(error)}, status=400)
     return JsonResponse({
         'board_id': board.pk,
         'redirect_url': f'{reverse("rooms:detail", args=[room.pk])}?boards=1&collection={collection.pk}&board={board.pk}',

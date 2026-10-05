@@ -1,6 +1,7 @@
 import json
 from uuid import uuid4
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -46,13 +47,43 @@ class RoomCreationServiceTests(TestCase):
         self.assertFalse(main.is_uncategorized)
         self.assertEqual(uncategorized.name, '未分類')
         self.assertEqual(uncategorized.room, room)
-        board = Board.objects.get()
-        self.assertEqual(board.name, '最初のBoard')
+        board = Board.objects.get(name='掲示板')
+        self.assertEqual(list(main.board_placements.order_by('board__created_at').values_list('board__name', flat=True)), ['お知らせ', '掲示板'])
+        self.assertEqual(list(Board.objects.filter(placement__collection=main).values_list('name', flat=True)), ['お知らせ', '掲示板'])
         self.assertEqual(board.placement.kind, BoardPlacement.COLLECTION)
         self.assertEqual(board.placement.collection, main)
         self.assertEqual(board.policy_conditions.count(), 3)
         self.assertTrue(board.evaluate_policy(self.owner, BoardPolicyCondition.VIEW).allowed)
         self.assertTrue(board.evaluate_policy(self.owner, BoardPolicyCondition.CREATE_THREAD).allowed)
+
+    def test_initial_boards_use_fixed_creator_and_room_membership(self):
+        room, _ = self.create()
+        notice = Board.objects.get(name='お知らせ')
+        forum = Board.objects.get(name='掲示板')
+        member = get_user_model().objects.create_user('initial_member')
+        outsider = get_user_model().objects.create_user('initial_outsider')
+        RoomMembership.objects.create(room=room, account=member)
+        for board in (notice, forum):
+            self.assertEqual(board.description, '')
+            self.assertEqual(board.policy_conditions.count(), 3)
+            for actor in (AnonymousUser(), self.owner, member, outsider):
+                self.assertTrue(board.evaluate_policy(actor, BoardPolicyCondition.VIEW).allowed)
+        for actor, allowed in ((self.owner, True), (member, False), (outsider, False), (AnonymousUser(), False)):
+            self.assertEqual(notice.evaluate_policy(actor, BoardPolicyCondition.CREATE_THREAD).allowed, allowed)
+        for actor, allowed in ((self.owner, True), (member, True), (outsider, False), (AnonymousUser(), False)):
+            self.assertEqual(forum.evaluate_policy(actor, BoardPolicyCondition.CREATE_THREAD).allowed, allowed)
+        self.assertEqual(notice.policy_conditions.get(capability='create_thread').definition, {'account_id': self.owner.pk})
+        room.owner = outsider
+        room.save(update_fields=['owner'])
+        self.assertTrue(notice.evaluate_policy(self.owner, BoardPolicyCondition.CREATE_THREAD).allowed)
+        self.assertFalse(notice.evaluate_policy(outsider, BoardPolicyCondition.CREATE_THREAD).allowed)
+
+    def test_room_initial_policy_failure_rolls_back_entire_structure(self):
+        with patch('rooms.services.BoardPolicyCondition.objects.bulk_create', side_effect=ValueError('invalid')):
+            with self.assertRaises(ValueError):
+                self.create()
+        for model in (Room, RoomMembership, RoomPlacement, Collection, Board, BoardPlacement, BoardPolicyCondition):
+            self.assertEqual(model.objects.count(), 0)
 
     def test_duplicate_submission_returns_existing_room_without_duplicates(self):
         submission_id = uuid4()
@@ -66,10 +97,10 @@ class RoomCreationServiceTests(TestCase):
         self.assertEqual(Room.objects.count(), 1)
         self.assertEqual(RoomMembership.objects.count(), 1)
         self.assertEqual(Collection.objects.count(), 2)
-        self.assertEqual(Board.objects.count(), 1)
-        self.assertEqual(BoardPlacement.objects.count(), 1)
+        self.assertEqual(Board.objects.count(), 2)
+        self.assertEqual(BoardPlacement.objects.count(), 2)
         self.assertEqual(RoomPlacement.objects.count(), 1)
-        self.assertEqual(BoardPolicyCondition.objects.count(), 3)
+        self.assertEqual(BoardPolicyCondition.objects.count(), 6)
 
     def test_room_membership_is_unique_per_account(self):
         room, _ = self.create()
@@ -94,7 +125,7 @@ class RoomCreationServiceTests(TestCase):
         self.assertEqual(first, second)
         self.assertEqual(second.name, 'お知らせ')
         self.assertFalse(second.placement.collection.is_uncategorized)
-        self.assertEqual(Board.objects.filter(placement__collection__room=room).count(), 2)
+        self.assertEqual(Board.objects.filter(placement__collection__room=room).count(), 3)
         self.assertEqual(second.policy_conditions.count(), 3)
 
 
@@ -109,7 +140,7 @@ class PlacementConstraintTests(TestCase):
             latitude='35.0',
             longitude='139.0',
         )
-        self.board = Board.objects.get(placement__collection__room=self.room)
+        self.board = Board.objects.get(placement__collection__room=self.room, name='掲示板')
 
     def test_board_thread_placement_uses_board_without_coordinates(self):
         thread = Thread.objects.create(creator=self.owner, title='Room Thread')
@@ -150,7 +181,7 @@ class RoomViewTests(TestCase):
             submission_id=uuid4(), owner=self.owner, name='View Room', description='Roomの説明',
             latitude='35.0', longitude='139.0',
         )
-        self.board = Board.objects.get(placement__collection__room=self.room)
+        self.board = Board.objects.get(placement__collection__room=self.room, name='掲示板')
         self.main = self.board.placement.collection
         self.uncategorized = self.room.collections.get(is_uncategorized=True)
 
@@ -165,7 +196,7 @@ class RoomViewTests(TestCase):
         room = Room.objects.get(name='New Room')
         self.assertEqual(response.json()['redirect_url'], reverse('rooms:detail', args=[room.pk]))
         self.assertTrue(room.has_member(self.member))
-        self.assertTrue(room.collections.get(name='Main').board_placements.filter(board__name='最初のBoard').exists())
+        self.assertTrue(room.collections.get(name='Main').board_placements.filter(board__name='お知らせ').exists())
 
     def test_guest_cannot_create_or_join_room(self):
         create_response = self.client.post(reverse('rooms:create'), {
@@ -238,7 +269,7 @@ class RoomViewTests(TestCase):
         self.client.force_login(self.owner)
         created = self.client.post(create_url, {'submission_id': submission_id, 'name': 'お知らせ'})
         duplicate = self.client.post(create_url, {'submission_id': submission_id, 'name': '重複'})
-        board = Board.objects.get(name='お知らせ')
+        board = Board.objects.get(pk=created.json()['board_id'])
         edited = self.client.post(
             reverse('rooms:board-edit', args=[self.room.pk, board.pk]),
             {'name': '更新済みBoard', 'description': 'Boardの詳細'},
@@ -254,6 +285,58 @@ class RoomViewTests(TestCase):
         self.assertEqual(edited.status_code, 200)
         self.assertEqual(deleted.json()['redirect_url'], f'{reverse("rooms:detail", args=[self.room.pk])}?boards=1')
         self.assertFalse(Board.objects.filter(pk=board.pk).exists())
+
+    def test_manual_board_create_saves_four_policy_fields_and_empty_allows(self):
+        self.client.force_login(self.owner)
+        url = reverse('rooms:board-create', args=[self.room.pk, self.main.pk])
+        guest = {'kind': 'default', 'definition': {'code': 'guest'}, 'label': 'untrusted'}
+        account = {'kind': 'default', 'definition': {'code': 'account'}}
+        member = {'kind': 'room', 'definition': {'room_id': self.room.pk, 'relation': 'member'}}
+        groups = {'view_allow': [[guest], [account]], 'view_deny': [[guest]],
+                  'create_thread_allow': [[member]], 'create_thread_deny': [[guest]]}
+        data = {'submission_id': str(uuid4()), 'name': 'Policy Board', 'policy_present': 'true'}
+        data.update({f'policy_{key}_groups': json.dumps(value) for key, value in groups.items()})
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 200)
+        board = Board.objects.get(pk=response.json()['board_id'])
+        self.assertEqual(board.policy_conditions.count(), 5)
+        self.assertFalse(board.evaluate_policy(AnonymousUser(), 'view').allowed)
+        self.assertTrue(board.evaluate_policy(self.owner, 'view').allowed)
+        self.assertEqual(board.policy_conditions.get(capability='view', decision='deny').label, 'Guest')
+        data.update(submission_id=str(uuid4()), name='Empty Policy')
+        data.update({f'policy_{key}_groups': '[]' for key in groups})
+        empty = self.client.post(url, data)
+        self.assertEqual(empty.status_code, 200)
+        empty_board = Board.objects.get(pk=empty.json()['board_id'])
+        self.assertEqual(empty_board.policy_conditions.count(), 0)
+        self.assertFalse(empty_board.evaluate_policy(self.owner, 'view').allowed)
+        self.assertFalse(empty_board.evaluate_policy(self.owner, 'create_thread').allowed)
+        self.assertContains(self.client.get(reverse('rooms:board-threads', args=[self.room.pk, empty_board.pk])), 'data-board-editor')
+
+    def test_manual_board_invalid_policy_is_atomic_and_non_owner_is_denied(self):
+        url = reverse('rooms:board-create', args=[self.room.pk, self.main.pk])
+        before = (Board.objects.count(), BoardPlacement.objects.count(), BoardPolicyCondition.objects.count())
+        self.client.force_login(self.owner)
+        for raw in ('invalid', '{}', '[[]]', json.dumps([[{'kind': 'field', 'definition': {}}]]),
+                    json.dumps([[{'kind': 'account', 'definition': {'account_id': 999999}}]])):
+            with self.subTest(raw=raw):
+                response = self.client.post(url, {'submission_id': str(uuid4()), 'name': 'Invalid Policy',
+                    'policy_present': 'true', 'policy_view_allow_groups': raw})
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual((Board.objects.count(), BoardPlacement.objects.count(), BoardPolicyCondition.objects.count()), before)
+        for actor, status in ((self.member, 403), (self.outsider, 403), (None, 401)):
+            self.client.logout()
+            if actor: self.client.force_login(actor)
+            self.assertEqual(self.client.post(url, {'name': 'Denied', 'policy_present': 'true'}).status_code, status)
+            self.assertEqual((Board.objects.count(), BoardPlacement.objects.count(), BoardPolicyCondition.objects.count()), before)
+
+    def test_initial_boards_can_be_normally_edited_and_deleted(self):
+        self.client.force_login(self.owner)
+        for name in ('お知らせ', '掲示板'):
+            board = Board.objects.get(placement__collection__room=self.room, name=name)
+            self.assertEqual(self.client.post(reverse('rooms:board-edit', args=[self.room.pk, board.pk]), {'name': name + ' edited'}).status_code, 200)
+            self.assertEqual(self.client.post(reverse('rooms:board-delete', args=[self.room.pk, board.pk])).status_code, 200)
+            self.assertFalse(Board.objects.filter(pk=board.pk).exists())
 
     def test_owner_manages_collections_and_deleted_collection_moves_boards(self):
         create_url = reverse('rooms:collection-create', args=[self.room.pk])
@@ -326,7 +409,7 @@ class RoomViewTests(TestCase):
         self.assertContains(owner_response, 'data-collection-create-window', count=2)
         self.assertContains(owner_response, 'data-collection-edit-toggle', count=1)
         self.assertContains(owner_response, f'<dd>{self.main.name}</dd>')
-        self.assertContains(owner_response, '<dt>Board数</dt><dd>1</dd>')
+        self.assertContains(owner_response, '<dt>Board数</dt><dd>2</dd>')
         owner_html = owner_response.content.decode()
         self.assertLess(owner_html.index('room-board-create'), owner_html.index(f'data-open-board="{self.board.pk}"'))
         self.assertLess(owner_html.index('>Main</button>'), owner_html.index('>未分類</button>'))
@@ -691,11 +774,11 @@ class RoomViewTests(TestCase):
             response.content.index(b'class="room-overview-body'),
         )
         self.assertNotContains(response, 'もっと見る')
-        self.assertNotContains(response, '最初のBoard')
+        self.assertNotContains(response, '掲示板')
         self.assertNotContains(response, 'Roomの説明')
         self.assertNotContains(response, 'Owner:')
         self.assertContains(response, 'room-thread-list-pane')
-        self.assertContains(board_response, '最初のBoard')
+        self.assertContains(board_response, '掲示板')
         self.assertContains(board_response, 'data-ui-tab=', count=2)
         self.assertContains(board_response, '>Main<')
         self.assertContains(board_response, '>未分類<')

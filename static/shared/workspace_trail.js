@@ -358,10 +358,54 @@ window.NiixyWorkspaceTrail = (() => {
     const fields = JSON.parse(room.querySelector('#room-pane-field-catalog')?.textContent || '[]');
     const interfaces = JSON.parse(room.querySelector('#room-pane-interface-catalog')?.textContent || '[]');
 
+    let listAccountConditions = null;
+    entry.dispose = () => listAccountConditions?.destroy();
+    entry.pane.addEventListener('ui-workspace-retain', () => listAccountConditions?.close());
     const loadList = async () => {
+      listAccountConditions?.destroy();
+      listAccountConditions = null;
       await fetchInto(entry, listUrl);
       NiixyUI.bindTabs(entry.body);
       initializeCollectionControls(entry.body);
+      if (boards && window.NiixyAccountConditions) {
+        listAccountConditions = NiixyAccountConditions.create({
+          root: entry.body,
+          track: trail.track,
+          setStage: (stage) => {
+            if (stage === 'room-list') {
+              trail.discardAfter(entry);
+              trail.align(entry);
+              return;
+            }
+            const selector = {
+              'account-conditions': '.account-condition-pane',
+              'account-selector': '.account-selector-pane',
+              'account-condition-detail': '.account-condition-detail-pane',
+              'account-condition-history-edit': '.account-condition-detail-pane',
+            }[stage];
+            const pane = selector && Array.from(trail.track.querySelectorAll(selector)).at(-1);
+            if (pane) trail.focus(pane, stage.startsWith('account-condition-detail') || stage.endsWith('history-edit') ? 'remaining' : 'fixed');
+          },
+          historyStage: 'account-conditions',
+          selectorStage: 'account-selector',
+          detailStage: 'account-condition-detail',
+          historyEditStage: 'account-condition-history-edit',
+          defaultReturnStage: 'room-list',
+          getReturnStage: () => 'room-list',
+          fieldCatalog: fields,
+          authenticated: room.dataset.authenticated === 'true',
+          currentAccount: room.dataset.currentAccount,
+          listUrl: room.dataset.accountConditionListUrl,
+          saveUrl: room.dataset.accountConditionSaveUrl,
+          deleteUrl: room.dataset.accountConditionDeleteUrl,
+          accountSearchUrl: room.dataset.accountSearchUrl,
+          roomSearchUrl: room.dataset.accountConditionRoomSearchUrl,
+          csrfToken: () => entry.body.querySelector('[name="csrfmiddlewaretoken"]')?.value || '',
+          conditionKindAllowed: (kind) => ['default', 'account', 'room'].includes(kind),
+          conditionAllowed: (condition) => condition.kind !== 'default'
+            || ['guest', 'account', 'self'].includes(condition.definition.code),
+        });
+      }
     };
 
     const openBoard = (board) => {
@@ -472,6 +516,14 @@ window.NiixyWorkspaceTrail = (() => {
       loadBoard().catch((error) => showError(boardEntry, error));
     };
 
+    entry.body.addEventListener('focusin', (event) => {
+      const input = event.target;
+      if (!input.matches('input:not([type="hidden"]), textarea, select')
+        || !input.closest('[data-board-action-kind="create"]')) return;
+      requestAnimationFrame(() => {
+        if (entry.pane.isConnected && document.activeElement === input) trail.align(entry);
+      });
+    });
     entry.body.addEventListener('click', (event) => {
       const board = event.target.closest('[data-open-board]');
       if (board) openBoard(board);

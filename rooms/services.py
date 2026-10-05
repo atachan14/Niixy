@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -133,8 +134,9 @@ def board_policy_rows(board):
     return rows
 
 
-def board_policy_editor_rows(board, room):
-    conditions = list(board.policy_conditions.all())
+def board_policy_editor_rows(board, room, *, conditions=None, target_prefix=None):
+    conditions = list(board.policy_conditions.all()) if conditions is None else conditions
+    target_prefix = target_prefix or f'board-policy-{board.pk}'
     rows = []
     for capability, label in BoardPolicyCondition.CAPABILITY_CHOICES:
         decisions = []
@@ -157,7 +159,7 @@ def board_policy_editor_rows(board, room):
             decisions.append({
                 'decision': decision,
                 'label': f'{label}{decision_label}',
-                'target': f'board-policy-{board.pk}-{capability}-{decision}',
+                'target': f'{target_prefix}-{capability}-{decision}',
                 'groups_json': json.dumps(groups, ensure_ascii=False),
             })
         rows.append({'capability': capability, 'label': label, 'decisions': decisions})
@@ -177,15 +179,27 @@ def create_room(*, submission_id, owner, name, description, latitude, longitude)
         RoomPlacement.objects.create(room=room, latitude=latitude, longitude=longitude)
         main = Collection.objects.create(name='Main', room=room)
         Collection.objects.create(name='未分類', room=room, is_uncategorized=True)
-        board = Board.objects.create(name='最初のBoard')
-        BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
-        seed_board_policy(board, room)
+        for board_name in ('お知らせ', '掲示板'):
+            board = Board.objects.create(name=board_name)
+            BoardPlacement.objects.create(board=board, kind=BoardPlacement.COLLECTION, collection=main)
+            conditions = default_board_policy_conditions(board, room)
+            if board_name == 'お知らせ':
+                kind, definition, label = _board_policy_condition_snapshot(
+                    {'kind': 'account', 'definition': {'account_id': owner.pk}}, room, owner,
+                )
+                conditions[-1].kind = kind
+                conditions[-1].definition = definition
+                conditions[-1].label = label
+            BoardPolicyCondition.objects.bulk_create(conditions)
+        # Keep the existing activity ordering while showing the initial notice first.
+        initial_activity = max(timezone.now(), board.last_activity_at + timedelta(microseconds=1))
+        Board.objects.filter(placement__collection=main, name='お知らせ').update(last_activity_at=initial_activity)
         return room
 
     return run_once(Room, submission_id, operation)
 
 
-def create_board(*, submission_id, collection, name, description=''):
+def create_board(*, submission_id, collection, name, description='', policy_data=None, actor=None):
     def operation():
         with transaction.atomic():
             target = Collection.objects.select_for_update().get(pk=collection.pk)
@@ -201,7 +215,10 @@ def create_board(*, submission_id, collection, name, description=''):
             )
             room = target.room
             if room is not None:
-                seed_board_policy(board, room)
+                if policy_data is None:
+                    seed_board_policy(board, room)
+                else:
+                    update_board_policy(board, room, policy_data, actor)
             return board
 
     return run_once(Board, submission_id, operation)

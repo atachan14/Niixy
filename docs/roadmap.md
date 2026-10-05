@@ -171,6 +171,16 @@ Threadの閲覧とResponse投稿を共通Account条件・Policy評価器へ移�
 
 ---
 
+## v0.11 - Room初期Board / Board作成Policy
+
+Status: Complete (local implementation / focused verification)
+
+新規RoomのMainに「お知らせ」「掲示板」を生成し、手動Board作成で共通Account条件UIによる4欄Policy設定を可能にする。既存Roomの移行・Template・動的RoomOwnerは対象外。
+
+詳細: [v0.11要件](v0.11/requirements.md)。関連: [Backlog BL-001 / BL-003](backlog.md)。
+
+---
+
 ## Future
 
 v0.1以降のVersion番号や実装順序は固定しない。
