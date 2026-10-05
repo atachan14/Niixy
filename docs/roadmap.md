@@ -201,11 +201,11 @@ AccountのBoard一覧Pane、本人向けCollection／Board管理、Main／日記
 
 ---
 
-## Version未割当 - Interface / Field版更新・凍結／復帰
+## v0.14 - Interface / Field版更新・凍結／復帰
 
-Status: Local implementation / isolated verification; shared migration and release pending
+Status: Complete (implementation / isolated verification; release approved, migration pending)
 
-Accountの最新版編集・保存前確認、IF定義の対応可否とAccount適用状態の分離、凍結中の共有Field更新、条件付き復帰を実装する。Threadの既存表示を維持し、新規作成の最新版解決を継続する。Threadの適用済み編集・Layout本体・投稿Snapshot・AccountIF条件の実装は後続。まとめ番号候補はv0.14だが未確定とする。
+Accountの最新版編集・保存前確認、IF定義の対応可否とAccount適用状態の分離、凍結中の共有Field更新、条件付き復帰を実装する。Threadの既存表示を維持し、新規作成の最新版解決を継続する。Threadの適用済み編集・Layout本体・投稿Snapshot・AccountIF条件の実装は後続。v0.14として公開承認済み。共有interfaces0008はVercel本番buildの自動migrateで反映し、読取で保存性を確認する。
 
 詳細: [未割当要件と移行影響](interface-version-foundation.md)。基盤の一区切り後は承認済みUI／NiiMap調整を挟み、その後AccountLayoutへ進む。
 

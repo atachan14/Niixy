@@ -1,7 +1,7 @@
 # Interface / Field版更新・凍結／復帰基盤
 
-Version: 未割当（まとめ番号候補v0.14、親スレッドで確定）
-Status: Local implementation / isolated verification; shared DB migration and release pending
+Version: v0.14
+Status: Complete (implementation / isolated verification; release approved, migration pending)
 Base: `fc94013`（v0.13）。既存inbox差分は保護。v0.12の実績・READMEは変更しない。
 
 ## 共通方針と今回の範囲
@@ -51,10 +51,10 @@ Field定義→IF定義→Accountの順で行lockを取得し、保存をtransact
 
 列をnullableのままにするのは、migration後も旧v0.13コードが稼働する公開切替中に旧writerのINSERTを壊さないため。新コードは必ず版を保存し、旧writerがNULL列を残した場合は読取時に最初の残存参照から解決する。公開GETでは補完書込をしない。次の本人編集で対象Bindingに版を保存する。旧コード稼働中は旧版編集ルールのままなので、ルール切替には新コード公開完了と通常開発serverのrestartが必要。
 
-共有Neonへのmigration・公開・commit／pushは未実施。承認後の手順案は次の通り。
+基盤checkpointは`6f68524`。v0.14基盤／v0.15 UI・NiiMap Boardの区切りと公開は承認済み。共有Neonの未適用migrationは0008だけと読取確認し、対象schema／データの限定backupをgitignore内に保存した。Account適用5テーブルは0件だった。公開手順は次の通り。
 
-1. 保護対象を含めず変更ファイルを個別reviewし、まとめVersionを確定する。共有DBの適用済みmigrationと0008のplanをread-onlyで確認する。
-2. nullable追加・backfillの0008を適用する。Vercel buildの自動migrateを使う場合はmigrationが旧writerと共存できることを前提に、新コードを公開する。同時に旧コードが長時間稼働しないよう切替を確認する。
+1. 保護対象を除外してreviewし、既存checkpointを保持する通常commitでv0.14 docsとv0.15実装を区切る。remote masterへ一度pushし、対象SHAを確認する。
+2. `vercel.json`のproduction buildによる自動migrateで0008を適用する。手動migrateは重ねない。buildと公開切替を確認し、旧writerの稼働時間を短くする。移行後は追加列・default・migration記録・値／日時／履歴参照の保存性をbackupと読取照合する。
 3. 通常runserverはAGENTS.mdどおりPID／親PID／実行パス／開始日時／8000 listenerを確認し、検証済みNiixy親子だけ停止する。残存processとlistenerがなくなってから通常コマンドで一組だけ起動する。
 4. 新asset識別子と状態markupをGETで確認し、共有DBへ実験書込せずPC/mobileのread-only smokeを行う。
 
@@ -79,4 +79,4 @@ schema追加後は旧コードでも読書可能だが、ルールの実装は�
 - 画像QAでpreviewの長い定義JSONによるmobile横はみ出しを検出し、利用者向けの版・型・選択肢・Field構成へ変更。grid列の最小幅と折返しを修正し、横はみ出しassert・console/page error検査と代表PC/mobileを再実行して成功。Workspace／最終表示の画像も確認。
 - 最終preview補強後は版更新の直接20件と変更箇所の直接／PC/mobileテストだけを再検証。`makemigrations --check --dry-run`は追加差分なし、保護対象を除く`git diff --check`は成功。
 
-新規コード・docs・migration・テストは未commit。inboxは読取／変更／stageしていない。共有DB・公開版・通常runserverは今回変更していない。
+基盤の実装・migration・テストは`6f68524`へcheckpoint済み。inbox／root READMEは変更・stage対象外。上記は隔離QAの記録で、公開・共有0008・通常runserverの切替は承認された公開工程で別途確認する。
