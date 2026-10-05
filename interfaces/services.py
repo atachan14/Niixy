@@ -131,6 +131,9 @@ def publish_field_definition(
             definition.save(update_fields=['name', 'current_version', 'updated_at'])
         except IntegrityError as error:
             raise ValidationError({'name': '同じ名前のFieldがすでに存在します。'}) from error
+        from .versioning import refresh_interface_accounts
+        refresh_interface_accounts(Interface.objects.filter(current_version__fields__definition=definition)
+                                   .values_list('pk', flat=True))
     return definition, version
 
 
@@ -165,8 +168,10 @@ def publish_draft(draft_id):
 
     fields = list(draft.fields.all())
     resolved_fields = []
+    locked_definitions = {item.pk: item for item in FieldDefinition.objects.select_for_update()
+                          .filter(pk__in=[field.definition_id for field in fields]).order_by('pk')}
     for field in fields:
-        definition = field.definition
+        definition = locked_definitions[field.definition_id]
         field_version = definition.current_version
         if definition.status != FieldDefinition.ACTIVE or field_version is None:
             raise ValidationError({'fields': f'{definition.name}は現在利用できません。'})
@@ -206,6 +211,8 @@ def publish_draft(draft_id):
     interface.current_version = version
     interface.save(update_fields=['name', 'kind', 'current_version', 'updated_at'])
     draft.delete()
+    from .versioning import refresh_interface_accounts
+    refresh_interface_accounts([interface.pk])
     return interface, version
 
 

@@ -15,7 +15,7 @@
       <div class="ui-summary-list">{% for item in applied.interfaces %}
         <div class="applied-interface-item">
           {% if edit_mode %}<button type="button" class="ui-summary-item" data-edit-applied-interface="{{ item.id }}">{% else %}<div class="ui-summary-item">{% endif %}
-          <span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ item.name }}@{{ item.creator }} v{{ item.version }}/AccountIF</strong><span class="applied-field-value">{% for value in item.values %}{{ value.field.label }}: {{ value.display_value }}{% if not forloop.last %} / {% endif %}{% endfor %}</span><small class="ui-summary-item-updated">最終更新 {{ item.updated_at|date:'Y/m/d H:i' }}</small>
+          <span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ item.name }}@{{ item.creator }} v{{ item.version }}/AccountIF</strong><span class="field-help" data-application-state="{{ item.state }}">{{ item.state_label }}</span><span class="applied-field-value">{% for value in item.values %}{{ value.field.label }}: {{ value.display_value }}{% if not forloop.last %} / {% endif %}{% endfor %}</span><small class="ui-summary-item-updated">最終更新 {{ item.updated_at|date:'Y/m/d H:i' }}</small>
           {% if edit_mode %}</button>{% else %}</div>{% endif %}
         </div>
       {% empty %}<p class="empty">適用済みAccountIFはありません。</p>{% endfor %}</div>

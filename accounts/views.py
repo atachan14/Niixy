@@ -354,8 +354,8 @@ def account_applied_change(request, username):
         confirmation = payload.pop('confirmation', None)
         change_application(account, payload, confirmation)
     except MergeConfirmationRequired as error:
-        return JsonResponse({'error': '共有される値の変更を確認してください。',
-            'changes': error.changes, 'confirmation': error.token}, status=409)
+        return JsonResponse({'error': '版・依存Field・共有値の更新内容を確認してください。',
+            'changes': error.changes, 'confirmation': error.token, 'needs_confirmation': True})
     except (json.JSONDecodeError, UnicodeDecodeError, ValidationError, ValueError, TypeError) as error:
         messages = error.messages if isinstance(error, ValidationError) else ['操作が正しくありません。']
         return JsonResponse({'error': ' '.join(messages)}, status=400)

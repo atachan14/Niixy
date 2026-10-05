@@ -386,6 +386,12 @@ class ThreadInterfaceValue(models.Model):
 
 
 class AccountInterfaceImplementation(models.Model):
+    ACTIVE = 'active'
+    FROZEN = 'frozen'
+    PENDING = 'pending'
+    STATE_CHOICES = [(ACTIVE, '有効'), (FROZEN, '凍結'), (PENDING, '復帰待ち')]
+    state = models.CharField(max_length=16, choices=STATE_CHOICES, default=ACTIVE, db_default=ACTIVE)
+
     account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='interface_implementations')
     interface = models.ForeignKey(Interface, on_delete=models.PROTECT, related_name='account_implementations')
     version = models.ForeignKey(InterfaceVersion, on_delete=models.PROTECT, related_name='account_implementations')
@@ -408,6 +414,9 @@ class AccountFieldValue(models.Model):
 
 
 class AccountFieldBinding(models.Model):
+    # The one applied FieldVersion for this definition on this Account.
+    version = models.ForeignKey(FieldVersion, null=True, on_delete=models.PROTECT, related_name='account_bindings')
+
     account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='field_bindings')
     definition = models.ForeignKey(
         FieldDefinition,

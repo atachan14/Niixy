@@ -59,8 +59,12 @@ class AccountApplicationTests(TestCase):
             change_application(new_owner, {'operation': 'add_interface', 'id': account_if.pk, 'values': {str(self.field.key): ['value']}})
         self.assertEqual(self.owner.interface_implementations.get().version_id, version.pk)
         binding = self.owner.field_bindings.get()
-        change_application(self.owner, {'operation': 'edit_value', 'id': binding.pk, 'values': ['still fixed']})
-        self.assertEqual(application_payload(self.owner)['interfaces'][0]['values'][0]['value'], 'still fixed')
+        payload = {'operation': 'edit_value', 'id': binding.pk, 'values': ['latest edit']}
+        with self.assertRaises(MergeConfirmationRequired) as preview:
+            change_application(self.owner, payload)
+        change_application(self.owner, payload, preview.exception.token)
+        self.assertEqual(application_payload(self.owner)['interfaces'][0]['values'][0]['value'], 'latest edit')
+        self.assertEqual(application_payload(self.owner)['interfaces'][0]['state'], 'frozen')
 
     def test_direct_and_multiple_interfaces_share_one_value_and_preserve_bindings(self):
         self.add_field()
@@ -126,9 +130,14 @@ class AccountApplicationTests(TestCase):
         old_if, _ = self.interface('Old IF', [(field, True)])
         self.add_interface(old_if, {str(field.key): ['old']})
         self.new_field('Choice', 'single_choice', definition=field, settings={'options': ['new']})
-        with self.assertRaises(ValidationError): self.add_field(field, 'new')
+        payload = {'operation': 'add_field', 'id': field.pk, 'values': {str(field.key): ['new']}}
+        with self.assertRaises(MergeConfirmationRequired) as preview:
+            change_application(self.owner, payload)
         self.assertEqual(AccountDirectField.objects.count(), 0)
         self.assertEqual(AccountFieldValue.objects.get().value, 'old')
+        change_application(self.owner, payload, preview.exception.token)
+        self.assertEqual(AccountFieldValue.objects.get().value, 'new')
+        self.assertEqual(application_payload(self.owner)['interfaces'][0]['state'], 'frozen')
 
     def test_bulk_edit_validates_all_before_write_and_shared_conflicting_input(self):
         number, _ = self.new_field('Number', 'integer')

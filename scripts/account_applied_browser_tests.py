@@ -176,7 +176,7 @@ class AccountAppliedBrowserTests(StaticLiveServerTestCase):
             page = context.new_page(); page.set_default_timeout(7000)
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
-            page.on('console', lambda msg: errors.append(msg.text) if msg.type == 'error' and '409 (Conflict)' not in msg.text and not msg.location.get('url', '').endswith('/favicon.ico') else None)
+            page.on('console', lambda msg: errors.append(msg.text) if msg.type == 'error' and not msg.location.get('url', '').endswith('/favicon.ico') else None)
             try:
                 page.goto(self.live_server_url + '/mypage/?section=applied')
                 page.locator('[data-add-applied="field"]').click()
@@ -211,3 +211,92 @@ class AccountAppliedBrowserTests(StaticLiveServerTestCase):
             finally:
                 context.close(); browser.close()
         self.assertEqual({item['value'] for item in application_payload(self.owner)['fields']}, {'late'})
+
+    def test_latest_edit_freeze_and_pending_recovery_pc_mobile(self):
+        from playwright.sync_api import sync_playwright, expect
+        from interfaces.account_applications import change_application
+        output = Path(settings.BASE_DIR) / '.artifacts' / 'account-versions'
+        output.mkdir(parents=True, exist_ok=True)
+        for name, size in [('desktop', {'width': 1280, 'height': 720}), ('mobile', {'width': 390, 'height': 844})]:
+            field, _ = publish_field_definition(creator=self.owner, name='Version Choice ' + name,
+                field_type='single_choice', settings={'options': ['old']})
+            interfaces = []
+            for prefix in ['Frozen IF ', 'Ready IF ']:
+                draft = InterfaceDraft.objects.create(creator=self.owner, kind='account', name=prefix + name)
+                InterfaceDraftField.objects.create(draft=draft, definition=field, position=0, required=True)
+                interface, _ = publish_draft(draft.pk); interfaces.append(interface)
+                change_application(self.owner, {'operation': 'add_interface', 'id': interface.pk,
+                    'values': {str(field.key): ['old']}})
+            frozen, ready = interfaces
+            publish_field_definition(creator=self.owner, definition=field, name=field.name,
+                field_type='single_choice', settings={'options': ['new']})
+            extra, _ = publish_field_definition(creator=self.owner, name='Extra ' + name, field_type='integer')
+            draft = InterfaceDraft.objects.create(creator=self.owner, interface=ready, kind='account', name=ready.name)
+            InterfaceDraftField.objects.create(draft=draft, definition=field, position=0, required=True)
+            InterfaceDraftField.objects.create(draft=draft, definition=extra, position=1, required=True)
+            publish_draft(draft.pk)
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(channel='msedge', headless=True)
+                context = browser.new_context(viewport=size, is_mobile=name == 'mobile', has_touch=name == 'mobile')
+                context.add_cookies([{'name': settings.SESSION_COOKIE_NAME,
+                    'value': self.client.cookies[settings.SESSION_COOKIE_NAME].value, 'url': self.live_server_url}])
+                page = context.new_page(); page.set_default_timeout(8000); errors = []
+                page.on('pageerror', lambda error: errors.append(str(error)))
+                page.on('console', lambda message: errors.append(message.text) if message.type == 'error'
+                    and not message.location.get('url', '').endswith('/favicon.ico') else None)
+                try:
+                    page.goto(self.live_server_url + '/mypage/?section=applied')
+                    applied = page.locator('[data-applied-pane]')
+                    applied.locator('[data-ui-tab="applied-interface"]').click()
+                    expect(applied.locator('[data-application-state="frozen"]')).to_have_count(1)
+                    applied.locator('[data-edit-applied-interface]').filter(has_text=frozen.name).click()
+                    editor = page.locator('[data-applied-editor]')
+                    expect(editor.locator('[type="submit"]')).to_be_disabled()
+                    expect(editor.locator('select')).to_be_disabled()
+                    editor.locator('.ui-pane-header button').click()
+                    applied.locator('[data-ui-tab="applied-field"]').click()
+                    applied.locator('[data-edit-applied-field]').click()
+                    editor = page.locator('[data-applied-editor]')
+                    editor.locator('select').select_option('new')
+                    editor.locator('[type="submit"]').click()
+                    expect(editor.locator('[data-merge-preview]')).to_contain_text('old')
+                    before = page.request.get(self.live_server_url + '/accounts/applied_browser/applied/data/').json()
+                    self.assertEqual(before['fields'][0]['value'], 'old')
+                    self.assert_pane_at_right(page, '[data-applied-editor]', size['width'], 'remaining')
+                    self.assertTrue(editor.locator('form').evaluate('el => el.scrollWidth <= el.clientWidth + 1'))
+                    self.assertNotIn('definition_id', editor.locator('[data-merge-preview]').inner_text())
+                    page.screenshot(path=output / f'{name}-field-preview.png', full_page=True)
+                    editor.locator('[data-merge-preview] button').click()
+                    expect(page.locator('[data-applied-editor]')).to_have_count(0)
+                    expect(applied.locator('[data-edit-applied-field]')).to_contain_text('new')
+                    applied.locator('[data-ui-tab="applied-interface"]').click()
+                    expect(applied.locator('[data-application-state="pending"]')).to_have_count(1)
+                    applied.locator('[data-edit-applied-interface]').filter(has_text=ready.name).click()
+                    editor = page.locator('[data-applied-editor]')
+                    expect(editor.locator('select')).to_have_value('new')
+                    editor.locator('input[type="number"]').fill('12')
+                    editor.locator('[type="submit"]').click()
+                    expect(editor.locator('[data-merge-preview]')).to_contain_text('Extra')
+                    before = page.request.get(self.live_server_url + '/accounts/applied_browser/applied/data/').json()
+                    self.assertEqual(len(before['fields']), 1)
+                    self.assertTrue(editor.locator('form').evaluate('el => el.scrollWidth <= el.clientWidth + 1'))
+                    page.screenshot(path=output / f'{name}-recovery-preview.png', full_page=True)
+                    editor.locator('[data-merge-preview] button').click()
+                    expect(page.locator('[data-applied-editor]')).to_have_count(0)
+                    applied.locator('[data-ui-tab="applied-interface"]').click()
+                    expect(applied.locator('[data-application-state="active"]')).to_have_count(1)
+                    context.clear_cookies()
+                    page.goto(self.live_server_url + '/accounts/applied_browser/')
+                    page.locator('[data-open-account-account-if]').click()
+                    public = page.locator('[data-account-applied-container]')
+                    public.locator('[data-ui-tab="applied-interface"]').click()
+                    expect(public.locator('[data-application-state="active"]')).to_have_count(1)
+                    expect(public.locator('[data-application-state="frozen"]')).to_have_count(1)
+                    expect(public).to_contain_text('new'); expect(public).to_contain_text('12')
+                    page.screenshot(path=output / f'{name}-public.png', full_page=True)
+                    self.assertEqual(errors, [])
+                finally:
+                    context.close(); browser.close()
+            for interface in interfaces:
+                item = self.owner.interface_implementations.get(interface=interface)
+                change_application(self.owner, {'operation': 'remove_interface', 'id': item.pk})

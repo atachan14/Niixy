@@ -13,6 +13,20 @@ window.NiixyAccountApplied = (() => {
       if (!error) { error = document.createElement('p'); error.dataset.appliedError = ''; error.className = 'room-form-error'; error.setAttribute('role', 'alert'); root.append(error); }
       error.textContent = text;
     }
+    function previewValue(value) {
+      if (value == null) return '未入力';
+      if (typeof value === 'boolean') return value ? 'はい' : 'いいえ';
+      return Array.isArray(value) ? value.join(' / ') : String(value);
+    }
+    function previewDefinition(field) {
+      if (!field.label) return [field.name, field.description].filter(Boolean).join('：');
+      const parts = [`${field.label} v${field.version}`, field.type_label,
+        field.required ? '必須' : '任意'];
+      if (field.settings?.options?.length) parts.push(`選択肢: ${field.settings.options.join(' / ')}`);
+      if (field.synonym_labels?.length) parts.push(`片同義: ${field.synonym_labels.join(' / ')}`);
+      if (field.description) parts.push(field.description);
+      return parts.join('・');
+    }
     async function submit(payload, root) {
       if (root.dataset.appliedPending) return false;
       root.dataset.appliedPending = 'true';
@@ -26,12 +40,30 @@ window.NiixyAccountApplied = (() => {
           body: JSON.stringify(payload)});
         const result = await response.json();
         if (!current() || generation !== revision || !root.isConnected) return false;
-        if (response.status === 409 && result.confirmation) {
+        if (result.needs_confirmation || (response.status === 409 && result.confirmation)) {
           root.querySelector('[data-merge-preview]')?.remove();
           const preview = document.createElement('section'); preview.dataset.mergePreview = '';
           const heading = document.createElement('p'); heading.textContent = result.error; preview.append(heading);
           result.changes.forEach(change => { const line = document.createElement('p');
-            line.textContent = `${change.field}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`; preview.append(line); });
+            const versionChange = ['field_version', 'interface_version'].includes(change.kind);
+            line.textContent = versionChange ? `${change.field}: v${change.before} → v${change.after}`
+              : change.kind === 'field_addition' ? `${change.field}: Fieldを追加（v${change.after}）`
+              : `${change.field}: ${previewValue(change.before)} → ${previewValue(change.after)}`; preview.append(line);
+            if (change.before_definition) {
+              const detail = document.createElement('p');
+              detail.textContent = `定義: ${previewDefinition(change.before_definition)} → ${previewDefinition(change.after_definition)}`;
+              preview.append(detail);
+            }
+            if (change.before_fields) {
+              const detail = document.createElement('p');
+              detail.textContent = `Field構成: ${change.before_fields.map(previewDefinition).join(' / ') || 'なし'} → ${change.after_fields.map(previewDefinition).join(' / ') || 'なし'}`;
+              preview.append(detail);
+            }
+            if (Object.hasOwn(change, 'value')) {
+              const detail = document.createElement('p'); detail.textContent = `現在値: ${previewValue(change.value)}`;
+              preview.append(detail);
+            }
+          });
           const confirm = document.createElement('button'); confirm.type = 'button'; confirm.className = 'button primary';
           confirm.textContent = '確認して保存'; confirm.addEventListener('click', () => submit({...payload, confirmation: result.confirmation}, root));
           preview.append(confirm); root.append(preview);
@@ -82,11 +114,26 @@ window.NiixyAccountApplied = (() => {
       const close = document.createElement('button'); close.type = 'button'; close.className = 'icon-button'; close.textContent = '×'; close.setAttribute('aria-label', 'Applied一覧に戻る');
       close.addEventListener('click', () => { ++revision; cleanup(); options.setStage('applied'); }); header.append(title, close);
       const form = document.createElement('form'); form.className = 'applied-editor-form';
-      const values = kind === 'field' ? [{binding_id: item.id, value_id: item.value_id, field: item.field, raw_values: item.raw_values, shared_with: item.shared_with}] : item.values;
+      const editVersion = kind === 'field' ? item.edit_field?.version : item.latest_version;
+      if (editVersion && editVersion !== item.version) {
+        const hint = document.createElement('p'); hint.className = 'field-help';
+        hint.textContent = `編集には最新版 v${editVersion} への更新が必要です。保存前に変更内容を確認できます。`;
+        form.append(hint);
+      }
+      const modernInterface = Array.isArray(item.edit_values);
+      const editable = kind === 'field' ? Boolean(Object.hasOwn(item, 'edit_field') ? item.edit_field : item.field) : item.editable !== false;
+      const values = kind === 'field' ? [{binding_id: item.id, value_id: item.value_id, field: item.edit_field || item.field, raw_values: item.raw_values, shared_with: item.shared_with}] : (editable && modernInterface ? item.edit_values : item.values);
+      if (kind === 'interface' && !editable) {
+        const hint = document.createElement('p');
+        hint.textContent = `${item.state_label}：AccountIF経由の値編集はできません。Fieldタブから共有値を更新できます。 ${(item.reasons || []).join(' ')}`;
+        form.append(hint);
+      }
       values.forEach(value => {
         const control = NiixyRoomForms.fieldControl(value.field, `value_${value.binding_id}`, value.field.required);
-        control.dataset.appliedBinding = value.binding_id;
-        control.dataset.appliedValue = value.value_id;
+        if (value.binding_id != null) control.dataset.appliedBinding = value.binding_id;
+        control.dataset.appliedFieldKey = value.field.key;
+        if (!editable) control.querySelectorAll('input, textarea, select').forEach(input => { input.disabled = true; });
+        if (value.value_id != null) control.dataset.appliedValue = value.value_id;
         control.addEventListener('input', () => {
           const selected = NiixyRoomForms.fieldValues(control);
           form.querySelectorAll('[data-applied-value]').forEach(other => {
@@ -113,12 +160,16 @@ window.NiixyAccountApplied = (() => {
         requestAnimationFrame(() => { if (editor.isConnected && document.activeElement === input) options.setStage('applied-edit'); });
       });
       const save = document.createElement('button'); save.type = 'submit'; save.className = 'button primary'; save.textContent = '保存';
-      save.disabled = values.length === 0;
+      save.disabled = !editable || (kind === 'field' && values.length === 0) || (kind === 'interface' && values.length === 0 && (!modernInterface || item.version === item.latest_version));
       form.append(save);
       form.addEventListener('submit', event => {
         event.preventDefault();
         const updates = Array.from(form.querySelectorAll('[data-applied-binding]'), wrapper => ({id: Number(wrapper.dataset.appliedBinding), values: NiixyRoomForms.fieldValues(wrapper)}));
-        submit({operation: 'edit_values', updates}, form);
+        if (kind === 'interface' && modernInterface) {
+          const supplied = {};
+          form.querySelectorAll('[data-applied-field-key]').forEach(wrapper => { supplied[wrapper.dataset.appliedFieldKey] = NiixyRoomForms.fieldValues(wrapper); });
+          submit({operation: 'update_interface', id: item.id, values: supplied}, form);
+        } else submit({operation: 'edit_values', updates}, form);
       });
       const removeId = kind === 'field' ? item.direct_id : item.id;
       if (removeId) {

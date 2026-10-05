@@ -379,3 +379,10 @@ AccountのBoard一覧Paneに、通常CollectionのMain、ユーザー追加Colle
 AccountPage専用ではなく、Account・Room・Board・ThreadなどのWorkspace遷移に共通適用する。Pane内から別のPaneを開くときは、操作の起点Paneとそれ以前を保持し、その後ろのPaneを閉じて新しい遷移先へ置き換える。末尾Paneからの操作は追加になる。専用のAccountNextPaneは設けない。
 
 保持するPaneは再取得せず、スクロール・入力・Tabなどの状態を維持する。閉じたPaneの通信応答や遅延処理は新しい枝に反映しない。Account条件やField選択などの補助Paneも呼び出し元と同じ枝として扱う。末尾PaneのCloseは従来どおり直前へ戻り、途中PaneのCloseではその後続も閉じる。Page遷移・ブラウザ履歴・URLからの復元との区別は維持する。
+
+
+## 2026-10-05: 最新版編集とIFの凍結／復帰（Version未割当）
+
+既存内容の旧版表示を保持しつつ、新規作成・適用・編集（適用済みField値編集を含む）を最新版へ揃える。同一定義の複数版を対象へ併用しない。依存Field最新版に未対応のIFは凍結し、表示参照と有効判定を分離する。凍結IFの制約は他の共有Field値更新を妨げず、値・Fieldを保持する。対応IF版公開後、既存の最新版Fieldと現値だけで確認不要に復帰できる場合のみ自動復帰し、不足Field・矛盾・統合確認があれば復帰待ちとする。取り外したIFは戻さない。
+
+Layout依存IFの凍結でも適用済みLayoutの表示を保持し、新規適用・編集だけ最新版条件を要求する。投稿時の表示名／表示値Snapshotと不変FieldVersion／LayoutVersion参照はThreadPostの`#1`・Response・defaultLayout共通の後続契約とする。同一定義のField型変更禁止は継続する。詳細と段階別実装範囲は[未割当要件](../interface-version-foundation.md)。

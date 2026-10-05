@@ -689,7 +689,7 @@
 .applied-list-pane { flex: 0 0 var(--ui-workspace-fixed-width); width: var(--ui-workspace-fixed-width); overflow-y: auto; }
 .applied-editor-pane { flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width)); width: calc(100vw - var(--ui-workspace-fixed-width)); overflow-y: auto; }
 .applied-actions, .applied-editor-form { padding: 20px; }
-.applied-editor-form { display: grid; gap: 16px; }
+.applied-editor-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; overflow-wrap: anywhere; }
 .applied-list-content .ui-summary-item-updated { white-space: normal; overflow-wrap: anywhere; }
 .mypage-workspace .thread-create-module-list-pane { flex: 0 0 var(--ui-workspace-fixed-width); width: var(--ui-workspace-fixed-width); }
 .mypage-workspace .thread-create-module-detail-pane { flex: 0 0 calc(100vw - var(--ui-workspace-fixed-width)); width: calc(100vw - var(--ui-workspace-fixed-width)); }
