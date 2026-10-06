@@ -261,7 +261,7 @@ class AccountVersionTests(TestCase):
             json.dumps(self.edit()), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()['needs_confirmation'])
-        self.assertContains(self.client.get(reverse('mypage')), 'accounts/applied.js?v=20261005-application-versions', count=1)
+        self.assertContains(self.client.get(reverse('mypage')), 'accounts/applied.js?v=20261006-account-if-fix', count=1)
         self.assertEqual(self.account.field_values.get().value, 'kept')
 
     def test_preview_invalidated_when_incoming_if_version_alone_changes(self):

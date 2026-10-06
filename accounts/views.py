@@ -369,12 +369,24 @@ def account_applied_data(request, username):
     return JsonResponse(result)
 
 
+def csrf_failure(request, reason=''):
+    # Keep Django's normal form response; Applied's JSON client needs JSON errors.
+    match = request.resolver_match
+    if match and match.view_name == 'accounts:applied-change':
+        return JsonResponse({'error': '確認情報が一致しません。再読込してログイン状態を確認してください。',
+                             'code': 'csrf_failed'}, status=403)
+    from django.views.csrf import csrf_failure as default_failure
+    return default_failure(request, reason=reason)
+
+
 @require_POST
 def account_applied_change(request, username):
     from interfaces.account_applications import change_application, MergeConfirmationRequired
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'ログインが必要です。'}, status=401)
-    account = get_object_or_404(User, username__iexact=username)
+    account = User.objects.filter(username__iexact=username).first()
+    if account is None:
+        return JsonResponse({'error': 'Accountが見つかりません。'}, status=404)
     if account.pk != request.user.pk:
         return JsonResponse({'error': '本人のAccountだけを変更できます。'}, status=403)
     try:

@@ -202,6 +202,7 @@ window.NiixyRoomForms = (() => {
     const button = document.createElement('button');
     button.className = 'ui-summary-item';
     button.type = 'button';
+    button.dataset.summaryKind = kind;
     const context = document.createElement('span');
     context.className = 'ui-summary-item-context';
     context.setAttribute('aria-hidden', 'true');

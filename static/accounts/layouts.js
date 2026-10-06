@@ -27,7 +27,7 @@ window.NiixyAccountLayouts = (() => {
   async function post(url, data, root) {
     const response = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json',
       'X-CSRFToken': root.querySelector('[name="csrfmiddlewaretoken"]')?.value || document.querySelector('[name="csrfmiddlewaretoken"]')?.value || ''}, body: JSON.stringify(data)});
-    const result = await response.json();
+    const result = await NiixyUI.readJsonResponse(response);
     if (!response.ok) throw new Error(result.error || '操作に失敗しました。');
     return result;
   }

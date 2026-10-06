@@ -128,7 +128,8 @@ def change_application(account, payload, confirmation=None):
     definition_ids.update(FieldDefinition.objects.filter(interface_bindings__version__interface_id__in=interface_ids,
         interface_bindings__version__interface__current_version_id=F('interface_bindings__version_id'))
         .values_list('pk', flat=True))
-    definitions = list(FieldDefinition.objects.select_for_update().filter(pk__in=definition_ids).order_by('pk')
+    # Published versions are immutable; lock definitions, not the nullable version join.
+    definitions = list(FieldDefinition.objects.select_for_update(of=('self',)).filter(pk__in=definition_ids).order_by('pk')
         .select_related('current_version').prefetch_related('current_version__synonyms'))
     list(Interface.objects.select_for_update().filter(pk__in=interface_ids).order_by('pk'))
     account = get_user_model().objects.select_for_update().get(pk=account.pk)

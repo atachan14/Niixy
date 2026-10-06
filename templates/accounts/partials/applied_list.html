@@ -5,7 +5,7 @@
     <section class="ui-tab-panel{% if not edit_mode %} account-feature-column{% endif %} is-active" data-ui-tab-panel="applied-field" data-page-number="{{ applied_pages.fields.number }}">
       {% if edit_mode %}<div class="applied-actions"><form data-applied-picker>{% csrf_token %}<button class="button secondary" type="button" data-add-applied="field">Fieldを追加</button></form></div>{% endif %}
       <div class="ui-summary-list">{% for item in applied.fields %}
-        {% if edit_mode %}<button type="button" class="ui-summary-item" data-edit-applied-field="{{ item.id }}">{% else %}<div class="ui-summary-item">{% endif %}
+        {% if edit_mode %}<button type="button" class="ui-summary-item" data-summary-kind="field" data-edit-applied-field="{{ item.id }}">{% else %}<div class="ui-summary-item" data-summary-kind="field">{% endif %}
           <span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ item.name }}@{{ item.creator }} v{{ item.version }}/Field</strong><span class="applied-field-value">{{ item.display_value }}</span><small class="ui-summary-item-updated">最終更新 {{ item.updated_at|date:'Y/m/d H:i' }}</small>
         {% if edit_mode %}</button>{% else %}</div>{% endif %}
       {% empty %}<p class="empty">適用済みFieldはありません。</p>{% endfor %}</div>
@@ -15,7 +15,7 @@
       {% if edit_mode %}<div class="applied-actions"><form data-applied-picker>{% csrf_token %}<button class="button secondary" type="button" data-add-applied="interface">AccountIFを追加</button></form></div>{% endif %}
       <div class="ui-summary-list">{% for item in applied.interfaces %}
         <div class="applied-interface-item">
-          {% if edit_mode %}<button type="button" class="ui-summary-item" data-edit-applied-interface="{{ item.id }}">{% else %}<div class="ui-summary-item">{% endif %}
+          {% if edit_mode %}<button type="button" class="ui-summary-item" data-summary-kind="interface" data-edit-applied-interface="{{ item.id }}">{% else %}<div class="ui-summary-item" data-summary-kind="interface">{% endif %}
           <span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ item.name }}@{{ item.creator }} v{{ item.version }}/AccountIF</strong><span class="field-help" data-application-state="{{ item.state }}">{{ item.state_label }}</span><span class="applied-field-value">{% for value in item.values %}{{ value.field.label }}: {{ value.display_value }}{% if not forloop.last %} / {% endif %}{% endfor %}</span><small class="ui-summary-item-updated">最終更新 {{ item.updated_at|date:'Y/m/d H:i' }}</small>
           {% if edit_mode %}</button>{% else %}</div>{% endif %}
         </div>

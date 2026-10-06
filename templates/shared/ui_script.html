@@ -57,6 +57,20 @@ window.NiixyUI = (() => {
     }
   }
 
+  async function readJsonResponse(response) {
+    const type = response.headers.get('content-type') || '';
+    if (response.redirected || !/^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(type)) {
+      const message = response.redirected || response.status === 401
+        ? 'ログイン状態を確認してください。入力内容を保持しています。'
+        : response.status === 403 ? '確認情報が一致しません。再読込してログイン状態を確認してください。入力内容を保持しています。'
+        : response.status === 404 ? '保存先が見つかりません。入力内容を保持しています。'
+        : '保存処理に失敗しました。入力内容を保持しています。しばらくして再試行してください。';
+      throw new Error(message);
+    }
+    try { return await response.json(); }
+    catch { throw new Error('応答を確認できませんでした。入力内容を保持しています。もう一度お試しください。'); }
+  }
+
   async function fetchFragment(url, selector = null) {
     const response = await fetch(url, {headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error('UI fragment request failed');
@@ -474,6 +488,6 @@ window.NiixyUI = (() => {
     if (node.nodeType === Node.ELEMENT_NODE) bindAccordions(node);
   }))).observe(document.body, {childList: true, subtree: true});
 
-  return {beginPendingAction, bindAccordions, bindModuleFilters, bindSummarySearch, bindTabs, createExclusivePanels, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, setAccordionExpanded, showPaneError, submitThreadReply};
+  return {beginPendingAction, bindAccordions, bindModuleFilters, bindSummarySearch, bindTabs, createExclusivePanels, createFeatureWorkspaceController, createPaneStack, createStatusPane, createWorkspace, fetchFragment, readJsonResponse, setAccordionExpanded, showPaneError, submitThreadReply};
 })();
 </script>

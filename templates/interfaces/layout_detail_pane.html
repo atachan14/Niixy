@@ -5,7 +5,7 @@
   <div class="layout-detail-content">
     <p>{{ version.description|linebreaksbr }}</p><p class="field-help">AccountPage下部のProfileに適用します。Field/AccountIFと値はLayoutを切り替えても保持します。</p>
     <h3>Require</h3><div class="layout-require-status">
-    {% for r in requirements %}<button class="ui-summary-item" type="button" data-layout-require-url="{% url 'interfaces:layout-requirement' r.kind r.id %}"><strong>{{ r.name }}@{{ r.creator }} v{{ r.version }}/{% if r.kind == 'field' %}Field{% else %}AccountIF{% endif %}</strong>{% if user.is_authenticated %}<small>{% if r.ready %}適用済み{% else %}{{ r.reason }}{% endif %}</small>{% endif %}</button>{% empty %}<p>Requireなし</p>{% endfor %}</div>
+    {% for r in requirements %}<button class="ui-summary-item" data-summary-kind="{% if r.kind == 'field' %}field{% else %}interface{% endif %}" type="button" data-layout-require-url="{% url 'interfaces:layout-requirement' r.kind r.id %}"><strong>{{ r.name }}@{{ r.creator }} v{{ r.version }}/{% if r.kind == 'field' %}Field{% else %}AccountIF{% endif %}</strong>{% if user.is_authenticated %}<small>{% if r.ready %}適用済み{% else %}{{ r.reason }}{% endif %}</small>{% endif %}</button>{% empty %}<p>Requireなし</p>{% endfor %}</div>
     <h3>Item</h3>{% for item in version.items.all %}<p><code>{{ item.alias }}.name / {{ item.alias }}.value</code> → {{ item.field_version.name }} v{{ item.field_version.version_number }}</p>{% empty %}<p>Itemなし</p>{% endfor %}
     <details><summary>HTML / CSSを確認</summary><pre>{{ version.html }}</pre><pre>{{ version.css }}</pre></details>
     {% for reason in reasons %}<p class="field-error">{{ reason }}</p>{% endfor %}

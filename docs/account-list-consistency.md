@@ -1,5 +1,7 @@
 # AccountPage一覧・分類tabの整合
 
+> 一覧整合のlocal checkpointは`dfcec66`。続いて優先した[AccountIF適用エラーとSummary Color](account-if-implementation-fix.md)は別checkpoint。Thread / Response評価・ユーザーListは調査段階で保全している。
+
 2026-10-06。公開済み `d5b53a8073e3e6b992b43fa946fe21df27acc169`を基準とする後続local修正。Room Review / Mute `9011a00`とrooms0012は公開済み。通常server pair `30348 → 5452`、8000 listenerは5452の1つ。この後続工程では通常serverのrestart / GET、共有Neonの書込み、push / public反映を行わない。
 
 ## 今回の変更

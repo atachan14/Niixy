@@ -38,7 +38,7 @@ window.NiixyAccountApplied = (() => {
         const response = await fetch(pane.dataset.appliedChangeUrl, {method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRFToken': pane.querySelector('[name="csrfmiddlewaretoken"]').value},
           body: JSON.stringify(payload)});
-        const result = await response.json();
+        const result = await NiixyUI.readJsonResponse(response);
         if (!current() || generation !== revision || !root.isConnected) return false;
         if (result.needs_confirmation || (response.status === 409 && result.confirmation)) {
           root.querySelector('[data-merge-preview]')?.remove();
@@ -86,7 +86,8 @@ window.NiixyAccountApplied = (() => {
         if (!catalog) {
           const response = await fetch(pane.dataset.appliedDataUrl, {cache: 'no-store'});
           if (!response.ok) throw new Error('一覧を読み込めませんでした。');
-          catalog = (await response.json()).catalog;
+          catalog = (await NiixyUI.readJsonResponse(response)).catalog;
+          if (!catalog) throw new Error('ログイン状態を確認してください。入力内容を保持しています。');
         }
         if (!current() || generation !== revision) return;
         const applied = kind === 'field' ? data.direct_fields : data.interfaces;
