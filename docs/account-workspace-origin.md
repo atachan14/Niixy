@@ -1,5 +1,7 @@
 # AccountPage起点のWorkspace切替
 
+> 2026-10-06の未公開後続修正: Board / Peopleのnative切替、People同段tab、Pane余白・Module Header、最終QAと残る仕様差は[AccountPage Paneの切替と表示統一](account-pane-consistency.md)を参照。以下は先行工程の記録として保持する。
+
 2026-10-06の追加ユーザー訂正。AccountPageからBoard / Peopleを開いたときは、AccountPageを起点として後続Paneを置き換える。既存の共通Workspace prepare / push / Close / historyを使用する。
 
 ## 修正前の再現

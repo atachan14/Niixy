@@ -203,7 +203,7 @@ window.NiixyWorkspaceTrail = (() => {
   }
 
   function showError(entry, error) {
-    if (!entry.pane.isConnected || error.name === 'AbortError') return;
+    if (!entry.pane.isConnected || entry.abort.signal.aborted || error.name === 'AbortError') return;
     entry.body.innerHTML = '<p class="ui-pane-status has-load-error"></p>';
     entry.body.firstElementChild.textContent = error.message || '読み込みに失敗しました。';
   }
@@ -301,7 +301,7 @@ window.NiixyWorkspaceTrail = (() => {
         }).catch((error) => showError(moduleEntry, error));
       }
     });
-    fetchInto(entry, listUrl, kind === 'account-if' ? '.applied-list-content' : null).then(() => {
+    fetchInto(entry, listUrl, kind === 'account-if' ? '.applied-list-content' : kind === 'module' ? '[data-module-public]' : null).then(() => {
       NiixyUI.bindTabs(entry.body);
       const modules = entry.body.querySelector('[data-module-public]');
       if (modules) NiixyUI.bindModuleFilters(modules, {type:'element', subtype:'field', collection:'self'}, {onChange:state => {
@@ -493,26 +493,31 @@ window.NiixyWorkspaceTrail = (() => {
     return loadBoard().then(() => boardEntry).catch((error) => showError(boardEntry, error));
     }
 
-  function openRoomList(trail, room, kind, origin, restoreParams = null) {
+  function openRoomList(trail, room, kind, origin, restoreParams = null, nativeEntry = null) {
     const boards = kind === 'boards';
     const accountScope = Boolean(room.dataset.accountPageUrl);
     const pageUrl = room.dataset.accountPageUrl || room.dataset.roomPageUrl;
     const listParams = accountScope ? {pane: 'board'} : {[kind]: 1};
     const initial = restoreParams || new URLSearchParams();
     const threadSource = accountScope ? {dataset: {...room.dataset, threadDetailTemplate: room.dataset.boardThreadDetailTemplate}} : room;
-    const entry = trail.push({
+    const entry = nativeEntry || trail.push({
       title: boards ? 'Board一覧' : '参加者一覧',
       width: 'fixed',
       url: childUrl(pageUrl, {...listParams, collection: initial.get('collection'), tab: initial.get('tab')}),
       after: origin,
     });
+    // Child Close snapshots the list URL, including when restoring a deep link.
+    if (nativeEntry && (initial.has('board') || initial.has('thread'))) {
+      entry.url = childUrl(pageUrl, {...listParams, collection:initial.get('collection'), tab:initial.get('tab')}).href;
+      history.replaceState(history.state, '', entry.url);
+    }
     const listUrl = boards ? room.dataset.boardsUrl : room.dataset.membersUrl;
     const fields = JSON.parse(room.querySelector('#board-pane-field-catalog, #room-pane-field-catalog')?.textContent || '[]');
     const interfaces = JSON.parse(room.querySelector('#board-pane-interface-catalog, #room-pane-interface-catalog')?.textContent || '[]');
 
     let listAccountConditions = null;
     entry.dispose = () => listAccountConditions?.destroy();
-    entry.pane.addEventListener('ui-workspace-retain', () => listAccountConditions?.close());
+    entry.pane.addEventListener('ui-workspace-retain', () => listAccountConditions?.close(), {signal:entry.abort.signal});
     const loadList = async (collectionId = null) => {
       listAccountConditions?.destroy();
       listAccountConditions = null;
@@ -528,8 +533,8 @@ window.NiixyWorkspaceTrail = (() => {
           track: trail.track,
           setStage: (stage) => {
             if (stage === 'room-list') {
-              trail.discardAfter(entry);
-              trail.align(entry);
+              if (entry.native) {trail.discardAfter(); entry.align();}
+              else {trail.discardAfter(entry); trail.align(entry);}
               return;
             }
             const selector = {
@@ -563,17 +568,17 @@ window.NiixyWorkspaceTrail = (() => {
       }
     };
 
-    entry.body.addEventListener('niixy:collections-refreshed', () => initializeCollectionControls(entry.body));
-    const openBoard = (board) => openBoardPane(trail, room, board, entry, () => loadList().catch((error) => showError(entry, error)));
+    entry.body.addEventListener('niixy:collections-refreshed', () => initializeCollectionControls(entry.body), {signal:entry.abort.signal});
+    const openBoard = (board) => openBoardPane(trail, room, board, entry.native ? entry.pane : entry, () => loadList().catch((error) => showError(entry, error)));
 
     entry.body.addEventListener('focusin', (event) => {
       const input = event.target;
       if (!input.matches('input:not([type="hidden"]), textarea, select')
         || !input.closest('[data-board-action-kind="create"]')) return;
       requestAnimationFrame(() => {
-        if (entry.pane.isConnected && document.activeElement === input) trail.align(entry);
+        if (entry.pane.isConnected && !entry.abort.signal.aborted && document.activeElement === input) {if (entry.native) entry.align(); else trail.align(entry);}
       });
-    });
+    }, {signal:entry.abort.signal});
     entry.body.addEventListener('click', (event) => {
       const tab = event.target.closest('[data-ui-tab]');
       if (tab) {
@@ -583,7 +588,7 @@ window.NiixyWorkspaceTrail = (() => {
       }
       const board = event.target.closest('[data-open-board]');
       if (board) openBoard(board);
-    });
+    }, {signal:entry.abort.signal});
     entry.body.addEventListener('submit', async (event) => {
       const form = event.target.closest('[data-board-action], [data-collection-action]');
       if (!form) return;
@@ -599,7 +604,7 @@ window.NiixyWorkspaceTrail = (() => {
           if (board) openBoard(board);
         }
       } catch (error) { showError(entry, error); }
-    }, true);
+    }, {capture:true, signal:entry.abort.signal});
     return loadList().then(async () => {
       const tab = initial.get('tab');
       if (tab) entry.body.querySelector(`[data-ui-tab="${CSS.escape(tab)}"]`)?.click();
@@ -740,7 +745,7 @@ window.NiixyWorkspaceTrail = (() => {
     return entry;
   }
 
-  return {openReferenceBoard, openContentPane, openReviewEditor, openMapBoard, openBoards, prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
+  return {openReferenceBoard, openContentPane, openReviewEditor, openMapBoard, openBoards, loadAccountBoards:(account,entry,params) => openRoomList(trail,account,'boards',null,params,entry), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
     if (preserveUrl) history.replaceState(history.state, '', url);

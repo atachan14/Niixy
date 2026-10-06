@@ -39,11 +39,13 @@
         <div class="account-static-track">
           <section id="account-if-list-pane" class="ui-list-pane account-static-list-pane" aria-label="Applied一覧">
             <header class="ui-pane-header ui-list-pane-header"><h2>Applied一覧</h2><button id="close-account-if-list" class="icon-button" type="button" aria-label="Profileに戻る">×</button></header>
-            <div class="account-static-column" data-account-applied-container></div>
+            <div data-account-applied-container></div>
           </section>
 
         </div>
       </section>
+      {% with feature_kind="board" feature_label="Board" %}{% include 'accounts/partials/feature_list_workspace.html' %}{% endwith %}
+      {% with feature_kind="people" feature_label="People" %}{% include 'accounts/partials/feature_list_workspace.html' %}{% endwith %}
     </div>
   </div>
 </section>

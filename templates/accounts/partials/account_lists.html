@@ -1,12 +1,12 @@
-<section class="account-list-content" data-account-lists-index data-list-fetch-url="{{ summary_page_url }}" data-list-page-url="{% url 'accounts:detail' account.username %}?pane=people" data-list-title="People一覧">
+<section class="account-list-content account-feature-content" data-account-lists-index data-list-fetch-url="{{ summary_page_url }}" data-list-page-url="{% url 'accounts:detail' account.username %}?pane=people" data-list-title="People一覧">
   <div class="ui-tabs" role="tablist" aria-label="Peopleの種類">
-    <button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="lists">AccountList</button>
-    {% for list in summary_page %}<button type="button" role="tab" aria-selected="false" data-ui-tab="list-{{ list.pk }}" data-list-tab-id="{{ list.pk }}" data-list-tab-url="{% url 'accounts:list-page' list.pk %}">{{ list.name }}</button>{% endfor %}
-    <button type="button" role="tab" aria-selected="false" data-ui-tab="love">Love</button>
-    <button type="button" role="tab" aria-selected="false" data-ui-tab="hate">Hate</button>
+    <button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="love">Love</button><button type="button" role="tab" aria-selected="false" data-ui-tab="hate">Hate</button>
+    {% for list in people_lists %}<button type="button" role="tab" aria-selected="false" data-ui-tab="list-{{ list.pk }}" data-list-tab-id="{{ list.pk }}">{{ list.name }}</button>{% endfor %}
   </div>
-  <section class="ui-tab-panel is-active" data-ui-tab-panel="lists">{% include 'accounts/partials/account_list_items.html' %}</section>
-  {% for list in summary_page %}<section class="ui-tab-panel" data-ui-tab-panel="list-{{ list.pk }}"><a class="account-list-summary muter-summary" href="{% url 'accounts:list-page' list.pk %}" data-account-list-id="{{ list.pk }}"><span>{{ list.name }}</span><span><span data-list-count>{{ list.reference_count }}</span> Accounts</span></a></section>{% endfor %}
-  <section class="ui-tab-panel" data-ui-tab-panel="love"><p class="empty">未実装</p></section>
-  <section class="ui-tab-panel" data-ui-tab-panel="hate"><p class="empty">未実装</p></section>
+  <section class="ui-tab-panel account-feature-column is-active" data-ui-tab-panel="love"><div class="ui-summary-list">{% for review in loved_accounts %}{% include 'accounts/partials/account_summary.html' with summary_account=review.target added_at=review.updated_at feature_summary=True timestamp_label="Review更新" %}{% empty %}<p class="empty">LoveしたAccountはありません。</p>{% endfor %}</div></section>
+  <section class="ui-tab-panel account-feature-column" data-ui-tab-panel="hate"><div class="ui-summary-list">{% for review in hated_accounts %}{% include 'accounts/partials/account_summary.html' with summary_account=review.target added_at=review.updated_at feature_summary=True timestamp_label="Review更新" %}{% empty %}<p class="empty">HateしたAccountはありません。</p>{% endfor %}</div></section>
+  {% for list in people_lists %}<section class="ui-tab-panel account-feature-column" data-ui-tab-panel="list-{{ list.pk }}">
+    <p class="people-list-actions"><a class="button secondary" href="{% url 'accounts:list-page' list.pk %}" data-people-list-detail>Listの詳細・管理</a></p>
+    <div class="ui-summary-list">{% for reference in list.visible_references %}{% if reference.target %}{% include 'accounts/partials/account_summary.html' with summary_account=reference.target added_at=reference.created_at feature_summary=True %}{% else %}<p class="empty">削除されました</p>{% endif %}{% empty %}<p class="empty">表示できるAccount参照はありません。</p>{% endfor %}</div>
+  </section>{% endfor %}
 </section>

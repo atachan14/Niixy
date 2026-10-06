@@ -91,23 +91,25 @@ class ModuleListBrowserTests(StaticLiveServerTestCase):
                             expect(page.locator('[data-list-operation=add] [name=target_url]')).to_have_value('/fields/pending/')
                             page.screenshot(path=str(output/(viewport+'-saved-list.png')),full_page=True)
                             page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
-                            # Create through the integrated entry, then see its new third tab.
-                            root.locator('[data-reference-title="Module List管理"]').click();wait_for_trail_count(page,1)
-                            index=page.locator('[data-account-lists-index]');create=index.locator('[data-list-operation=create]')
+                            # List creation stays available in the add-to-List picker.
+                            panel.locator('.content-reference-summary:visible').click();wait_for_trail_count(page,1)
+                            page.locator('[data-account-list-picker-url]').click();wait_for_trail_count(page,2)
+                            picker=page.locator('[data-account-list-picker]');create=picker.locator('[data-list-operation=create]')
                             create.locator('[name=name]').fill('New '+viewport);create.locator('button[type=submit]').click()
-                            wait_for_trail_count(page,2)
+                            wait_for_trail_count(page,3)
                             expect(root.locator('[data-module-collection]').last).to_have_text('New '+viewport)
                             new_detail=page.locator('[data-account-list-detail]')
                             new_detail.locator('summary').filter(has_text='Listの管理').click()
-                            page.once('dialog',lambda d:d.accept());new_detail.locator('[data-list-operation=delete] button').click();wait_for_trail_count(page,1)
+                            page.once('dialog',lambda d:d.accept());new_detail.locator('[data-list-operation=delete] button').click();wait_for_trail_count(page,2)
                             expect(root.locator('[data-module-collection]').last).to_have_text('Mixed List B')
-                            page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
+                            for count in (1,0):
+                                page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,count)
                             # Restore the shared fixture name for the other viewport.
                             response=context.request.post(self.live_server_url+route('interface','list-rename',self.content_list.pk),form={'name':'Mixed List A'},headers={'X-CSRFToken':page.locator('[name=csrfmiddlewaretoken]').first.input_value()})
                             self.assertEqual(response.status,200)
                             # Board's tabs retain original placement creation and input on refresh.
                             page.goto(self.live_server_url+reverse('accounts:detail',args=[self.owner.username]))
-                            page.locator('[data-open-account-boards]').click();wait_for_trail_count(page,1)
+                            page.locator('[data-open-account-boards]').click();wait_for_trail_count(page,0)
                             boards=page.locator('[data-integrated-kind=board]')
                             expect(boards.locator('[data-ui-tab]:visible')).to_have_text(['自作','fav','bad','Main','未分類'])
                             main_id=self.main_id
@@ -116,13 +118,12 @@ class ModuleListBrowserTests(StaticLiveServerTestCase):
                             collection.locator('[data-collection-create-toggle]').click()
                             input_=collection.locator('[data-board-action-kind=create] [name=name]');input_.fill('Kept Board input')
                             collection.evaluate('el=>window.qaBoardCollection=el')
-                            boards.locator('[data-reference-title="Board List管理"]').click();wait_for_trail_count(page,2)
-                            idx=page.locator('[data-account-lists-index]');idx.locator('[data-list-operation=create] [name=name]').fill('New Board '+viewport)
-                            idx.locator('[data-list-operation=create] button').click();wait_for_trail_count(page,3)
+                            # Existing API creation triggers the same targeted refresh without
+                            # introducing an AccountPage create entry or replacing the draft DOM.
+                            response=context.request.post(self.live_server_url+route('board','list-create'),form={'name':'New Board '+viewport,'submission_id':str(uuid4())},headers={'X-CSRFToken':page.locator('[name=csrfmiddlewaretoken]').first.input_value()})
+                            self.assertEqual(response.status,201);new_board_id=response.json()['list_id']
+                            page.evaluate("()=>document.dispatchEvent(new CustomEvent('niixy:content-list-changed',{detail:{kind:'board'}}))")
                             expect(boards.locator('[data-ui-tab]:visible')).to_have_text(['自作','fav','bad','Main','New Board '+viewport,'未分類'])
-                            new_board_id=page.locator('[data-account-list-detail]').get_attribute('data-list-id')
-                            page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,2)
-                            page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,1)
                             self.assertTrue(collection.evaluate('el=>el===window.qaBoardCollection'));expect(input_).to_have_value('Kept Board input')
                             page.screenshot(path=str(output/(viewport+'-board-tabs.png')),full_page=True)
                             # Remove the newly created list to reset the mobile fixture.

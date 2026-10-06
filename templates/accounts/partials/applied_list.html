@@ -1,8 +1,8 @@
 <section class="ui-list-pane applied-list-pane" data-applied-pane data-applied-data-url="{% url 'accounts:applied-data' account.username %}" data-applied-change-url="{% url 'accounts:applied-change' account.username %}">
   <header class="ui-pane-header ui-list-pane-header"><h2>Applied一覧</h2><button class="icon-button" type="button" data-close-applied aria-label="戻る">×</button></header>
-  <div class="applied-list-content">
+  <div class="applied-list-content{% if not edit_mode %} account-feature-content{% endif %}">
     <div class="ui-tabs" role="tablist" aria-label="Appliedの種類"><button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="applied-field">Field</button><button type="button" role="tab" aria-selected="false" data-ui-tab="applied-interface">AccountIF</button></div>
-    <section class="ui-tab-panel is-active" data-ui-tab-panel="applied-field">
+    <section class="ui-tab-panel{% if not edit_mode %} account-feature-column{% endif %} is-active" data-ui-tab-panel="applied-field">
       {% if edit_mode %}<div class="applied-actions"><form data-applied-picker>{% csrf_token %}<button class="button secondary" type="button" data-add-applied="field">Fieldを追加</button></form></div>{% endif %}
       <div class="ui-summary-list">{% for item in applied.fields %}
         {% if edit_mode %}<button type="button" class="ui-summary-item" data-edit-applied-field="{{ item.id }}">{% else %}<div class="ui-summary-item">{% endif %}
@@ -10,7 +10,7 @@
         {% if edit_mode %}</button>{% else %}</div>{% endif %}
       {% empty %}<p class="empty">適用済みFieldはありません。</p>{% endfor %}</div>
     </section>
-    <section class="ui-tab-panel" data-ui-tab-panel="applied-interface">
+    <section class="ui-tab-panel{% if not edit_mode %} account-feature-column{% endif %}" data-ui-tab-panel="applied-interface">
       {% if edit_mode %}<div class="applied-actions"><form data-applied-picker>{% csrf_token %}<button class="button secondary" type="button" data-add-applied="interface">AccountIFを追加</button></form></div>{% endif %}
       <div class="ui-summary-list">{% for item in applied.interfaces %}
         <div class="applied-interface-item">

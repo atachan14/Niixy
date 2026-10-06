@@ -1,223 +1,191 @@
-"""AccountPage tab correction: isolated SQLite and local Edge only."""
+"""Current People navigation and scoped feature padding; isolated SQLite only."""
+import json
 from pathlib import Path
 from uuid import uuid4
-
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
-from django.test import TestCase
+from django.test import TestCase,Client
 from django.urls import reverse
-
 from accounts.content_lists import route
-from accounts.models import AccountList
+from accounts.models import AccountList,AccountListReference,AccountMute,AccountReview
 from interfaces.models import InterfaceDraft
 from interfaces.services import publish_draft
 from scripts.browser_test_server import SharedSQLiteStaticFilesHandler
 from scripts.nightly_qa_tests import seed
+from events.models import Thread,ThreadPost,ThreadAccessRule
 
 
 def setup(case):
     seed(case)
-    case.second_list = AccountList.objects.create(owner=case.owner, name='Second People', submission_id=uuid4())
-    case.own_interface, _ = publish_draft(InterfaceDraft.objects.create(
-        creator=case.owner, kind='thread', name='Own Published IF').pk)
-    InterfaceDraft.objects.create(creator=case.owner, interface=case.own_interface,
-        kind='thread', name='PRIVATE OWN DRAFT', description='PRIVATE OWN BODY')
+    case.second_list=AccountList.objects.create(owner=case.owner,name='Second People',submission_id=uuid4())
+    case.own_interface,_=publish_draft(InterfaceDraft.objects.create(creator=case.owner,kind='thread',name='Own Published IF').pk)
+    InterfaceDraft.objects.create(creator=case.owner,interface=case.own_interface,kind='thread',name='PRIVATE OWN DRAFT',description='PRIVATE OWN BODY')
 
 
 class AccountListTabTests(TestCase):
-    def setUp(self):
-        setup(self)
+    def setUp(self):setup(self)
 
-    def test_people_preserves_fixed_tabs_and_real_list_links_for_guest(self):
-        self.client.logout()
-        response = self.client.get(reverse('accounts:list-index', args=[self.owner.username]))
-        html = response.content.decode()
-        self.assertLess(html.index('data-ui-tab="lists"'), html.index('data-ui-tab="list-'))
-        self.assertLess(html.index('data-ui-tab="list-'), html.index('data-ui-tab="love"'))
-        self.assertLess(html.index('data-ui-tab="love"'), html.index('data-ui-tab="hate"'))
-        self.assertContains(response, 'QA People')
-        self.assertContains(response, route('interface', 'list-page', self.interface_list.pk), count=0)
-        self.assertNotContains(response, 'AccountListA')
-        self.assertNotContains(response, 'data-account-list-form')
-        self.assertContains(response, 'data-ui-tab-panel="love"><p class="empty">未実装')
-        self.assertContains(response, 'data-ui-tab-panel="hate"><p class="empty">未実装')
+    def test_people_inline_order_all_lists_and_existing_public_reviews(self):
+        for index in range(23):AccountList.objects.create(owner=self.owner,name=f'People {index}',submission_id=uuid4())
+        self.client.logout();response=self.client.get(reverse('accounts:list-index',args=[self.owner.username]));html=response.content.decode()
+        self.assertLess(html.index('data-ui-tab="love"'),html.index('data-ui-tab="hate"'))
+        self.assertLess(html.index('data-ui-tab="hate"'),html.index('data-ui-tab="list-'))
+        self.assertEqual(len(response.context['people_lists']),25)
+        self.assertContains(response,'People 22');self.assertContains(response,self.target.username)
+        self.assertContains(response,'Review更新');self.assertContains(response,'追加 ')
+        self.assertContains(response,reverse('accounts:list-page',args=[self.account_list.pk]))
+        for absent in ['data-ui-tab="lists"','data-account-list-form','data-list-tab-url','PRIVATE OWN']:
+            self.assertNotContains(response,absent)
+        self.assertNotContains(response,route('interface','list-page',self.interface_list.pk))
+        AccountMute.objects.create(muter=self.owner,muted_account=self.target)
+        self.client.force_login(self.owner)
+        self.assertNotContains(self.client.get(reverse('accounts:list-index',args=[self.owner.username])),self.target.username)
+        self.assertTrue(self.account_list.references.filter(target=self.target).exists())
+        self.assertTrue(AccountReview.objects.filter(author=self.owner,target=self.target).exists())
 
-    def test_interface_self_uses_published_versions_only_and_gets_do_not_write(self):
+    def test_published_module_reads_do_not_write(self):
         from django.apps import apps
-        models = [m for m in apps.get_models() if m._meta.app_label in {'accounts', 'interfaces', 'rooms'}]
-        before = {m: list(m.objects.order_by('pk').values()) for m in models}
-        self.client.logout()
-        response = self.client.get(route('interface', 'list-index', self.owner.username))
-        self.assertContains(response, 'QA IFs')
-        self.assertNotContains(response, 'PRIVATE OWN')
-        self.assertNotContains(response, 'data-module-collection="saved"')
-        self.assertNotContains(response, 'data-account-list-form')
-        module = self.client.get(reverse('accounts:module-pane', args=[self.owner.username]))
-        for kind in ['element', 'interface', 'layout']:
-            self.assertContains(module, 'data-module-type="'+kind+'"')
-        self.assertNotContains(module, 'PRIVATE OWN')
-        self.assertContains(module, 'Own Published IF')
-        self.assertNotContains(module, 'data-module-collection="saved"')
-        self.client.get(reverse('accounts:list-index', args=[self.owner.username]))
-        for model, rows in before.items():
-            self.assertEqual(list(model.objects.order_by('pk').values()), rows, model.__name__)
+        models=[m for m in apps.get_models() if m._meta.app_label in {'accounts','interfaces','rooms'}]
+        before={m:list(m.objects.order_by('pk').values()) for m in models};self.client.logout()
+        for url in [route('interface','list-index',self.owner.username),reverse('accounts:module-pane',args=[self.owner.username]),reverse('accounts:list-index',args=[self.owner.username])]:
+            response=self.client.get(url);self.assertEqual(response.status_code,200)
+            self.assertNotContains(response,'PRIVATE OWN');self.assertNotContains(response,'data-account-list-form')
+        for m,rows in before.items():self.assertEqual(list(m.objects.order_by('pk').values()),rows,m.__name__)
 
-    def test_empty_owner_can_create_and_nonowner_gets_no_create_form(self):
-        for url in [reverse('accounts:list-index', args=[self.target.username]),
-                    route('interface', 'list-index', self.target.username)]:
-            self.assertNotContains(self.client.get(url), 'data-account-list-form')
+    def test_creation_remains_in_picker_and_owner_api_only(self):
+        for user in [self.owner,self.target]:
+            self.client.force_login(user)
+            self.assertNotContains(self.client.get(reverse('accounts:list-index',args=[user.username])),'data-list-operation="create"')
+        self.client.force_login(self.owner)
+        self.assertContains(self.client.get(reverse('accounts:list-picker',args=[self.target.username])),'data-list-operation="create"')
+        response=self.client.post(reverse('accounts:list-create'),{'name':'Picker List','submission_id':uuid4(),'target_url':reverse('accounts:detail',args=[self.target.username])})
+        self.assertEqual(response.status_code,201)
+        self.assertTrue(AccountList.objects.get(pk=response.json()['list_id']).references.filter(target=self.target).exists())
         self.client.force_login(self.target)
-        for url in [reverse('accounts:list-index', args=[self.target.username]),
-                    route('interface', 'list-index', self.target.username)]:
-            self.assertContains(self.client.get(url), 'data-list-operation="create"')
+        self.assertEqual(self.client.post(reverse('accounts:list-rename',args=[self.account_list.pk]),{'name':'Stolen'}).status_code,404)
 
 
 class AccountListTabBrowserTests(StaticLiveServerTestCase):
-    static_handler = SharedSQLiteStaticFilesHandler
+    static_handler=SharedSQLiteStaticFilesHandler
+    def setUp(self):setup(self)
 
+    def test_pc_mobile_inline_lists_retained_input_and_stale_children(self):
+        from playwright.sync_api import sync_playwright,expect
+        from scripts.browser_smoke import wait_for_trail_count
+        output=Path(settings.BASE_DIR)/'.artifacts'/'account-list-tabs';output.mkdir(parents=True,exist_ok=True)
+        with sync_playwright() as pw:
+            browser=pw.chromium.launch(channel='msedge',headless=True)
+            try:
+                for viewport,size in [('desktop',{'width':1280,'height':900}),('mobile',{'width':390,'height':844})]:
+                    context=browser.new_context(viewport=size,is_mobile=viewport=='mobile',has_touch=viewport=='mobile')
+                    context.add_cookies([{'name':settings.SESSION_COOKIE_NAME,'value':self.client.cookies[settings.SESSION_COOKIE_NAME].value,'url':self.live_server_url}])
+                    page=context.new_page();errors=[]
+                    page.on('pageerror',lambda e:errors.append(str(e)))
+                    page.on('console',lambda m:errors.append(m.text) if m.type=='error' and not m.location.get('url','').endswith('/favicon.ico') else None)
+                    try:
+                        url=self.live_server_url+reverse('accounts:detail',args=[self.owner.username]);page.goto(url)
+                        page.locator('[data-open-account-people]').click();wait_for_trail_count(page,0)
+                        index=page.locator('[data-account-lists-index]');expect(index.locator('[role=tab]')).to_have_text(['Love','Hate','QA People','Second People'])
+                        expect(index.locator('[data-ui-tab-panel=love]')).to_contain_text(self.target.username)
+                        expect(index.locator('[data-list-operation=create]')).to_have_count(0)
+                        tab=index.locator(f'[data-list-tab-id="{self.account_list.pk}"]');tab.click();wait_for_trail_count(page,0)
+                        panel=index.locator(f'[data-ui-tab-panel="list-{self.account_list.pk}"]');expect(panel.locator('.account-summary')).to_have_count(1)
+                        panel.locator('[data-people-list-detail]').click();wait_for_trail_count(page,1)
+                        detail=page.locator('[data-account-list-detail]');add=detail.locator('[data-list-operation=add] [name=target_url]')
+                        add.fill(url);detail.evaluate('el=>window.qaList=el')
+                        detail.locator('.account-summary').first.click();wait_for_trail_count(page,2)
+                        nested=page.locator('[data-account-fragment]');nested.locator('[data-open-account-people]').click();wait_for_trail_count(page,3)
+                        nested.locator('[data-open-account-modules]').evaluate('el=>el.click()');wait_for_trail_count(page,3)
+                        expect(page.locator('[data-module-public]')).to_have_count(1);expect(page.locator('[data-account-lists-index]')).to_have_count(1)
+                        for count in (2,1):page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,count)
+                        self.assertTrue(detail.evaluate('el=>el===window.qaList'));expect(add).to_have_value(url)
+                        detail.locator('[data-list-operation=add] [type=submit]').click()
+                        expect(detail.locator('.account-summary')).to_have_count(2);expect(panel.locator('.account-summary')).to_have_count(2)
+                        detail.locator('summary').filter(has_text='Listの管理').click()
+                        rename=detail.locator('[data-list-operation=rename]');rename.locator('[name=name]').fill('Renamed People')
+                        rename.locator('[type=submit]').click();expect(tab).to_have_text('Renamed People')
+                        page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
+                        # An inline fixed tab cancels a pending child without replacing this index.
+                        index.evaluate('el=>window.qaIndex=el')
+                        page.evaluate("""()=>{window.qaFetch=fetch;window.fetch=(...a)=>{if(!String(a[0]).includes('/pane/')||!String(a[0]).includes('lists/'))return window.qaFetch(...a);a[1]={...a[1],signal:undefined};return window.qaFetch(...a).then(r=>new Promise(resolve=>{window.qaRelease=()=>resolve(r);}));};}""")
+                        panel.locator('[data-people-list-detail]').click();wait_for_trail_count(page,1);page.wait_for_function('typeof window.qaRelease==="function"')
+                        index.locator('[data-ui-tab=hate]').evaluate('el=>el.click()');wait_for_trail_count(page,0)
+                        page.evaluate('()=>{window.qaRelease();window.fetch=window.qaFetch;}');page.wait_for_timeout(150)
+                        wait_for_trail_count(page,0);self.assertTrue(index.evaluate('el=>el===window.qaIndex'))
+                        tab.click();page.screenshot(path=output/f'{viewport}-inline-list.png',full_page=True)
+                        page.reload();expect(tab).to_have_attribute('aria-selected','true');wait_for_trail_count(page,0)
+                        # Restore name for the next viewport, and retain direct shared List URLs.
+                        csrf=page.locator('[name=csrfmiddlewaretoken]').first.input_value()
+                        response=context.request.post(self.live_server_url+reverse('accounts:list-rename',args=[self.account_list.pk]),form={'name':'QA People'},headers={'X-CSRFToken':csrf});self.assertEqual(response.status,200)
+                        response=context.request.post(self.live_server_url+reverse('accounts:list-add',args=[self.account_list.pk]),form={'target_url':url},headers={'X-CSRFToken':csrf});self.assertEqual(response.status,200)
+                        ref_id=response.json()['reference_id']
+                        response=context.request.post(self.live_server_url+reverse('accounts:list-remove',args=[self.account_list.pk,ref_id]),headers={'X-CSRFToken':csrf});self.assertEqual(response.status,200)
+                        page.goto(self.live_server_url+reverse('accounts:list-page',args=[self.account_list.pk]));wait_for_trail_count(page,1)
+                        expect(detail.locator('[data-list-operation=add]')).to_be_visible()
+                        context.clear_cookies();page.reload();wait_for_trail_count(page,1)
+                        expect(detail.locator('[data-account-list-form]')).to_have_count(0);self.assertEqual(errors,[])
+                    finally:context.close()
+            finally:browser.close()
+
+
+class AccountFeatureLayoutTests(StaticLiveServerTestCase):
+    static_handler=SharedSQLiteStaticFilesHandler
     def setUp(self):
         setup(self)
+        thread=Thread.objects.create(creator=self.owner,title='Gutter Thread')
+        ThreadPost.objects.create(thread=thread,creator=self.owner,number=1,body='Gutter body')
+        ThreadAccessRule.objects.bulk_create([ThreadAccessRule(thread=thread,capability=c,audience=a) for c in ['view','write'] for a in ['guest','account']])
 
-    def test_pc_mobile_tabs_lists_origin_retention_and_late_responses(self):
-        from playwright.sync_api import sync_playwright, expect
+    def test_owner_other_guest_native_and_nested_layout_pc_mobile(self):
+        from playwright.sync_api import sync_playwright,expect
         from scripts.browser_smoke import wait_for_trail_count
-        output = Path(settings.BASE_DIR) / '.artifacts' / 'account-list-tabs'
-        output.mkdir(parents=True, exist_ok=True)
+        output=Path(settings.BASE_DIR)/'.artifacts'/'account-feature-layout';output.mkdir(parents=True,exist_ok=True);rows=[]
+        sessions={}
+        for role,user in [('owner',self.owner),('other',self.target)]:
+            client=Client();client.force_login(user);sessions[role]=client.cookies[settings.SESSION_COOKIE_NAME].value
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(channel='msedge', headless=True)
+            browser=pw.chromium.launch(channel='msedge',headless=True)
             try:
-                for viewport, size in [('desktop', {'width':1280,'height':720}), ('mobile', {'width':390,'height':844})]:
-                    for kind in ['account']:
-                        with self.subTest(viewport=viewport, kind=kind):
-                            context = browser.new_context(viewport=size, is_mobile=viewport=='mobile', has_touch=viewport=='mobile')
-                            context.add_cookies([{'name':settings.SESSION_COOKIE_NAME,
-                                'value':self.client.cookies[settings.SESSION_COOKIE_NAME].value,'url':self.live_server_url}])
-                            page = context.new_page()
-                            page.set_default_timeout(10000)
-                            errors = []
-                            page.on('pageerror', lambda e:errors.append(str(e)))
-                            page.on('console', lambda m:errors.append(m.text) if m.type=='error' and not m.location.get('url','').endswith('/favicon.ico') else None)
-                            try:
-                                page.goto(self.live_server_url+reverse('accounts:detail', args=[self.owner.username]))
-                                page.locator('[data-open-account-people]').click()
-                                item = self.account_list
-                                tabs = ['AccountList','QA People','Second People','Love','Hate']
-                                detail_url = reverse('accounts:list-page',args=[item.pk])
-                                new_target = reverse('accounts:detail',args=[self.owner.username])
-                                wait_for_trail_count(page,1)
-                                index = page.locator('[data-account-lists-index]')
-                                expect(index.locator('[role=tab]')).to_have_text(tabs)
-                                index.locator('[data-ui-tab=lists]').click()
-                                create = index.locator('[data-list-operation=create]')
-                                draft = kind+' pending '+viewport
-                                create.locator('[name=name]').fill(draft)
-                                index.evaluate('el=>{window.qaIndex=el;}')
-                                # Name tab opens the existing List to the right. Fixed
-                                # tab switches remove only children and retain draft DOM.
-                                index.locator(f'[data-list-tab-id="{item.pk}"]').click()
-                                wait_for_trail_count(page,2)
-                                detail = page.locator('[data-account-list-detail]')
-                                expect(detail).to_be_visible()
-                                add = detail.locator('[data-list-operation=add]')
-                                add.locator('[name=target_url]').fill(self.live_server_url+new_target)
-                                add.locator('[type=submit]').click()
-                                if kind == 'account':
-                                    expect(detail.locator('[data-account-reference]')).to_have_count(2)
-                                    expect(index.locator('[data-ui-tab-panel=lists] [data-list-count]').first).to_have_text('2')
-                                else:
-                                    expect(detail.locator('[data-content-reference]')).to_have_count(2)
-                                    expect(index.locator('[data-ui-tab-panel=lists] [data-list-count]')).to_have_text('2')
-                                page.locator('.ui-workspace-trail-header .icon-button').last.click()
-                                wait_for_trail_count(page,1)
-                                index.locator('[data-ui-tab=lists]').click()
-                                expect(create.locator('[name=name]')).to_have_value(draft)
-                                self.assertTrue(page.evaluate('window.qaIndex===document.querySelector("[data-account-lists-index]")'))
-                                for tab in (['love','hate'] if kind=='account' else ['search','self']):
-                                    index.locator(f'[data-ui-tab={tab}]').click()
-                                    expect(index.locator(f'[data-ui-tab-panel={tab}]')).to_be_visible()
-                                page.screenshot(path=output/f'{viewport}-{kind}-fixed.png')
-                                # Hold a fetched response after ignoring its abort signal.
-                                page.evaluate("""() => {window.qaFetch=fetch;window.fetch=(...a)=>{
-                                  if(!String(a[0]).includes('/pane/') || !String(a[0]).includes('lists/'))return window.qaFetch(...a);
-                                  a[1]={...a[1],signal:undefined};return window.qaFetch(...a).then(response=>new Promise(resolve=>{window.qaRelease=()=>resolve(response);}));};} """)
-                                index.locator(f'[data-list-tab-id="{item.pk}"]').click()
-                                wait_for_trail_count(page,2)
-                                page.wait_for_function('typeof window.qaRelease==="function"')
-                                index.locator('[data-ui-tab=lists]').evaluate('el=>el.click()')
-                                wait_for_trail_count(page,1)
-                                page.evaluate('() => {window.qaRelease();window.fetch=window.qaFetch;}')
-                                page.wait_for_timeout(100)
-                                wait_for_trail_count(page,1)
-                                expect(detail).to_have_count(0)
-                                expect(create.locator('[name=name]')).to_have_value(draft)
-                                # Create remains connected; selected tab and draft guard
-                                # survive the index refresh and new detail opening.
-                                create.locator('[type=submit]').click()
-                                wait_for_trail_count(page,2)
-                                expect(index.locator('[data-list-tab-url]').last).to_have_text(draft)
-                                page.locator('.ui-workspace-trail-header .icon-button').last.click()
-                                wait_for_trail_count(page,1)
-                                index.locator('[data-list-tab-url]').last.click()
-                                wait_for_trail_count(page,2)
-                                detail.locator('summary').filter(has_text='Listの管理').click()
-                                detail.locator('[data-list-operation=rename] [name=name]').fill(draft+' renamed')
-                                detail.locator('[data-list-operation=rename] [type=submit]').click()
-                                expect(index.locator('[data-list-tab-url]').last).to_have_text(draft+' renamed')
-                                expect(page.locator('.ui-workspace-trail-header h2').last).to_have_text(draft+' renamed')
-                                # A saved detail refresh collapses its management details.
-                                detail.locator('summary').filter(has_text='Listの管理').click()
-                                page.once('dialog',lambda dialog:dialog.accept())
-                                detail.locator('[data-list-operation=delete] [type=submit]').click()
-                                wait_for_trail_count(page,1)
-                                expect(index.locator('[data-list-tab-url]')).to_have_count(2 if kind=='account' else 1)
-                                self.assertTrue(index.evaluate('''el => {
-                                    const active=el.querySelector('[data-ui-tab][aria-selected=true]').getBoundingClientRect();
-                                    const row=el.querySelector('[role=tablist]').getBoundingClientRect();
-                                    return active.left >= row.left-1 && active.right <= row.right+1;
-                                }'''))
-                                # Existing List selected through the original summary link.
-                                index.locator('[data-ui-tab-panel=lists] .account-list-summary').first.click()
-                                wait_for_trail_count(page,2)
-                                add = detail.locator('[data-list-operation=add]')
-                                add.locator('[name=target_url]').fill(self.live_server_url+new_target)
-                                if kind == 'account':
-                                    detail.locator('.account-summary').first.click()
-                                    wait_for_trail_count(page,3)
-                                    nested = page.locator('[data-account-fragment]')
-                                    nested.locator('[data-open-account-people]').click()
-                                    wait_for_trail_count(page,4)
-                                    child = page.locator('[data-account-lists-index]').last
-                                    expect(child.locator('[data-ui-tab=love]')).to_be_visible()
-                                    nested.locator('[data-open-account-modules]').evaluate('el=>el.click()')
-                                    wait_for_trail_count(page,4)
-                                    expect(page.locator('[data-module-public]')).to_have_count(1)
-                                    expect(page.locator('[data-account-lists-index]')).to_have_count(1)
-                                    page.locator('.ui-workspace-trail-header .icon-button').last.click()
-                                    wait_for_trail_count(page,3)
-                                    page.locator('.ui-workspace-trail-header .icon-button').last.click()
-                                    wait_for_trail_count(page,2)
-                                else:
-                                    detail.locator('.content-reference-summary').first.click()
-                                    wait_for_trail_count(page,3)
-                                    expect(page.locator('[data-public-interface]')).to_be_visible()
-                                    page.locator('.ui-workspace-trail-header .icon-button').last.click()
-                                    wait_for_trail_count(page,2)
-                                expect(add.locator('[name=target_url]')).to_have_value(self.live_server_url+new_target)
-                                page.screenshot(path=output/f'{viewport}-{kind}-list.png')
-                                # Reload canonical URL and read it as Guest. Authorization
-                                # stays in existing API suites as well as this UI check.
-                                page.goto(self.live_server_url+detail_url)
-                                wait_for_trail_count(page,1)
-                                expect(detail.locator('[data-list-operation=add]')).to_be_visible()
-                                context.clear_cookies()
-                                page.reload()
-                                wait_for_trail_count(page,1)
-                                expect(detail.locator('[data-account-list-form]')).to_have_count(0)
+                for viewport,size in [('desktop',{'width':1280,'height':900}),('mobile',{'width':390,'height':844})]:
+                    for role,user in [('owner',self.owner),('other',self.target),('guest',None)]:
+                        context=browser.new_context(viewport=size,is_mobile=viewport=='mobile',has_touch=viewport=='mobile')
+                        if user:
+                            context.add_cookies([{'name':settings.SESSION_COOKIE_NAME,'value':sessions[role],'url':self.live_server_url}])
+                        page=context.new_page();errors=[]
+                        page.on('pageerror',lambda e:errors.append(str(e)))
+                        page.on('console',lambda m:errors.append(m.text) if m.type=='error' and not m.location.get('url','').endswith('/favicon.ico') else None)
+                        try:
+                            for nested in [False,True]:
+                                url=reverse('accounts:detail',args=[self.owner.username])
+                                page.goto(self.live_server_url+('/' if nested else url))
+                                if nested:
+                                    page.evaluate('url=>NiixyWorkspaceTrail.open(url)',url);wait_for_trail_count(page,1)
+                                    origin=page.locator('[data-account-fragment]')
+                                else:origin=page.locator('.account-overview-pane')
+                                for action in ['threads','account-if','people','modules']:
+                                    origin.locator('[data-open-account-'+action+']').evaluate('el=>el.click()')
+                                    if nested:wait_for_trail_count(page,2)
+                                    expect(page.locator('.site-header')).to_contain_text(user.username) if user else expect(page.locator('.site-header')).to_contain_text('ログイン')
+                                    content=page.locator('.account-feature-content:visible').last;expect(content).to_be_visible()
+                                    expect(content.locator('[role=tab]')).not_to_have_count(0)
+                                    if action=='modules':
+                                        column=content.locator('[data-module-public-panel].is-active');expect(column).to_be_visible()
+                                        expect(content.locator('[data-module-public-panel]:visible')).to_have_count(1)
+                                        expect(content.locator('[role=tablist]:visible')).to_have_count(3)
+                                        expect(content.locator('[data-module-subtypes]:visible')).to_have_count(1)
+                                        self.assertEqual(content.evaluate('el=>el.closest(".ui-pane,.ui-workspace-trail-pane").querySelectorAll(".ui-pane-header").length'),1)
+                                    else:column=content.locator('.ui-tab-panel.is-active')
+                                    expected=16 if viewport=='mobile' else 20
+                                    page.wait_for_timeout(350)
+                                    metrics=column.evaluate('el=>{const title=el.querySelector(".ui-summary-item-title");return {padding:parseFloat(getComputedStyle(el).paddingLeft),titleGutter:title?title.getBoundingClientRect().left-el.getBoundingClientRect().left:null};}')
+                                    self.assertEqual(metrics['padding'],expected,(viewport,role,nested,action,metrics))
+                                    if action in ['threads','people']:self.assertAlmostEqual(metrics['titleGutter'],expected,delta=1)
+                                    expect(content.locator('[data-list-operation=create]')).to_have_count(0)
+                                    expect(content.locator('[data-reference-title="Board List管理"], [data-reference-title="Module List管理"]')).to_have_count(0)
+                                    rows.append({'viewport':viewport,'viewer':role,'nested':nested,'feature':action,**metrics})
+                                    self.assertAlmostEqual(content.evaluate('el=>el.closest(".ui-list-pane,.ui-workspace-trail-pane").getBoundingClientRect().right'),size['width'],delta=1)
+                                    page.screenshot(path=output/f'{viewport}-{role}-{"nested" if nested else "native"}-{action}.png',full_page=True)
                                 self.assertEqual(errors,[])
-                            except Exception:
-                                page.screenshot(path=output/f'{viewport}-{kind}-failure.png')
-                                raise
-                            finally:
-                                context.close()
-            finally:
-                browser.close()
+                        finally:context.close()
+            finally:browser.close()
+        (output/'metrics.json').write_text(json.dumps(rows,indent=2),encoding='utf-8')

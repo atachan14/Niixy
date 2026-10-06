@@ -1,5 +1,7 @@
 # AccountPage Board / Module List統合
 
+> 2026-10-06の未公開後続修正: Board / Peopleのnative切替、People同段tab、Pane余白・Module Header、最終QAと残る仕様差は[AccountPage Paneの切替と表示統一](account-pane-consistency.md)を参照。以下は先行工程の記録として保持する。
+
 2026-10-06の最新ユーザー訂正を実装。基準はlocal `8ae011cbf6a185f56fda315e805983af3ab7cc15`（Spot mobile幅修正を保全）。公開版・remoteの基準は`f0ec1d8864da13856c76c400be53b0786bcbfeed`。Version番号は追加していない。
 
 ## 最新の配置

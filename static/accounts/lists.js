@@ -56,6 +56,12 @@ window.NiixyAccountLists = (() => {
         if (root.dataset.contentListKind === 'interface') window.NiixyContentReferences.open(url, root);
         else openDetail(url, root);
       } else NiixyWorkspaceTrail.prepare(root);
+      // Prepare restores the retained parent's URL. Apply the selected People
+      // tab afterward so Close/reload cannot revert to the previous child tab.
+      if (root.hasAttribute('data-account-lists-index') && !root.dataset.contentListKind) {
+        const url=new URL(root.dataset.listPageUrl,location.origin);url.searchParams.set('people_tab',entry.selectedTab);
+        entry.url=url.href;history.replaceState(history.state,'',entry.url);
+      }
     });
     if (locked) lockControls(root);
     root.querySelectorAll('[data-list-share-url]').forEach(input => { input.value = new URL(input.value, location.origin).href; });
@@ -75,7 +81,7 @@ window.NiixyAccountLists = (() => {
         const active = tab.getAttribute('aria-selected') === 'true';
         root.querySelector(`[data-ui-tab-panel="${tab.dataset.uiTab}"]`)?.remove();
         tab.remove();
-        if (active) root.querySelector('[data-ui-tab="lists"]').click();
+        if (active) root.querySelector('[data-ui-tab]')?.click();
       } else if (result.name) tab.textContent = result.name;
     });
     document.querySelectorAll(`[data-account-list-id="${result.list_id}"]`).forEach(item => {
@@ -146,6 +152,19 @@ window.NiixyAccountLists = (() => {
     if (restore && account.closest('.account-page')) history.replaceState(history.state, '', account.dataset.accountPageUrl);
     return open(url,pageUrl,account.querySelector('.account-overview-pane') || account,'People一覧');
   }
+  async function mountIndex(account, entry, params) {
+    const url = new URL(account.dataset.accountListsUrl, location.origin);
+    if (params.get('page')) url.searchParams.set('page',params.get('page'));
+    entry.selectedTab = params.get('people_tab') || 'love';
+    return load(entry,url);
+  }
+  document.addEventListener('niixy:content-list-changed', event => {
+    if (event.detail.kind) return;
+    document.querySelectorAll('[data-account-lists-index]').forEach(root => {
+      const entry=entries.get(root);
+      if (entry && !entry.abort.signal.aborted) load(entry,entry.fetchUrl);
+    });
+  });
   function openDetail(pageUrl, source) {
     const page = new URL(pageUrl, location.origin);
     const url = new URL(page); url.pathname += 'pane/';
@@ -231,5 +250,5 @@ window.NiixyAccountLists = (() => {
       controls.forEach((control,index) => { control.disabled = disabled[index]; }); pending.restore();
     }
   });
-  return {open,openIndex,openDetail,setLocked,hasDrafts:() => [...drafts.values()].some(draft => draft.dirty), isPending:() => mutations.size > 0};
+  return {open,openIndex,mountIndex,openDetail,setLocked,hasDrafts:() => [...drafts.values()].some(draft => draft.dirty), isPending:() => mutations.size > 0};
 })();

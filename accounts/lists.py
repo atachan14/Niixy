@@ -4,7 +4,7 @@ from uuid import uuid4
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -67,7 +67,14 @@ def list_context(request, account):
 @require_GET
 @never_cache
 def listing(request, username):
-    return render(request, 'accounts/partials/account_lists.html', list_context(request, target_account(username)))
+    account = target_account(username)
+    muted = muted_account_ids(request.user)
+    references = AccountListReference.objects.select_related('target__niixy_profile').exclude(target_id__in=muted)
+    lists = AccountList.objects.filter(owner=account).order_by('created_at','pk').prefetch_related(Prefetch('references',queryset=references,to_attr='visible_references'))
+    reviewed = {sentiment: AccountReview.objects.filter(author=account,sentiment=sentiment).exclude(target_id__in=muted).select_related('target__niixy_profile') for sentiment in ('love','hate')}
+    return render(request, 'accounts/partials/account_lists.html', {
+        **list_context(request, account), 'people_lists': lists, 'loved_accounts': reviewed['love'], 'hated_accounts': reviewed['hate'],
+    })
 
 
 @require_GET

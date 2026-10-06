@@ -1,5 +1,4 @@
 <div class="room-collection-browser"{% if account_boards %} data-integrated-kind="board" data-integrated-fetch="{{ request.path }}"{% endif %}>
-  {% if account_boards %}<p><button class="button secondary" type="button" data-reference-fetch="{% url 'references:board-list-index' account.username %}" data-reference-title="Board List管理">List管理</button></p>{% endif %}
   {% if collections or board_is_owner or account_boards %}
     <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="BoardList一覧">
       {% if account_boards %}<button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="self">自作</button><button type="button" role="tab" aria-selected="false" data-ui-tab="fav">fav</button><button type="button" role="tab" aria-selected="false" data-ui-tab="bad">bad</button>{% endif %}

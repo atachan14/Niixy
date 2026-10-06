@@ -33,3 +33,18 @@
 
 .content-feedback .button.secondary:disabled { background:#f2f1ef; color:var(--muted); cursor:not-allowed; }
 .public-interface { padding:20px; min-width:0; overflow-wrap:anywhere; }
+
+/* Account feature bodies: one gutter contract, also inside shared Workspace panes. */
+.account-feature-content { --account-pane-gutter: 20px; }
+.account-list-content.account-feature-content { padding: 0; }
+.account-feature-content .account-feature-column { --summary-list-gutter: var(--account-pane-gutter); padding: 18px var(--account-pane-gutter) 28px; }
+.account-feature-content .summary-item-header { padding-inline: max(8px, var(--summary-list-gutter, 0px)); }
+.account-feature-content .summary-item { min-width: 0; }
+.account-feature-content .people-list-actions { margin: 0 0 12px; }
+.account-feature-content [data-module-subtypes][hidden] { display: none; }
+.account-feature-content .module-list-panel { display: none; }
+.account-feature-content .module-list-panel.is-active { display: block; }
+@media (max-width: 780px) {
+  .account-feature-content { --account-pane-gutter: 16px; }
+  .account-feature-content .account-feature-column { padding: 16px; }
+}

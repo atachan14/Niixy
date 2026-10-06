@@ -1,5 +1,7 @@
 # AccountPage People / InterfaceList のタブ訂正
 
+> 2026-10-06の未公開後続修正: Board / Peopleのnative切替、People同段tab、Pane余白・Module Header、最終QAと残る仕様差は[AccountPage Paneの切替と表示統一](account-pane-consistency.md)を参照。以下は先行工程の記録として保持する。
+
 > 最新訂正: 独立BoardList / InterfaceList入口とModuleの固定検索・保存済み枠を撤去し、Board / Module内の各List Tabへ統合。以下の旧InterfaceList配置記録は履歴。People仕様は維持。最新仕様・非破壊migration・QAは[module-list-integration.md](module-list-integration.md)を参照。
 
 Status: ローカル修正。基準 `590852c18a4b9668f4c038c72779d1d5859b074e` を保持し、その上に追加。公開・push・通常server restart・共有Neon書込みを行わない。Version番号は未割当。

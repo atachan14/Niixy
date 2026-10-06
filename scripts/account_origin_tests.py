@@ -34,7 +34,7 @@ class AccountOriginBrowserTests(StaticLiveServerTestCase):
                     page.on('pageerror',lambda e:errors.append(str(e)))
                     page.on('console',lambda m:errors.append(m.text) if m.type=='error' and not m.location.get('url','').endswith('/favicon.ico') else None)
                     try:
-                        for kind,stage in [('boards','overview'),('people','overview'),('modules','module-list'),('threads','list'),('responses','list'),('rooms','room-list'),('account-if','account-if-list')]:
+                        for kind,stage in [('boards','board-list'),('people','people-list'),('modules','module-list'),('threads','list'),('responses','list'),('rooms','room-list'),('account-if','account-if-list')]:
                             with self.subTest(viewport=viewport,kind=kind):
                                 page.goto(self.live_server_url+reverse('accounts:detail',args=[self.owner.username]))
                                 origin=page.locator('.account-overview-pane');origin.evaluate('el=>{window.qaOrigin=el;el.dataset.qaOrigin="kept";}')
@@ -48,7 +48,7 @@ class AccountOriginBrowserTests(StaticLiveServerTestCase):
                                 page.evaluate('() => {window.qaOldPanes=Array.from(document.querySelectorAll(".ui-workspace-trail-pane"));}')
                                 selector='data-open-account-'+('account-if' if kind=='account-if' else kind)
                                 page.locator('.account-overview-pane ['+selector+']').evaluate('el=>el.click()')
-                                wait_for_trail_count(page,1 if kind in ['boards','people'] else 0)
+                                wait_for_trail_count(page,0)
                                 expect(page.locator('.account-track')).to_have_attribute('data-ui-workspace-stage',stage)
                                 self.assertTrue(page.evaluate('() => window.qaOldPanes.every(el=>!el.isConnected)'))
                                 self.assertTrue(origin.evaluate('el=>el===window.qaOrigin && el.dataset.qaOrigin==="kept"'))
@@ -56,11 +56,11 @@ class AccountOriginBrowserTests(StaticLiveServerTestCase):
                                 if kind in ['boards','people']:
                                     self.assertTrue(page.locator('[data-ui-feature-workspace=conversation]').evaluate('el=>el.hidden'))
                                     page.screenshot(path=str(output/(viewport+'-'+kind+'.png')),full_page=True)
-                                    page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
+                                    page.locator('.account-'+('board' if kind=='boards' else 'people')+'-list-pane .ui-pane-header .icon-button').click();wait_for_trail_count(page,0)
                                     expect(page.locator('.account-track')).to_have_attribute('data-ui-workspace-stage','overview')
                                     expect(page.locator('.account-thread-detail-pane .thread-reply-form textarea:visible')).to_have_count(0)
                                     self.assertTrue(origin.evaluate('el=>el===window.qaOrigin'))
-                                    page.go_back();expect(page.locator('.account-track')).to_have_attribute('data-ui-workspace-stage','list')
+                                    page.go_back();expect(page.locator('.account-track')).to_have_attribute('data-ui-workspace-stage',stage)
                                     wait_for_trail_count(page,0)
                                     expect(page.locator('.account-thread-detail-pane .thread-reply-form textarea:visible')).to_have_count(0)
                                     page.go_forward();expect(page.locator('.account-track')).to_have_attribute('data-ui-workspace-stage','overview')
@@ -98,21 +98,21 @@ class AccountOriginBrowserTests(StaticLiveServerTestCase):
                               return response;
                             });}''',self.thread.pk)
                             page.locator('.account-thread-pane [data-thread-detail]').first.click();page.wait_for_function('window.qaHeld===true')
-                            page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()');wait_for_trail_count(page,1)
+                            page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()');wait_for_trail_count(page,0)
                             page.evaluate('() => {window.qaRelease();window.fetch=window.qaFetch;}');page.wait_for_timeout(150)
                             expect(page.locator('[data-thread-detail-pane]')).to_have_count(0)
-                            expect(page.locator('.account-track')).to_have_attribute('data-ui-workspace-stage','overview')
-                            page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
+                            expect(page.locator('.account-track')).to_have_attribute('data-ui-workspace-stage','people-list')
+                            page.locator('#close-account-people-list').click();wait_for_trail_count(page,0)
                             # Hold a shared Board response after receipt. Replacement aborts and disconnects it.
                             page.evaluate('''()=>{window.qaHeld=false;window.qaFetch=fetch;window.fetch=(...args)=>window.qaFetch(...args).then(response=>{
                               if(String(args[0]).endsWith('/boards/')) return new Promise(resolve=>{window.qaHeld=true;window.qaRelease=()=>resolve(response);});return response;
                             });}''')
                             page.locator('[data-open-account-boards]').click();page.wait_for_function('window.qaHeld===true')
-                            page.evaluate('() => window.qaOldBoard=document.querySelector(".ui-workspace-trail-pane")')
-                            page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()');wait_for_trail_count(page,1)
-                            page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
+                            page.evaluate('() => window.qaOldBoard=document.querySelector(".account-board-list-pane")')
+                            page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()');wait_for_trail_count(page,0)
+                            page.locator('#close-account-people-list').click();wait_for_trail_count(page,0)
                             page.evaluate('() => {window.qaRelease();window.fetch=window.qaFetch;}');page.wait_for_timeout(150)
-                            self.assertFalse(page.evaluate('window.qaOldBoard.isConnected'));wait_for_trail_count(page,0)
+                            self.assertTrue(page.evaluate('window.qaOldBoard.isConnected'));wait_for_trail_count(page,0)
                             expect(page.locator('.room-collection-browser')).to_have_count(0)
                             # Reopen the same legacy list while its old request is held.
                             # A new request generation must prevent the old response replacing it.
@@ -123,7 +123,7 @@ class AccountOriginBrowserTests(StaticLiveServerTestCase):
                                   if(!window.qaHeld && new URL(args[0],location.origin).pathname===path) return new Promise(resolve=>{window.qaHeld=true;window.qaRelease=()=>resolve(response);});return response;
                                 });}""",path)
                                 page.locator('[data-open-account-'+action+']').click();page.wait_for_function('window.qaHeld===true')
-                                page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()');wait_for_trail_count(page,1)
+                                page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()');wait_for_trail_count(page,0)
                                 page.locator('.account-overview-pane [data-open-account-'+action+']').evaluate('el=>el.click()');wait_for_trail_count(page,0)
                                 expect(page.locator(container+' .ui-tabs')).to_be_visible()
                                 page.locator(container).evaluate('el=>{const marker=document.createElement("span");marker.dataset.qaFreshResponse="kept";el.append(marker);}')
@@ -132,11 +132,11 @@ class AccountOriginBrowserTests(StaticLiveServerTestCase):
                             # Restoring both public origin URLs creates exactly one current Pane.
                             for pane in ['board','people']:
                                 page.goto(self.live_server_url+reverse('accounts:detail',args=[self.owner.username])+'?pane='+pane)
-                                wait_for_trail_count(page,1)
-                                page.reload();wait_for_trail_count(page,1)
-                                self.assertIn(page.locator('.account-track').get_attribute('data-ui-workspace-stage'),[None,'overview'])
+                                wait_for_trail_count(page,0)
+                                page.reload();wait_for_trail_count(page,0)
+                                self.assertEqual(page.locator('.account-track').get_attribute('data-ui-workspace-stage'),pane+'-list')
                                 self.assertTrue(page.locator('[data-ui-feature-workspace=conversation]').evaluate('el=>el.hidden'))
-                                page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
+                                page.locator('#close-account-'+pane+'-list').click();wait_for_trail_count(page,0)
                                 self.assertEqual(page.url,self.live_server_url+reverse('accounts:detail',args=[self.owner.username]))
                             self.assertEqual(errors,[])
                         finally:context.close()

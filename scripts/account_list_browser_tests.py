@@ -112,47 +112,44 @@ class AccountListBrowserTests(StaticLiveServerTestCase):
                     expect(detail.locator('.account-summary')).to_have_count(2)
                     detail.locator('[data-list-operation=remove]').first.locator('[type=submit]').click()
                     expect(detail.locator('.account-summary')).to_have_count(1)
-                    # Root replaces the whole later branch, then List opens from People.
-                    page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()')
-                    wait_for_trail_count(page,1)
+                    # People is a native root feature with inline named List tabs.
+                    page.locator('.account-overview-pane [data-open-account-people]').evaluate('el=>el.click()');wait_for_trail_count(page,0)
                     index=page.locator('[data-account-lists-index]')
-                    expect(index.locator('[data-account-list-form]')).to_have_count(1) # direct List reload uses owner Account
+                    expect(index.locator('[data-account-list-form]')).to_have_count(0)
                     page.goto(self.live_server_url+'/accounts/review_browser_author/')
-                    page.locator('[data-open-account-people]').click();wait_for_trail_count(page,1)
-                    expect(index.locator('[data-list-operation=create]')).to_be_visible()
-                    index.locator('[data-account-list-link]').filter(has_text='改名 '+name).click();wait_for_trail_count(page,2)
+                    page.locator('[data-open-account-people]').click();wait_for_trail_count(page,0)
+                    renamed=index.locator('[data-list-tab-id]').filter(has_text='改名 '+name);renamed.click()
+                    index.locator('[data-ui-tab-panel].is-active [data-people-list-detail]').click();wait_for_trail_count(page,1)
                     detail.locator('summary').filter(has_text='Listの管理').click()
                     page.once('dialog',lambda d:d.accept())
-                    detail.locator('[data-list-operation=delete] [type=submit]').click();wait_for_trail_count(page,1)
-                    expect(index.locator('[data-account-list-link]').filter(has_text='改名 '+name)).to_have_count(0)
+                    detail.locator('[data-list-operation=delete] [type=submit]').click();wait_for_trail_count(page,0)
+                    expect(renamed).to_have_count(0)
                     # Late GET after Close must not resurrect its Pane.
                     page.evaluate("""() => {window.listFetch=fetch;window.fetch=(...args)=>{
                       if(!String(args[0]).includes('/lists/'))return window.listFetch(...args);
                       args[1]={...args[1],signal:undefined};return window.listFetch(...args).then(r=>new Promise(resolve=>setTimeout(()=>resolve(r),300)));};}""")
-                    index.locator('[data-account-list-link]').filter(has_text='既存List').click()
-                    page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,1)
+                    index.locator('[data-list-tab-id]').filter(has_text='既存List').click()
+                    index.locator('[data-ui-tab-panel].is-active [data-people-list-detail]').click();wait_for_trail_count(page,1)
+                    page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
                     page.wait_for_timeout(400);expect(detail).to_have_count(0)
                     page.evaluate('() => {window.fetch=window.listFetch;}')
-                    index.locator('[data-account-list-link]').filter(has_text='既存List').click();wait_for_trail_count(page,2)
-                    # Nested People uses the same right-side replacement, without
-                    # dropping the parent's pending URL input.
-                    detail.locator('.account-summary').first.click();wait_for_trail_count(page,3)
+                    index.locator('[data-ui-tab-panel].is-active [data-people-list-detail]').click();wait_for_trail_count(page,1)
+                    detail.locator('.account-summary').first.click();wait_for_trail_count(page,2)
                     nested=page.locator('.ui-workspace-trail-pane [data-account-fragment]')
-                    nested.locator('[data-open-account-people]').click();wait_for_trail_count(page,4)
+                    nested.locator('[data-open-account-people]').click();wait_for_trail_count(page,3)
                     expect(page.locator('[data-account-lists-index]').last).to_be_visible()
-                    page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,3)
-                    page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,2)
-                    # Close during delayed add then reopen; stale callback neither
-                    # closes nor replaces the newer Pane.
+                    for count in (2,1):
+                        page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,count)
+                    # Closing a pending add retains mutation guard and reads committed data.
                     detail.locator('[data-list-operation=add] [name=target_url]').fill(self.live_server_url+'/accounts/review_browser_author/')
                     page.evaluate("""() => {window.listFetch=fetch;window.fetch=(...args)=>String(args[0]).endsWith('/add/')?
                       new Promise(resolve=>setTimeout(resolve,300)).then(()=>window.listFetch(...args)):window.listFetch(...args);} """)
                     detail.locator('[data-list-operation=add] [type=submit]').click()
-                    page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,1)
-                    index.locator('[data-account-list-link]').filter(has_text='既存List').click();wait_for_trail_count(page,2)
+                    page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,0)
+                    index.locator('[data-ui-tab-panel].is-active [data-people-list-detail]').click();wait_for_trail_count(page,1)
                     expect(detail.locator('.account-summary')).to_have_count(15)
                     page.evaluate('() => {window.fetch=window.listFetch;}')
-                    expect(index.locator('[data-account-list-link]').filter(has_text='既存List').locator('[data-list-count]')).to_have_text('15')
+                    expect(index.locator('[data-ui-tab-panel].is-active .account-summary')).to_have_count(15)
                     page.screenshot(path=output/f'{name}-workspace.png')
                     # Guest URL direct read preserves targets and hides owner writes.
                     context.clear_cookies();page.goto(self.live_server_url+f'/accounts/lists/{self.existing.pk}/')
