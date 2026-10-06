@@ -264,7 +264,15 @@ window.NiixyWorkspaceTrail = (() => {
       return;
     }
     const [title, listUrl] = definition;
+    let roomListUrl = listUrl;
     const entry = trail.push({title, width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind}), after: origin});
+    if (kind === 'room') window.addEventListener('niixy:room-review-changed', (event) => {
+      if (event.detail.actor !== account.dataset.accountId) return;
+      const url = new URL(roomListUrl, location.origin);
+      url.searchParams.set('room_tab', entry.body.querySelector('[data-ui-tab][aria-selected="true"]')?.dataset.uiTab || 'owner');
+      roomListUrl = url.href;
+      fetchInto(entry, roomListUrl).then(() => NiixyUI.bindTabs(entry.body)).catch((error) => showError(entry, error));
+    }, {signal: entry.abort.signal});
     if (kind === 'account-if') entry.body.addEventListener('focusin', (event) => {
       const tab = event.target;
       if (!tab.matches('[data-ui-tab]')) return;
@@ -274,6 +282,7 @@ window.NiixyWorkspaceTrail = (() => {
       const pagination = event.target.closest('[data-pane-pagination], [data-room-pagination], [data-summary-page]');
       if (pagination) {
         event.preventDefault();
+        if (kind === 'room') roomListUrl = pagination.href;
         fetchInto(entry, pagination.href).then(() => NiixyUI.bindTabs(entry.body)).catch((error) => showError(entry, error));
         return;
       }

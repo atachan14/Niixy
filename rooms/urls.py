@@ -1,10 +1,15 @@
 from django.urls import path
 
-from . import views
+from . import views, reviews, mutes
 
 app_name = 'rooms'
 
 urlpatterns = [
+    path('<int:room_id>/mute/', mutes.change, name='mute-change'),
+    path('<int:room_id>/reviews/', reviews.listing, name='reviews'),
+    path('<int:room_id>/reviews/editor/', reviews.editor, name='review-editor'),
+    path('<int:room_id>/reviews/save/', reviews.save, name='review-save'),
+    path('<int:room_id>/reviews/delete/', reviews.delete, name='review-delete'),
     path('new/', views.room_create, name='create'),
     path('<int:room_id>/', views.room_detail, name='detail'),
     path('<int:room_id>/pane/', views.room_pane, name='pane'),

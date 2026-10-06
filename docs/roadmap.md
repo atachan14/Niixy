@@ -243,6 +243,16 @@ Status: Complete (implementation / isolated verification / published at `e17e00e
 
 ---
 
+## Version未割当 - Room Review / Mute
+
+Status: Complete (implementation / isolated verification / local checkpoint, unpublished)
+
+[Room Review / Mute](room-review-mute.md)を実装した。RoomOwnerも紹介文付きLove / Hateを作成・編集・削除でき、公開RoomMuteはReview・RoomOwner AccountへのMuteと独立する。元配置からRoom / Board / Threadを一覧・検索で隠し、自由参照と直接URL・既存ACLを維持する。AccountPage > RoomにLove / Hateタブを追加し、保存後のnative / shared一覧も更新する。
+
+追加rooms0012は新規2テーブルのみ。開始基準は親から引き継いだ209c6ef（interfaces0011共有反映済み）。今回の共有DB migration・通常server restart・push/publicは未実施。検証結果・残る公開工程はリンク先に記録する。Version番号は割り当てない。
+
+---
+
 ## Future
 
 次のVersion番号や実装順序は固定しない。完了済みの基盤全体を未着手候補として扱わない。

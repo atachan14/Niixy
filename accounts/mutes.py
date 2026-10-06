@@ -14,7 +14,8 @@ def muted_account_ids(viewer):
 def filter_muted(queryset, viewer, account_field='creator_id'):
     if not viewer.is_authenticated:
         return queryset
-    return queryset.exclude(**{f'{account_field}__in': muted_account_ids(viewer)})
+    from rooms.mutes import filter_muted_rooms
+    return filter_muted_rooms(queryset.exclude(**{f'{account_field}__in': muted_account_ids(viewer)}), viewer)
 
 
 def prepare_muted_posts(posts, viewer, muted=None):

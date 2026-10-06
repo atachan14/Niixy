@@ -12,6 +12,8 @@ from django.views.decorators.http import require_POST
 
 from events.idempotency import run_once, submission_id_from
 from accounts.mutes import filter_muted, muted_account_ids
+from .mutes import muted_board_ids
+from .reviews import review_context
 from events.models import Thread, ThreadAccessRule, ThreadPlacement, ThreadPost
 from events.services import prepare_thread_for_view, prepare_thread_modules, thread_queryset
 from events.policies import prepare_thread_policy, save_thread_policy, default_thread_policy_groups, thread_policy_editor_rows
@@ -146,6 +148,7 @@ def room_detail(request, room_id):
     room = _room(request, room_id)
     return render(request, 'rooms/room_page.html', {
         'room': room,
+        **review_context(room, request.user),
         'thread_field_catalog': thread_field_catalog(),
         'thread_interface_catalog': thread_interface_catalog(),
     })
@@ -153,8 +156,10 @@ def room_detail(request, room_id):
 
 @never_cache
 def room_pane(request, room_id):
+    room = _room(request, room_id)
     return render(request, 'rooms/partials/room_pane.html', {
-        'room': _room(request, room_id),
+        'room': room,
+        **review_context(room, request.user),
         'room_thread_field_catalog': thread_field_catalog(),
         'room_thread_interface_catalog': thread_interface_catalog(),
     })
@@ -214,7 +219,7 @@ def room_boards(request, room_id=None, username=None):
             filter_muted(Board.objects.filter(placement__collection=collection), request.user)
             .select_related('placement__collection')
             .prefetch_related('policy_conditions')
-            .annotate(thread_count=Count('thread_placements', filter=~Q(thread_placements__thread__creator_id__in=muted_account_ids(request.user))))
+            .annotate(thread_count=Count('thread_placements', filter=Q(thread_placements__thread_id__in=filter_muted(Thread.objects.all(), request.user).values('pk'))))
             .order_by('-last_activity_at', '-created_at')
         )
         for board in collection.visible_boards:
@@ -224,7 +229,8 @@ def room_boards(request, room_id=None, username=None):
         from accounts.content_lists import describe_target
         references = collection.references.select_related('target__placement__collection__room').prefetch_related('target__policy_conditions') if collection.account_id else []
         muted = set(muted_account_ids(request.user))
-        collection.reference_summaries = [describe_target('board', ref.target, request.user) for ref in references if ref.target and ref.target.creator_id not in muted]
+        muted_boards = set(muted_board_ids(request.user))
+        collection.reference_summaries = [describe_target('board', ref.target, request.user) for ref in references if ref.target and ref.target.creator_id not in muted and ref.target_id not in muted_boards]
         collection.board_submission_id = uuid.uuid4()
         collection.board_policy_editor_rows = board_policy_editor_rows(
             Board(), room, conditions=default_board_policy_conditions(Board(), _scope_room(room), account=_scope_account(room)),
@@ -508,9 +514,10 @@ def _rated_boards(request, account):
     from accounts.content_lists import describe_target
     from .models import BoardRating
     muted = set(muted_account_ids(request.user))
+    muted_boards = set(muted_board_ids(request.user))
     rows = BoardRating.objects.filter(author=account).select_related('target__placement__collection__room').prefetch_related('target__policy_conditions').order_by('-updated_at', '-pk')
     result = {'fav': [], 'bad': []}
     for row in rows:
-        if row.target.creator_id not in muted:
+        if row.target.creator_id not in muted and row.target_id not in muted_boards:
             result[row.sentiment].append(describe_target('board', row.target, request.user))
     return result

@@ -1,0 +1,13 @@
+<form class="review-editor" data-review-form data-review-target="{{ room.pk }}" method="post" action="{% url 'rooms:review-save' room.pk %}" data-review-delete-url="{% url 'rooms:review-delete' room.pk %}">
+  {% csrf_token %}
+  <input type="hidden" name="review_id" value="{{ own_review.pk|default:'' }}">
+  <input type="hidden" name="revision" value="{{ own_review.revision|default:'' }}">
+  <p class="review-target">{{ room.name }}</p>
+  <div class="review-editor-choices" aria-label="Reviewの評価">
+    <label class="review-love"><input type="radio" name="sentiment" value="love" {% if review_sentiment == 'love' %}checked{% endif %} required>Love</label>
+    <label class="review-hate"><input type="radio" name="sentiment" value="hate" {% if review_sentiment == 'hate' %}checked{% endif %} required>Hate</label>
+  </div>
+  <label class="field">紹介文<textarea name="body" maxlength="{{ review_body_max_length }}" rows="8" required>{{ own_review.body|default:'' }}</textarea></label>
+  <p class="review-error" role="alert" hidden></p>
+  <div class="review-editor-actions"><button class="button" type="submit" data-pending-label="保存中...">保存</button><button class="button secondary" type="button" data-review-cancel>キャンセル</button>{% if own_review %}<button class="button secondary" type="button" data-review-delete data-pending-label="削除中...">削除</button>{% endif %}</div>
+</form>

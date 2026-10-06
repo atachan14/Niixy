@@ -22,7 +22,8 @@ from interfaces.models import (
 from rooms.models import Board, BoardPlacement, BoardPolicyCondition, BoardListReference, BoardRating, Collection
 from .internal_urls import resolve_internal_url
 from .lists import invalid, login_denied, url_error
-from .mutes import muted_account_ids
+from .mutes import filter_muted, muted_account_ids
+from rooms.mutes import muted_board_ids
 from .reviews import target_account
 
 
@@ -182,6 +183,7 @@ def detail(request, kind, list_id):
     item = prepare_list(kind, get_object_or_404(list_query(kind).select_related(spec.owner_field + '__niixy_profile'), pk=list_id))
     references = []
     muted = set(muted_account_ids(request.user))
+    muted_boards = set(muted_board_ids(request.user)) if kind == 'board' else set()
     for ref_kind in (MODULE_KINDS if kind in MODULE_KINDS else ('board',)):
         query = KINDS[ref_kind].reference.objects.filter(**{KINDS[ref_kind].list_field: item}).select_related('target')
         if ref_kind == 'board':
@@ -189,7 +191,7 @@ def detail(request, kind, list_id):
         else:
             query = query.select_related('target__current_version')
         for ref in query:
-            if ref.target and ref.target.creator_id in muted:
+            if ref.target and (ref.target.creator_id in muted or (ref_kind == 'board' and ref.target_id in muted_boards)):
                 continue
             ref.summary = describe_target(ref_kind, ref.target, request.user) if ref.target else None
             # A filtered Module tab shows only matching published definitions.
@@ -203,8 +205,7 @@ def detail(request, kind, list_id):
     placed = []
     if kind == 'board':
         boards = Board.objects.filter(placement__collection=item).select_related('placement__collection__room').prefetch_related('policy_conditions')
-        if request.user.is_authenticated:
-            boards = boards.exclude(creator_id__in=muted_account_ids(request.user))
+        boards = filter_muted(boards, request.user)
         placed = [describe_target(kind, board, request.user) for board in boards]
     return render(request, 'shared/content_list_detail.html', {
         'kind': kind, 'list_label': spec.label, 'target_label': 'Board' if kind == 'board' else 'Module', 'content_list': item, 'placed_boards': placed,

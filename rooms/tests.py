@@ -770,7 +770,8 @@ class RoomViewTests(TestCase):
         self.assertContains(response, 'Policy')
         self.assertContains(response, 'class="room-overview-body identity-overview-content"')
         self.assertContains(response, 'class="room-hero identity-overview-hero"')
-        self.assertContains(response, '<h2>評価</h2>')
+        self.assertContains(response, '<h2>Review</h2>')
+        self.assertContains(response, 'data-review-kind="room"')
         self.assertContains(response, '<h2>Profile</h2>')
         self.assertLess(
             response.content.index(b'class="ui-placement-row'),

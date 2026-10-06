@@ -1,7 +1,8 @@
 import uuid
 
 from django.conf import settings
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxLengthValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -33,6 +34,48 @@ class Room(models.Model):
 
     def has_member(self, user):
         return user.is_authenticated and self.memberships.filter(account=user).exists()
+
+
+class RoomReview(models.Model):
+    LOVE = 'love'
+    HATE = 'hate'
+    SENTIMENT_CHOICES = [(LOVE, 'Love'), (HATE, 'Hate')]
+    BODY_MAX_LENGTH = 10000  # Same limit as a Response (ThreadPostForm).
+
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='written_room_reviews')
+    target = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='reviews')
+    sentiment = models.CharField(max_length=4, choices=SENTIMENT_CHOICES)
+    body = models.TextField(max_length=BODY_MAX_LENGTH, validators=[MaxLengthValidator(BODY_MAX_LENGTH)])
+    revision = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-pk']
+        constraints = [
+            models.UniqueConstraint(fields=['author', 'target'], name='unique_room_review'),
+            models.CheckConstraint(condition=models.Q(sentiment__in=['love', 'hate']), name='room_review_sentiment'),
+            models.CheckConstraint(condition=~models.Q(body=''), name='room_review_body_required'),
+        ]
+        indexes = [models.Index(fields=['target', '-updated_at', '-id'], name='room_review_recent')]
+
+    def clean(self):
+        super().clean()
+        self.body = self.body.strip()
+        if not self.body:
+            raise ValidationError({'body': '紹介文を入力してください。'})
+
+
+class RoomMute(models.Model):
+    """Public intent about a Room, independent of Review and AccountMute."""
+    muter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='room_mutes')
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='muters')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [models.UniqueConstraint(fields=['muter', 'room'], name='unique_room_mute')]
+        indexes = [models.Index(fields=['room', '-created_at', '-id'], name='room_mute_recent')]
 
 
 class RoomPlacement(models.Model):

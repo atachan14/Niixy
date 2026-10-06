@@ -1,14 +1,9 @@
 <div class="ui-tabs account-room-tabs" role="tablist" aria-label="Roomの種類">
-  <button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="owner">Owner</button>
-  <button type="button" role="tab" aria-selected="false" data-ui-tab="member">参加中</button>
+  {% for tab in room_tabs %}<button {% if room_tab == tab.kind %}class="is-active"{% endif %} type="button" role="tab" aria-selected="{% if room_tab == tab.kind %}true{% else %}false{% endif %}" data-ui-tab="{{ tab.kind }}">{{ tab.label }}</button>{% endfor %}
 </div>
 <div class="account-room-lists">
-  <section class="ui-tab-panel account-room-column is-active" data-ui-tab-panel="owner">
-    <div class="ui-summary-list">{% for room in owner_page %}<a class="ui-summary-item" href="{% url 'rooms:detail' room.pk %}" data-account-room-detail="{{ room.pk }}" data-summary-kind="room"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ room.name }}</strong><small class="ui-summary-item-updated">最終更新 {{ room.last_activity_at|date:'Y/m/d H:i' }}</small></a>{% empty %}<p class="empty">OwnerになっているRoomはありません。</p>{% endfor %}</div>
-    {% if owner_page.has_other_pages %}<nav class="thread-pagination" aria-label="Owner Roomのページ">{% if owner_page.has_previous %}<a data-room-pagination href="?owner_page={{ owner_page.previous_page_number }}">前へ</a>{% endif %}<span>{{ owner_page.number }} / {{ owner_page.paginator.num_pages }}</span>{% if owner_page.has_next %}<a data-room-pagination href="?owner_page={{ owner_page.next_page_number }}">次へ</a>{% endif %}</nav>{% endif %}
-  </section>
-  <section class="ui-tab-panel account-room-column" data-ui-tab-panel="member">
-    <div class="ui-summary-list">{% for room in member_page %}<a class="ui-summary-item" href="{% url 'rooms:detail' room.pk %}" data-account-room-detail="{{ room.pk }}" data-summary-kind="room"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ room.name }}</strong><small class="ui-summary-item-updated">最終更新 {{ room.last_activity_at|date:'Y/m/d H:i' }}</small></a>{% empty %}<p class="empty">参加中のRoomはありません。</p>{% endfor %}</div>
-    {% if member_page.has_other_pages %}<nav class="thread-pagination" aria-label="参加中Roomのページ">{% if member_page.has_previous %}<a data-room-pagination href="?member_page={{ member_page.previous_page_number }}">前へ</a>{% endif %}<span>{{ member_page.number }} / {{ member_page.paginator.num_pages }}</span>{% if member_page.has_next %}<a data-room-pagination href="?member_page={{ member_page.next_page_number }}">次へ</a>{% endif %}</nav>{% endif %}
-  </section>
+  {% for tab in room_tabs %}<section class="ui-tab-panel account-room-column {% if room_tab == tab.kind %}is-active{% endif %}" data-ui-tab-panel="{{ tab.kind }}">
+    <div class="ui-summary-list">{% for room in tab.page %}<a class="ui-summary-item" href="{% url 'rooms:detail' room.pk %}" data-account-room-detail="{{ room.pk }}" data-summary-kind="room"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{{ room.name }}</strong><small class="ui-summary-item-updated">最終更新 {{ room.last_activity_at|date:'Y/m/d H:i' }}</small></a>{% empty %}<p class="empty">{{ tab.empty }}</p>{% endfor %}</div>
+    {% if tab.page.has_other_pages %}<nav class="thread-pagination" aria-label="{{ tab.label }} Roomのページ">{% if tab.page.has_previous %}<a data-room-pagination href="{% url 'accounts:room-pane' account.username %}?room_tab={{ tab.kind }}&amp;{{ tab.page_param }}={{ tab.page.previous_page_number }}">前へ</a>{% endif %}<span>{{ tab.page.number }} / {{ tab.page.paginator.num_pages }}</span>{% if tab.page.has_next %}<a data-room-pagination href="{% url 'accounts:room-pane' account.username %}?room_tab={{ tab.kind }}&amp;{{ tab.page_param }}={{ tab.page.next_page_number }}">次へ</a>{% endif %}</nav>{% endif %}
+  </section>{% endfor %}
 </div>

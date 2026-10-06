@@ -20,7 +20,7 @@
         </div>
       </div>
     </section>
-    <section class="room-placeholder-section identity-overview-section"><h2>評価</h2><p>未実装</p></section>
+    {% include 'rooms/partials/review_section.html' %}
     <section class="room-placeholder-section room-profile-placeholder identity-overview-section identity-profile-placeholder"><h2>Profile</h2><p>未実装</p></section>
   </div>
   {% if not user.is_authenticated %}<dialog class="ui-dialog room-participation-dialog" data-room-participation-dialog>

@@ -316,9 +316,6 @@ function resetAccountRoomDetail() {
 
 function bindAccountRoomList(query = '') {
   NiixyUI.bindTabs(accountRoomListContainer);
-  if (new URLSearchParams(query).has('member_page')) {
-    accountRoomListContainer.querySelector('[data-ui-tab="member"]')?.click();
-  }
 }
 
 async function loadAccountRoomPane(query = '') {
@@ -360,6 +357,16 @@ async function openAccountRooms(query = '', shouldUpdateUrl = true) {
   if (shouldUpdateUrl) updateUrl(accountRoomParams(query));
   return loadAccountRoomPane(query);
 }
+
+window.addEventListener('niixy:room-review-changed', (event) => {
+  if (event.detail.actor !== accountId) return;
+  roomPaneCache.clear();
+  if (profileStack.is('room-list') || profileStack.is('room-detail')) {
+    const query = new URLSearchParams(activeRoomQuery);
+    query.set('room_tab', accountRoomListContainer.querySelector('[data-ui-tab][aria-selected="true"]')?.dataset.uiTab || 'owner');
+    loadAccountRoomPane(`?${query}`);
+  }
+});
 
 function roomDetailUrl(roomId) {
   return roomDetailTemplate.replace('/0/', `/${roomId}/`);

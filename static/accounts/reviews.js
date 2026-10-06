@@ -5,7 +5,7 @@
   const mutations = new Map();
   let muteMutation = null;
   const listRequests = new WeakMap();
-  const keyFor = section => `${section.dataset.reviewActor}:${section.dataset.reviewTarget}`;
+  const keyFor = section => `${section.dataset.reviewActor}:${section.dataset.reviewKind || 'account'}:${section.dataset.reviewTarget}`;
   const errorText = async response => {
     try {
       const data = await response.json();
@@ -40,9 +40,9 @@
       if (listRequests.get(section) === request) section.removeAttribute('aria-busy');
     }
   }
-  async function refreshTarget(target) {
+  async function refreshTarget(source) {
     await Promise.all([...document.querySelectorAll('[data-review-section]')]
-      .filter(section => section.dataset.reviewTarget === target)
+      .filter(section => keyFor(section) === keyFor(source))
       .map(section => loadSection(section)));
   }
   async function openEditor(section, sentiment) {
@@ -105,7 +105,10 @@
           if (!response.ok) throw new Error(await errorText(response));
           drafts.delete(key);
           if (entry.pane.isConnected) entry.close.click();
-          await refreshTarget(section.dataset.reviewTarget);
+          await refreshTarget(section);
+          if (section.dataset.reviewKind === 'room') window.dispatchEvent(new CustomEvent('niixy:room-review-changed', {
+            detail: {actor: section.dataset.reviewActor, target: section.dataset.reviewTarget},
+          }));
         } catch (error) {
           if (form.isConnected) showError(form, error.message || '通信に失敗しました。もう一度お試しください。');
         } finally {

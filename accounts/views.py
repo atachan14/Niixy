@@ -57,9 +57,10 @@ def account_condition_search(request):
     ]})
 
 
+@never_cache
 def account_condition_room_search(request):
     query = request.GET.get('q', '').strip()
-    rooms = Room.objects.all()
+    rooms = filter_muted(Room.objects.all(), request.user, 'owner_id')
     if query:
         rooms = rooms.filter(Q(name__icontains=query) | Q(owner__username__icontains=query))
     if request.GET.get('joined') == 'true':
@@ -234,18 +235,26 @@ def account_response_pane(request, username):
 def account_room_pane(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     base_rooms = filter_muted(Room.objects.select_related('owner__niixy_profile'), request.user, 'owner_id')
-    owner_page = Paginator(
-        base_rooms.filter(owner=account).order_by('-last_activity_at', '-created_at'),
-        20,
-    ).get_page(request.GET.get('owner_page'))
-    member_page = Paginator(
-        base_rooms.filter(memberships__account=account).distinct().order_by('-last_activity_at', '-created_at'),
-        20,
-    ).get_page(request.GET.get('member_page'))
+    from rooms.models import RoomReview
+    tabs = []
+    active = request.GET.get('room_tab', 'owner')
+    for kind, label, query, empty in [
+        ('owner', 'Owner', base_rooms.filter(owner=account).order_by('-last_activity_at', '-created_at'), 'OwnerになっているRoomはありません。'),
+        ('member', '参加中', base_rooms.filter(memberships__account=account).distinct().order_by('-last_activity_at', '-created_at'), '参加中のRoomはありません。'),
+        ('love', 'Love', base_rooms.filter(reviews__author=account, reviews__sentiment=RoomReview.LOVE).order_by('-reviews__updated_at', '-reviews__pk'), 'LoveしたRoomはありません。'),
+        ('hate', 'Hate', base_rooms.filter(reviews__author=account, reviews__sentiment=RoomReview.HATE).order_by('-reviews__updated_at', '-reviews__pk'), 'HateしたRoomはありません。'),
+    ]:
+        page_param = kind + '_page'
+        if 'room_tab' not in request.GET and page_param in request.GET:
+            active = kind
+        tabs.append({'kind': kind, 'label': label, 'empty': empty, 'page_param': page_param,
+                     'page': Paginator(query, 20).get_page(request.GET.get(page_param))})
+    if active not in {'owner', 'member', 'love', 'hate'}:
+        active = 'owner'
     return render(request, 'accounts/partials/room_pane.html', {
-        'account': account,
-        'owner_page': owner_page,
-        'member_page': member_page,
+        'account': account, 'room_tabs': tabs, 'room_tab': active,
+        'owner_page': tabs[0]['page'], 'member_page': tabs[1]['page'],
+        'love_page': tabs[2]['page'], 'hate_page': tabs[3]['page'],
     })
 
 
