@@ -1,0 +1,156 @@
+/* Form and action density, based on the existing 14px Summary / 36px header UI.
+   Reader content, Summary rows and Workspace geometry keep their own sizing. */
+:root {
+  --ui-control-font: 14px;
+  --ui-control-height: 32px;
+  --ui-input-font: 14px;
+  --ui-input-height: 32px;
+  --ui-form-gap: 10px;
+  --ui-section-gap: 16px;
+  --ui-label-font: 13px;
+}
+
+.button:not(:where(.site-header .button, .room-page-header summary.button, .account-page-header .button, .room-controls .button)),
+.interface-section-heading button,
+.thread-rule-candidates button,
+.niimap-module-select,
+.thread-rule-add,
+#open-direct-field-selector,
+#open-thread-interface-selector,
+.review-choice {
+  font-size: var(--ui-control-font);
+  line-height: 1.4;
+  min-height: var(--ui-control-height);
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 10px;
+  overflow-wrap: anywhere;
+}
+
+/* These are actual input components, not a rule for all document inputs.
+   The nested search component matches its existing selector specificity. */
+:is(.field, .basic-info-form, .interface-draft-form, .interface-implementation-editor,
+    .thread-interface-field, .thread-field-search, .field-search-row,
+    .account-selector-content .field-search-row, .account-selector-search,
+    .account-field-condition-controls, .niimap-search-controls,
+    .room-edit-menu, .room-collection-create, .room-collection-edit,
+    .room-board-create, .room-board-edit, .room-thread-create,
+    .thread-reply-form, .applied-editor-form, .account-list-content,
+    .account-list-share, .location-search-form, [data-layout-require-form])
+  :is(input, select, textarea):not(:where([type=hidden], [type=checkbox], [type=radio],
+      [type=color], [type=range], [type=file], [type=button], [type=submit], [type=reset])) {
+  font-size: var(--ui-input-font);
+  line-height: 1.45;
+  min-height: var(--ui-input-height);
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 8px;
+}
+
+:is(.map-event-form, .auth-form, .basic-info-form, .interface-draft-form,
+    .interface-implementation-editor, .account-field-condition-form,
+    .account-condition-controls, .field-search-form, .review-editor,
+    .applied-editor-form, .room-edit-menu form, .room-board-edit,
+    .room-thread-create form, .thread-interface-input, .thread-field-search,
+    .interface-definition-detail, .account-list-content form) {
+  font-size: var(--ui-control-font);
+  line-height: 1.45;
+}
+
+:is(.map-event-form, .auth-form, .basic-info-form, .account-field-condition-form,
+    .account-condition-controls, .field-search-form, .review-editor,
+    .applied-editor-form, .room-edit-menu form, .room-board-edit,
+    .room-thread-create form, .ui-dialog form, .thread-rule-dialog form) {
+  gap: var(--ui-form-gap);
+}
+.field { gap: 5px; }
+.field label, .interface-inline-field > label { font-size: var(--ui-label-font); }
+.interface-inline-field > label { line-height: var(--ui-input-height); }
+.interface-draft-form, .interface-definition-detail { gap: var(--ui-section-gap); }
+.interface-draft-form, .basic-info-form { padding-top: 16px; }
+.interface-section-body, .interface-field-groups, .self-interface-fields { gap: var(--ui-form-gap); }
+.interface-inline-field { gap: 10px; }
+.interface-form-section { padding-bottom: 12px; }
+.interface-definition-detail .interface-form-section { padding-bottom: 12px; }
+.interface-form-section > summary { font-size: 15px; padding: 4px 0 8px; }
+.interface-form-section h3,
+.interface-definition-detail .interface-form-section > h3,
+.interface-implementation-editor > h3,
+.account-field-condition-form h3 { font-size: 15px; }
+.interface-implementation-editor { margin-top: 16px; padding-top: 12px; }
+.interface-detail-actions { gap: 8px; margin-top: 12px; }
+.thread-rule > .button,
+.interface-section-body > .button,
+.self-interface-fields > .button { justify-self: start; width: auto; }
+.map-event-form > button[type=submit],
+.basic-info-form > button[type=submit],
+.room-edit-menu form > button[type=submit],
+.room-thread-create form > button[type=submit] { justify-self: end; }
+.required-interface-field { min-height: var(--ui-control-height); padding: 5px 8px; }
+.published-field, .published-requirement { padding-block: 10px; }
+
+/* Reduce excess blank form space; multiline writing and code remain resizable. */
+.account-condition-controls { padding-block: 12px; }
+.account-condition-group-actions .button { min-width: 0; }
+.account-condition-detail-body, .thread-interface-selector-detail { padding: 16px; }
+.account-selector-content .field-search-form { gap: var(--ui-form-gap); padding-bottom: 12px; }
+.account-list-content form { margin-block: 8px; }
+.review-editor { padding: 16px 20px; }
+.review-editor-choices, .review-editor-actions { gap: 10px; }
+.review-editor .field textarea { height: 128px; min-height: 120px; }
+.thread-detail .thread-reply-form textarea { min-height: 88px; }
+.applied-actions, .applied-editor-form { padding: 16px 20px; }
+.basic-info-header { min-height: var(--pane-header-height); }
+.ui-control-accordion > summary { font-size: 14px; min-height: var(--ui-control-height); padding: 6px 10px; }
+.ui-control-accordion-body { padding: 0 10px 10px; }
+.auth-dialog, .ui-dialog, .thread-rule-dialog { padding: 16px; }
+.auth-dialog-header { margin-bottom: 12px; }
+.auth-dialog-header h2, .ui-dialog h2, .thread-rule-dialog-header h2 { font-size: 16px; }
+.auth-tabs { margin-bottom: 12px; }
+.auth-tabs button { font-size: 14px; padding: 6px 8px; }
+.ui-tabs button { min-height: 36px; }
+
+/* Keep code typography and checkbox/radio controls distinct from text fields. */
+.account-layout-editor textarea[name=html],
+.account-layout-editor textarea[name=css] { font: var(--ui-input-font)/1.5 monospace; }
+.layout-require-choice, .review-editor-choices label { min-width: 0; }
+.field-help, .auth-note, .field-error, .room-form-error, .account-list-error,
+.review-error, [data-applied-error], [data-layout-message] { line-height: 1.5; overflow-wrap: anywhere; }
+.button:focus-visible, .review-choice:focus-visible,
+.interface-section-heading button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:is(.field, .interface-draft-form, .basic-info-form, .account-field-condition-controls,
+    .account-selector-content, .room-board-edit, .room-thread-create,
+    .room-edit-menu, .thread-reply-form, .account-list-content)
+  :is(input, select, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+@media (min-width: 781px) {
+  /* Align the oversized desktop action cards with the established mobile density. */
+  .account-actions-grid, .account-detail-fragment .account-actions-grid, .mypage-actions { gap: 8px; }
+  .account-actions-grid button, .account-detail-fragment .account-actions-grid button,
+  .mypage-actions button { font-size: 14px; min-height: 36px; padding: 4px 8px; overflow-wrap: anywhere; }
+  .room-controls .button { font-size: 14px; min-height: 36px; padding: 4px 8px; }
+}
+
+@media (max-width: 780px) {
+  :root { --ui-input-font: 16px; --ui-input-height: 44px; }
+  /* 16px editable text avoids automatic input zoom on mobile Safari. */
+  .ui-tabs button { min-height: 44px; }
+  .review-editor, .applied-actions, .applied-editor-form { padding: 16px; }
+  .review-editor .field textarea { height: 152px; }
+  .mypage-actions { gap: 6px; }
+  .mypage-actions button { font-size: 13px; min-height: 36px; padding: 4px 6px; }
+}
+
+@media (pointer: coarse) {
+  :root { --ui-control-height: 44px; }
+  /* Established Header / Room upper controls keep their current geometry. */
+  .button:not(:where(.site-header .button, .room-page-header summary.button,
+      .account-page-header .button, .room-controls .button)),
+  .interface-section-heading button, .thread-rule-candidates button,
+  .niimap-module-select, .thread-rule-add,
+  #open-direct-field-selector, #open-thread-interface-selector,
+  .review-editor .review-choice, .ui-tabs button, .auth-tabs button { min-height: 44px; }
+  .content-feedback-compact .button.secondary { min-width: 44px; min-height: 44px; }
+  .layout-require-choice, .review-editor-choices label { min-height: 44px; }
+  .interface-form-section > summary { min-height: 44px; }
+}
