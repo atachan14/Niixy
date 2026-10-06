@@ -78,7 +78,8 @@ def draft_discard(request, draft_id):
 
 
 def detail(request, layout_id):
-    layout = get_object_or_404(AccountLayout.objects.select_related('creator', 'current_version'), pk=layout_id, current_version__isnull=False)
+    from accounts.content_lists import public_modules
+    layout = get_object_or_404(public_modules('layout'), pk=layout_id)
     version = layout.current_version
     own = request.user.is_authenticated
     management = request.GET.get('manage') == '1'

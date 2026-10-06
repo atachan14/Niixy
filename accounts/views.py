@@ -22,7 +22,7 @@ from .models import AccountCondition, AccountProfile
 from .services import account_condition_catalog, condition_payload, save_account_condition
 from interfaces.models import FieldDefinition, Interface
 from interfaces.services import thread_field_catalog, thread_interface_catalog
-from interfaces.views import mark_interface_update_status, module_list_context, profile_module_list_context
+from interfaces.views import mark_interface_update_status, module_list_context
 from rooms.models import Room
 
 
@@ -251,21 +251,17 @@ def account_room_pane(request, username):
 
 def account_module_pane(request, username):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
-    return render(
-        request,
-        'interfaces/module_management_list_pane.html',
-        profile_module_list_context(account),
-    )
+    from .module_lists import module_collections
+    return render(request, 'interfaces/profile_module_lists.html', {
+        'profile_mode': True, 'profile_account': account, **module_collections(request, account),
+    })
 
 
 def account_module_field_detail(request, username, field_id):
+    from .content_lists import public_modules
     account = get_object_or_404(User, username__iexact=username)
     field = get_object_or_404(
-        FieldDefinition.objects.filter(
-            creator=account,
-            status=FieldDefinition.ACTIVE,
-            current_version__isnull=False,
-        ).select_related('creator', 'current_version').prefetch_related(
+        public_modules('field').filter(creator=account).select_related('creator', 'current_version').prefetch_related(
             'current_version__synonyms__target__creator',
         ),
         pk=field_id,
@@ -277,13 +273,10 @@ def account_module_field_detail(request, username, field_id):
 
 
 def account_module_interface_detail(request, username, interface_id):
+    from .content_lists import public_modules
     account = get_object_or_404(User, username__iexact=username)
     interface = get_object_or_404(
-        Interface.objects.filter(
-            creator=account,
-            status=Interface.ACTIVE,
-            current_version__isnull=False,
-        ).select_related('creator', 'current_version').prefetch_related(
+        public_modules('interface').filter(creator=account).select_related('creator', 'current_version').prefetch_related(
             'current_version__fields__definition__creator',
             'current_version__fields__definition__current_version',
             'current_version__fields__field_version',

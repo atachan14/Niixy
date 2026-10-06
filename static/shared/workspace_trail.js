@@ -22,7 +22,7 @@ window.NiixyWorkspaceTrail = (() => {
     const url = new URL(anchor.href, location.origin);
     if (url.origin !== location.origin) return null;
     if (url.pathname === '/' && /^\d+$/.test(url.searchParams.get('board') || '') && !url.searchParams.has('room')) return {kind: 'board', id: url.searchParams.get('board'), pageUrl: url};
-    const referenceMatch = url.pathname.match(/^\/(boards|interfaces|board-lists|interface-lists)\/(\d+)\/$/);
+    const referenceMatch = url.pathname.match(/^\/(boards|interfaces|fields|layouts|board-lists|interface-lists)\/(\d+)\/$/);
     if (referenceMatch) return {kind:'content-reference', pageUrl:url};
     let listMatch = url.pathname.match(/^\/accounts\/lists\/(\d+)\/$/);
     if (listMatch) return {kind:'account-list', id:listMatch[1], pageUrl:url};
@@ -292,7 +292,14 @@ window.NiixyWorkspaceTrail = (() => {
         }).catch((error) => showError(moduleEntry, error));
       }
     });
-    fetchInto(entry, listUrl, kind === 'account-if' ? '.applied-list-content' : null).then(() => NiixyUI.bindTabs(entry.body)).catch((error) => showError(entry, error));
+    fetchInto(entry, listUrl, kind === 'account-if' ? '.applied-list-content' : null).then(() => {
+      NiixyUI.bindTabs(entry.body);
+      const modules = entry.body.querySelector('[data-module-public]');
+      if (modules) NiixyUI.bindModuleFilters(modules, {type:'element', subtype:'field', collection:'self'}, {onChange:state => {
+        entry.url = childUrl(account.dataset.accountPageUrl, {pane:'module', ...state}).href;
+        history.replaceState(history.state, '', entry.url);
+      }});
+    }).catch((error) => showError(entry, error));
   }
 
   function bindAccount(trail, entry, account) {
@@ -547,6 +554,7 @@ window.NiixyWorkspaceTrail = (() => {
       }
     };
 
+    entry.body.addEventListener('niixy:collections-refreshed', () => initializeCollectionControls(entry.body));
     const openBoard = (board) => openBoardPane(trail, room, board, entry, () => loadList().catch((error) => showError(entry, error)));
 
     entry.body.addEventListener('focusin', (event) => {
@@ -675,6 +683,13 @@ window.NiixyWorkspaceTrail = (() => {
       return entry;
     });
   }
+  function openBoards(source, restore = false) {
+    const initial = restore ? new URLSearchParams(location.search) : null;
+    // A restored feature URL represents the current Pane, not its Close target.
+    if (restore && source.matches?.('.account-page')) history.replaceState(history.state, '', source.dataset.accountPageUrl);
+    return openRoomList(trail, source, 'boards', source.querySelector('.account-overview-pane') || source, initial);
+  }
+
   const host = workspaceHost();
   if (!host) return {clear() {}, open() {}, prepare() {}};
   const trail = create(host);
@@ -716,7 +731,7 @@ window.NiixyWorkspaceTrail = (() => {
     return entry;
   }
 
-  return {openReferenceBoard, openContentPane, openReviewEditor, openMapBoard, openBoards: (source, restore = false) => openRoomList(trail, source, 'boards', null, restore ? new URLSearchParams(location.search) : null), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
+  return {openReferenceBoard, openContentPane, openReviewEditor, openMapBoard, openBoards, prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
     if (preserveUrl) history.replaceState(history.state, '', url);

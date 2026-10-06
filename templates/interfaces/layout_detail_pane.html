@@ -1,5 +1,7 @@
+{% load content_feedback %}
 <aside class="ui-pane ui-detail-pane interface-detail-pane account-layout-detail" data-mypage-pane="interface-detail" data-layout-detail data-layout-id="{{ layout.pk }}" data-layout-version="{{ version.pk }}" data-edit-url="{% url 'interfaces:layout-edit' layout.pk %}" {% if user.is_authenticated and management %}data-apply-url="{% url 'accounts:layout-change' user.username %}"{% endif %}>
   <header class="ui-pane-header ui-detail-pane-header"><h2>{{ version.name }}@{{ layout.creator.username }} v{{ version.version_number }}/AccountLayout</h2><button type="button" class="icon-button" data-close-interface-detail aria-label="Module一覧に戻る">×</button></header>
+  {% content_feedback layout 'layout' %}
   <div class="layout-detail-content">
     <p>{{ version.description|linebreaksbr }}</p><p class="field-help">AccountPage下部のProfileに適用します。Field/AccountIFと値はLayoutを切り替えても保持します。</p>
     <h3>Require</h3><div class="layout-require-status">

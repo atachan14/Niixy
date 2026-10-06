@@ -15,6 +15,7 @@ const paneUrls = {thread: threadWorkspace.dataset.threadPaneUrl, response: threa
 const threadDetailUrlTemplate = threadWorkspace.dataset.threadDetailUrlTemplate;
 const paneCache = new Map();
 let requestedPaneKey = null;
+let paneRequestId = 0;
 let activePane = 'thread';
 let highlightTimer = null;
 let isApplyingHistory = false;
@@ -28,6 +29,7 @@ const accountRoomDetailContainer = document.querySelector('[data-account-room-de
 const accountRoomDetailTitle = document.getElementById('account-room-detail-title');
 const roomPaneCache = new Map();
 let roomRequestId = 0;
+let roomListRequestId = 0;
 let activeRoomQuery = '';
 const profileStack = NiixyUI.createWorkspace(accountWorkspace, {
   overview: {root: true},
@@ -45,6 +47,10 @@ let activeModuleState = {type: 'element', subtype: 'field', collection: 'self'};
 profileStack.onRetain = (stage) => {
   if (stage === 'overview') {
     requestedPaneKey = null;
+    paneRequestId += 1;
+    roomListRequestId += 1;
+    activeRoomQuery = null;
+    appliedRequestId += 1;
     resetThreadDetail();
     resetAccountRoomDetail();
     removeProfileModule();
@@ -56,6 +62,7 @@ profileStack.onRetain = (stage) => {
   if (stage === 'overview') url.search = '';
   else ['thread', 'post', 'room', 'field', 'interface'].forEach((key) => url.searchParams.delete(key));
   history.replaceState(history.state, '', url);
+  requestAnimationFrame(updateAccountNavigation);
 };
 
 function updateAccountNavigation() {
@@ -95,6 +102,7 @@ function paneParams({pane = activePane, threadId = null, postNumber = null, quer
 }
 
 async function loadPane(pane, query = '') {
+  const requestId = ++paneRequestId;
   const cacheKey = `${pane}:${query}`;
   requestedPaneKey = cacheKey;
   if (paneCache.has(cacheKey)) {
@@ -107,6 +115,7 @@ async function loadPane(pane, query = '') {
     const response = await fetch(`${paneUrls[pane]}${query}`, {headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error('Account pane request failed');
     const html = await response.text();
+    if (requestId !== paneRequestId) return false;
     paneCache.set(cacheKey, html);
     if (requestedPaneKey === cacheKey) {
       paneContainer.innerHTML = html;
@@ -114,7 +123,7 @@ async function loadPane(pane, query = '') {
     }
     return true;
   } catch {
-    if (requestedPaneKey === cacheKey) renderPaneError(paneContainer);
+    if (requestId === paneRequestId && requestedPaneKey === cacheKey) renderPaneError(paneContainer);
     return false;
   }
 }
@@ -233,7 +242,7 @@ function bindProfileModuleList(list, initialState) {
     const item = event.target.closest('[data-detail-url]');
     if (!item) return;
     event.preventDefault();
-    const panelParts = item.closest('[data-module-panel]').dataset.modulePanel.split(':');
+    const panelParts = item.closest('[data-module-panel]')?.dataset.modulePanel.split(':') || [];
     const type = panelParts[0];
     if (type === 'element' && panelParts[1] === 'field') {
       openProfileModuleDetail('field', item.dataset.detailUrl, new URL(item.href).searchParams.get('field'));
@@ -313,6 +322,7 @@ function bindAccountRoomList(query = '') {
 }
 
 async function loadAccountRoomPane(query = '') {
+  const requestId = ++roomListRequestId;
   const cacheKey = query || 'default';
   activeRoomQuery = query;
   if (roomPaneCache.has(cacheKey)) {
@@ -325,6 +335,7 @@ async function loadAccountRoomPane(query = '') {
     const response = await fetch(`${roomPaneUrl}${query}`, {headers: {'X-Requested-With': 'fetch'}});
     if (!response.ok) throw new Error('Room pane request failed');
     const html = await response.text();
+    if (requestId !== roomListRequestId) return false;
     roomPaneCache.set(cacheKey, html);
     if (activeRoomQuery === query) {
       accountRoomListContainer.innerHTML = html;
@@ -332,7 +343,7 @@ async function loadAccountRoomPane(query = '') {
     }
     return true;
   } catch {
-    if (activeRoomQuery === query) renderPaneError(accountRoomListContainer);
+    if (requestId === roomListRequestId && activeRoomQuery === query) renderPaneError(accountRoomListContainer);
     return false;
   }
 }
@@ -588,7 +599,6 @@ function applyStateFromUrl() {
 window.addEventListener('popstate', applyStateFromUrl);
 
 document.querySelector('[data-open-account-boards]')?.addEventListener('click', () => {
-  profileStack.set('overview');
   NiixyWorkspaceTrail.openBoards(accountPage);
 });
 

@@ -29,7 +29,7 @@ class ContentListMigrationTests(TransactionTestCase):
             with connection.cursor() as cursor:
                 cursor.execute("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name!='django_migrations' ORDER BY name")
                 new_schema=dict(cursor.fetchall())
-                self.assertEqual(set(new_schema)-set(schema),{'rooms_boardlistreference','rooms_boardrating','interfaces_interfacelist','interfaces_interfacelistreference','interfaces_interfacerating'})
+                self.assertEqual(set(new_schema)-set(schema),{'rooms_boardlistreference','rooms_boardrating','interfaces_interfacelist','interfaces_interfacelistreference','interfaces_interfacerating','interfaces_fieldlistreference','interfaces_fieldrating','interfaces_layoutlistreference','interfaces_layoutrating'})
                 for table,expected in rows.items():
                     if table!='rooms_collection':self.assertEqual(new_schema[table],schema[table],table)
                     fields=','.join(connection.ops.quote_name(column) for column in columns[table]);cursor.execute('SELECT '+fields+' FROM '+connection.ops.quote_name(table)+' ORDER BY rowid');self.assertEqual(cursor.fetchall(),expected,table)

@@ -51,7 +51,8 @@ class AccountBoardTests(TestCase):
             self.assertContains(response, 'data-board-title="日記"')
             self.assertContains(response, 'data-ui-tab="fav"')
             self.assertContains(response, 'data-ui-tab="bad"')
-            self.assertEqual('data-collection-management-tab' in response.content.decode(), actor == self.owner)
+            self.assertNotContains(response, 'data-collection-management-tab')
+            self.assertContains(response, 'Board List管理')
             self.assertEqual('data-board-editor' in self.client.get(self.url('board-threads', self.diary.pk)).content.decode(),
                              actor == self.owner)
 

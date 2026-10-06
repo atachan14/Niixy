@@ -48,19 +48,16 @@ class AccountListTabTests(TestCase):
         before = {m: list(m.objects.order_by('pk').values()) for m in models}
         self.client.logout()
         response = self.client.get(route('interface', 'list-index', self.owner.username))
-        html = response.content.decode()
-        self.assertLess(html.index('data-ui-tab="search"'), html.index('data-ui-tab="self"'))
-        self.assertLess(html.index('data-ui-tab="self"'), html.index('data-ui-tab="lists"'))
-        self.assertContains(response, 'Own Published IF')
+        self.assertContains(response, 'QA IFs')
         self.assertNotContains(response, 'PRIVATE OWN')
-        self.assertNotContains(response, 'QA Public IF')
+        self.assertNotContains(response, 'data-module-collection="saved"')
         self.assertNotContains(response, 'data-account-list-form')
-        self.assertNotContains(response, 'data-ui-tab="editing"')
-        self.assertContains(response, '選択したInterfaceの検索は今後実装予定です。')
         module = self.client.get(reverse('accounts:module-pane', args=[self.owner.username]))
         for kind in ['element', 'interface', 'layout']:
             self.assertContains(module, 'data-module-type="'+kind+'"')
         self.assertNotContains(module, 'PRIVATE OWN')
+        self.assertContains(module, 'Own Published IF')
+        self.assertNotContains(module, 'data-module-collection="saved"')
         self.client.get(reverse('accounts:list-index', args=[self.owner.username]))
         for model, rows in before.items():
             self.assertEqual(list(model.objects.order_by('pk').values()), rows, model.__name__)
@@ -90,7 +87,7 @@ class AccountListTabBrowserTests(StaticLiveServerTestCase):
             browser = pw.chromium.launch(channel='msedge', headless=True)
             try:
                 for viewport, size in [('desktop', {'width':1280,'height':720}), ('mobile', {'width':390,'height':844})]:
-                    for kind in ['account', 'interface']:
+                    for kind in ['account']:
                         with self.subTest(viewport=viewport, kind=kind):
                             context = browser.new_context(viewport=size, is_mobile=viewport=='mobile', has_touch=viewport=='mobile')
                             context.add_cookies([{'name':settings.SESSION_COOKIE_NAME,
@@ -102,26 +99,14 @@ class AccountListTabBrowserTests(StaticLiveServerTestCase):
                             page.on('console', lambda m:errors.append(m.text) if m.type=='error' and not m.location.get('url','').endswith('/favicon.ico') else None)
                             try:
                                 page.goto(self.live_server_url+reverse('accounts:detail', args=[self.owner.username]))
-                                if kind == 'account':
-                                    page.locator('[data-open-account-people]').click()
-                                    item = self.account_list
-                                    tabs = ['AccountList','QA People','Second People','Love','Hate']
-                                    detail_url = reverse('accounts:list-page',args=[item.pk])
-                                    new_target = reverse('accounts:detail',args=[self.owner.username])
-                                else:
-                                    page.locator('[data-reference-title="InterfaceList一覧"]').click()
-                                    item = self.interface_list
-                                    tabs = ['検索','自作','保存済み','QA IFs']
-                                    detail_url = route(kind,'list-page',item.pk)
-                                    new_target = route(kind,'page',self.own_interface.pk)
+                                page.locator('[data-open-account-people]').click()
+                                item = self.account_list
+                                tabs = ['AccountList','QA People','Second People','Love','Hate']
+                                detail_url = reverse('accounts:list-page',args=[item.pk])
+                                new_target = reverse('accounts:detail',args=[self.owner.username])
                                 wait_for_trail_count(page,1)
                                 index = page.locator('[data-account-lists-index]')
                                 expect(index.locator('[role=tab]')).to_have_text(tabs)
-                                if kind == 'interface':
-                                    expect(index.locator('[data-ui-tab-panel=self]')).to_contain_text('Own Published IF')
-                                    expect(index).not_to_contain_text('PRIVATE OWN')
-                                    index.locator('[data-ui-tab=search]').click()
-                                    expect(index.locator('[data-ui-tab-panel=search]')).to_be_visible()
                                 index.locator('[data-ui-tab=lists]').click()
                                 create = index.locator('[data-list-operation=create]')
                                 draft = kind+' pending '+viewport
@@ -203,10 +188,10 @@ class AccountListTabBrowserTests(StaticLiveServerTestCase):
                                     wait_for_trail_count(page,4)
                                     child = page.locator('[data-account-lists-index]').last
                                     expect(child.locator('[data-ui-tab=love]')).to_be_visible()
-                                    nested.locator('[data-reference-title="InterfaceList一覧"]').evaluate('el=>el.click()')
+                                    nested.locator('[data-open-account-modules]').evaluate('el=>el.click()')
                                     wait_for_trail_count(page,4)
-                                    expect(page.locator('[data-content-list-kind=interface][data-account-lists-index]')).to_have_count(1)
-                                    expect(page.locator('[data-account-lists-index]')).to_have_count(2)
+                                    expect(page.locator('[data-module-public]')).to_have_count(1)
+                                    expect(page.locator('[data-account-lists-index]')).to_have_count(1)
                                     page.locator('.ui-workspace-trail-header .icon-button').last.click()
                                     wait_for_trail_count(page,3)
                                     page.locator('.ui-workspace-trail-header .icon-button').last.click()

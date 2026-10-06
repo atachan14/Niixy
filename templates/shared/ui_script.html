@@ -218,12 +218,17 @@ window.NiixyUI = (() => {
   }
 
   function bindModuleFilters(list, initialState, {onChange = null} = {}) {
+    list.moduleFilterAbort?.abort();
+    const controller = new AbortController(); list.moduleFilterAbort = controller;
+    const listenerOptions = {signal:controller.signal};
+    if (onChange) list.moduleFilterOnChange = onChange;
+    onChange = list.moduleFilterOnChange || null;
     const subtypeByType = {
       element: new Set(['field', 'computed_field', 'action']),
       interface: new Set(['account', 'thread', 'thread_post']),
       layout: new Set(['thread_post', 'account', 'room']),
     };
-    const allowedCollections = new Set(['search', 'self', 'editing', 'saved', 'deleted']);
+    const allowedCollections = new Set(Array.from(list.querySelectorAll('[data-module-collection]'), button => button.dataset.moduleCollection));
     const state = {
       type: subtypeByType[initialState.type] ? initialState.type : 'element',
       collection: allowedCollections.has(initialState.collection) ? initialState.collection : 'self',
@@ -278,6 +283,23 @@ window.NiixyUI = (() => {
         const hasVisibleItem = Array.from(panel.querySelectorAll('.module-summary-entry')).some((item) => !item.hidden);
         empty.hidden = hasVisibleItem;
       });
+      list.querySelectorAll('[data-module-public-panel]').forEach(panel => {
+        panel.classList.toggle('is-active', panel.dataset.modulePublicPanel === state.collection);
+        const rows = Array.from(panel.querySelectorAll('[data-module-summary-type]'));
+        rows.forEach(row => { row.hidden = row.dataset.moduleSummaryType !== state.type || row.dataset.moduleSummarySubtype !== state.subtypes[state.type]; });
+        panel.querySelector('[data-module-public-empty]').hidden = rows.some(row => !row.hidden);
+        panel.querySelectorAll('[data-module-list-detail]').forEach(button => {
+          const url = new URL(button.dataset.referenceBase, location.origin);
+          url.searchParams.set('type', state.type); url.searchParams.set('subtype', state.subtypes[state.type]);
+          button.dataset.referenceFetch = url.href;
+        });
+      });
+      list.dataset.moduleSelectedType = state.type; list.dataset.moduleSelectedSubtype = state.subtypes[state.type]; list.dataset.moduleSelectedCollection = state.collection;
+      const selectedTab = list.querySelector('[data-module-collection][aria-selected=true]');
+      if (selectedTab) {
+        const row = selectedTab.parentElement, a = row.getBoundingClientRect(), b = selectedTab.getBoundingClientRect();
+        if (b.left < a.left) row.scrollLeft += b.left-a.left; else if (b.right > a.right) row.scrollLeft += b.right-a.right;
+      }
       const kindInput = list.querySelector('[data-module-create-kind]');
       if (kindInput) kindInput.value = state.subtypes.interface;
       if (notify && onChange) onChange({
@@ -290,16 +312,16 @@ window.NiixyUI = (() => {
     list.querySelectorAll('[data-module-type]').forEach((button) => button.addEventListener('click', () => {
       state.type = button.dataset.moduleType;
       apply(true);
-    }));
+    }, listenerOptions));
     list.querySelectorAll('[data-module-subtypes] [data-module-subtype]').forEach((button) => button.addEventListener('click', () => {
       const type = button.closest('[data-module-subtypes]').dataset.moduleSubtypes;
       state.subtypes[type] = button.dataset.moduleSubtype;
       apply(true);
-    }));
+    }, listenerOptions));
     list.querySelectorAll('[data-module-collection]').forEach((button) => button.addEventListener('click', () => {
       state.collection = button.dataset.moduleCollection;
       apply(true);
-    }));
+    }, listenerOptions));
     apply();
     return {state, apply};
   }

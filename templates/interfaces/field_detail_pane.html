@@ -1,5 +1,7 @@
+{% load content_feedback %}
 <aside class="ui-pane ui-detail-pane field-detail-pane" data-mypage-pane="field-detail">
   <header class="ui-pane-header ui-detail-pane-header interface-pane-header"><h2>{{ field_item.name }}@{{ field_item.creator.username }} v{{ field_item.current_version.version_number }}/Field</h2><button class="icon-button" type="button" data-close-field-detail aria-label="Field一覧に戻る">×</button></header>
+  {% content_feedback field_item 'field' %}
   <article class="interface-definition-detail field-definition-detail">
     {% if field_item.status == 'deleted' %}<p class="interface-definition-status"><span class="interface-status">削除済み</span></p>{% endif %}
     <dl class="field-definition-summary">

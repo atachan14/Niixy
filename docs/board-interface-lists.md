@@ -1,5 +1,7 @@
 # BoardList・InterfaceList参照とfav / bad
 
+> 最新訂正: 独立BoardList / InterfaceList入口とModuleの固定検索・保存済み枠を撤去し、Board / Module内の各List Tabへ統合。以下の旧InterfaceList配置記録は履歴。People仕様は維持。最新仕様・非破壊migration・QAは[module-list-integration.md](module-list-integration.md)を参照。
+
 Status: 公開済み（最新公開基準 `e17e00e188e6863914a0863dc33c67f19cf85e6f`、親工程からの引き継ぎ）。新しいVersion番号は未割当。以下の実装開始時の基準・公開計画・隔離QAの「未実施」は当時の記録として保持する。accounts0003～0005、rooms0010～0011、interfaces0010は共有環境に適用済み。[最新状態と検証境界](qa-status-2026-10-06.md)を参照する。
 
 Version未割当。2026-10-05承認済みのAccountList後続工程。基準local HEAD `829f8b056fd77d581a99abd200f96b42e78242fe`。公開はv0.16 / `80a39cf`。この工程は実装、隔離SQLite QA、ローカルcheckpointだけで、push・共有Neon migration・通常runserverの起動停止/restartは行わない。

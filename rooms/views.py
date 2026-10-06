@@ -234,6 +234,7 @@ def room_boards(request, room_id=None, username=None):
         **_scope_context(room),
         'collections': collections,
         'rating_boards': _rated_boards(request, room) if username else {},
+        'self_boards': [describe_target('board', board, request.user) for board in filter_muted(Board.objects.filter(creator=room).select_related('placement__collection__room').prefetch_related('policy_conditions'), request.user)] if username else [],
     })
 
 

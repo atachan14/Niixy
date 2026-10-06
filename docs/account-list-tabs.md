@@ -1,5 +1,7 @@
 # AccountPage People / InterfaceList のタブ訂正
 
+> 最新訂正: 独立BoardList / InterfaceList入口とModuleの固定検索・保存済み枠を撤去し、Board / Module内の各List Tabへ統合。以下の旧InterfaceList配置記録は履歴。People仕様は維持。最新仕様・非破壊migration・QAは[module-list-integration.md](module-list-integration.md)を参照。
+
 Status: ローカル修正。基準 `590852c18a4b9668f4c038c72779d1d5859b074e` を保持し、その上に追加。公開・push・通常server restart・共有Neon書込みを行わない。Version番号は未割当。
 
 ## 訂正した要件と履歴

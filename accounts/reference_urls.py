@@ -3,9 +3,9 @@ from . import content_lists as views
 
 app_name = 'references'
 urlpatterns = []
-for kind, plural in [('board', 'boards'), ('interface', 'interfaces')]:
+for kind, plural in [('board', 'boards'), ('interface', 'interfaces'), ('field', 'fields'), ('layout', 'layouts')]:
     kwargs = {'kind': kind}
-    urlpatterns += [
+    paths = [
         path(plural + '/<int:target_id>/', views.target_page, kwargs, name=kind + '-page'),
         path(plural + '/<int:target_id>/' + ('reference/' if kind == 'board' else 'pane/'), views.target_pane, kwargs, name=kind + '-pane'),
         path(plural + '/<int:target_id>/references/threads/<int:thread_id>/', views.target_thread, kwargs, name=kind + '-thread'),
@@ -21,3 +21,7 @@ for kind, plural in [('board', 'boards'), ('interface', 'interfaces')]:
         path(kind + '-lists/<int:list_id>/references/<int:reference_id>/remove/', views.remove, kwargs, name=kind + '-list-remove'),
         path('accounts/<str:username>/' + kind + '-lists/', views.listing, kwargs, name=kind + '-list-index'),
     ]
+
+    if kind in {'field', 'layout'}:
+        paths = [p for p in paths if '-list-' not in p.name or p.name.endswith('-list-remove')]
+    urlpatterns += paths

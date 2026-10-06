@@ -611,3 +611,49 @@ class InterfaceRating(models.Model):
             models.UniqueConstraint(fields=['author', 'target'], name='unique_interface_rating'),
             models.CheckConstraint(condition=models.Q(sentiment__in=['fav', 'bad']), name='interface_rating_sentiment'),
         ]
+
+
+class FieldListReference(models.Model):
+    interface_list = models.ForeignKey(InterfaceList, on_delete=models.CASCADE, related_name='field_references')
+    target = models.ForeignKey(FieldDefinition, null=True, on_delete=models.SET_NULL, related_name='list_references')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['interface_list', 'target'], name='unique_field_list_reference')]
+
+
+class FieldRating(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='field_ratings')
+    target = models.ForeignKey(FieldDefinition, on_delete=models.CASCADE, related_name='ratings')
+    sentiment = models.CharField(max_length=3, choices=[('fav', 'fav'), ('bad', 'bad')])
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['author', 'target'], name='unique_field_rating'),
+            models.CheckConstraint(condition=models.Q(sentiment__in=['fav', 'bad']), name='field_rating_sentiment'),
+        ]
+
+
+class LayoutListReference(models.Model):
+    interface_list = models.ForeignKey(InterfaceList, on_delete=models.CASCADE, related_name='layout_references')
+    target = models.ForeignKey(AccountLayout, null=True, on_delete=models.SET_NULL, related_name='list_references')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['interface_list', 'target'], name='unique_layout_list_reference')]
+
+
+class LayoutRating(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='layout_ratings')
+    target = models.ForeignKey(AccountLayout, on_delete=models.CASCADE, related_name='ratings')
+    sentiment = models.CharField(max_length=3, choices=[('fav', 'fav'), ('bad', 'bad')])
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['author', 'target'], name='unique_layout_rating'),
+            models.CheckConstraint(condition=models.Q(sentiment__in=['fav', 'bad']), name='layout_rating_sentiment'),
+        ]

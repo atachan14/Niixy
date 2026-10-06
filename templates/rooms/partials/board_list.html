@@ -1,16 +1,16 @@
-<div class="room-collection-browser">
+<div class="room-collection-browser"{% if account_boards %} data-integrated-kind="board" data-integrated-fetch="{{ request.path }}"{% endif %}>
+  {% if account_boards %}<p><button class="button secondary" type="button" data-reference-fetch="{% url 'references:board-list-index' account.username %}" data-reference-title="Board List管理">List管理</button></p>{% endif %}
   {% if collections or board_is_owner or account_boards %}
     <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="BoardList一覧">
-      {% for collection in collections %}
-        <button class="{% if forloop.first %}is-active{% endif %}" type="button" role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" data-ui-tab="collection-{{ collection.pk }}" data-collection-id="{{ collection.pk }}">{{ collection.name }}</button>
-      {% endfor %}
-      {% if account_boards %}<button class="{% if not collections %}is-active{% endif %}" type="button" role="tab" aria-selected="{% if not collections %}true{% else %}false{% endif %}" data-ui-tab="fav">fav</button><button type="button" role="tab" aria-selected="false" data-ui-tab="bad">bad</button>{% endif %}
-      {% if board_is_owner %}<button type="button" role="tab" aria-selected="false" data-ui-tab="collection-management" data-collection-management-tab>管理</button>{% endif %}
+      {% if account_boards %}<button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="self">自作</button><button type="button" role="tab" aria-selected="false" data-ui-tab="fav">fav</button><button type="button" role="tab" aria-selected="false" data-ui-tab="bad">bad</button>{% endif %}
+      {% for collection in collections %}<button class="{% if forloop.first and not account_boards %}is-active{% endif %}" type="button" role="tab" aria-selected="{% if forloop.first and not account_boards %}true{% else %}false{% endif %}" data-ui-tab="collection-{{ collection.pk }}" data-collection-id="{{ collection.pk }}">{{ collection.name }}</button>{% endfor %}
+      {% if board_is_owner and not account_boards %}<button type="button" role="tab" aria-selected="false" data-ui-tab="collection-management" data-collection-management-tab>管理</button>{% endif %}
     </div>
   {% endif %}
 
+  {% if account_boards %}<section class="ui-tab-panel room-collection-panel is-active" data-ui-tab-panel="self"><div class="ui-summary-list">{% for summary in self_boards %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">自作のBoardはありません。</p>{% endfor %}</div></section>{% endif %}
   {% for collection in collections %}
-    <section class="ui-tab-panel room-collection-panel{% if forloop.first %} is-active{% endif %}" data-ui-tab-panel="collection-{{ collection.pk }}" data-collection-panel-id="{{ collection.pk }}">
+    <section class="ui-tab-panel room-collection-panel{% if forloop.first and not account_boards %} is-active{% endif %}" data-ui-tab-panel="collection-{{ collection.pk }}" data-collection-panel-id="{{ collection.pk }}">
       <div class="room-board-list ui-summary-list">
         <div class="room-collection-window-actions">
           <button class="button secondary" type="button" data-collection-information-toggle aria-controls="collection-information-{{ collection.pk }}" aria-expanded="false">詳細確認</button>
@@ -23,7 +23,7 @@
               <section class="room-collection-information" data-collection-information-view>
                 <dl class="room-board-information-list">
                   <div><dt>BoardList名</dt><dd>{{ collection.name }}</dd></div>
-                  {% if account_boards %}<div><dt>自由な参照</dt><dd><a href="{% url 'references:board-list-page' collection.pk %}">BoardListを開く</a></dd></div>{% endif %}
+                  {% if account_boards %}<div><dt>自由な参照</dt><dd><a class="content-reference-summary" href="{% url 'references:board-list-page' collection.pk %}">Listの詳細・管理</a></dd></div>{% endif %}
                   <div><dt>Board数</dt><dd>{{ collection.visible_boards|length }}</dd></div>
                 </dl>
               </section>
@@ -67,7 +67,7 @@
           </div>
         {% endif %}
 
-        {% if collection.reference_summaries %}<p>自由な参照</p>{% for summary in collection.reference_summaries %}{% include 'shared/content_summary.html' %}{% endfor %}<p>配置されているBoard</p>{% endif %}
+        <div data-collection-references>{% if collection.reference_summaries %}<p>自由な参照</p>{% for summary in collection.reference_summaries %}{% include 'shared/content_summary.html' %}{% endfor %}<p>配置されているBoard</p>{% endif %}</div>
         {% for board in collection.visible_boards %}
           <button class="ui-summary-item" type="button" data-open-board="{{ board.pk }}" data-board-title="{{ board.name }}" data-board-url="{{ board.detail_url }}" data-board-collection="{{ collection.pk }}" data-summary-kind="board">
             <span class="ui-summary-item-context"{% if board.can_view %} aria-hidden="true"{% endif %}>{% if not board.can_view %}閲覧不可{% endif %}</span>
@@ -88,7 +88,7 @@
     <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="bad"><div class="ui-summary-list">{% for summary in rating_boards.bad %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">badはありません。</p>{% endfor %}</div></section>
   {% endif %}
 
-  {% if board_is_owner %}
+  {% if board_is_owner and not account_boards %}
     <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="collection-management">
       <div class="room-collection-management">
         <details class="ui-control-accordion room-collection-create">

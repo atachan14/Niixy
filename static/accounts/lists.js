@@ -144,7 +144,7 @@ window.NiixyAccountLists = (() => {
       if (page) { url.searchParams.set('page',page); pageUrl.searchParams.set('page',page); }
     }
     if (restore && account.closest('.account-page')) history.replaceState(history.state, '', account.dataset.accountPageUrl);
-    return open(url,pageUrl,account,'People一覧');
+    return open(url,pageUrl,account.querySelector('.account-overview-pane') || account,'People一覧');
   }
   function openDetail(pageUrl, source) {
     const page = new URL(pageUrl, location.origin);
@@ -206,6 +206,7 @@ window.NiixyAccountLists = (() => {
       const result = await response.json(); drafts.delete(key);
       mutations.delete(key); finished();
       patchSummaries(result);
+      document.dispatchEvent(new CustomEvent('niixy:content-list-changed',{detail:result}));
       if (!entry.pane.isConnected || !form.isConnected) return;
       if (form.dataset.listOperation === 'create') {
         await load(entry,entry.fetchUrl);
@@ -213,7 +214,7 @@ window.NiixyAccountLists = (() => {
           const parent = entries.get(index);
           if (parent && parent !== entry && index.dataset.listFetchUrl === result.index_url) load(parent,parent.fetchUrl);
         });
-        if (entry.pane.isConnected && !entry.abort.signal.aborted) await openDetail(result.url, entry.pane);
+        if (entry.pane.isConnected && !entry.abort.signal.aborted) await (result.kind === 'interface' ? NiixyContentReferences.open(result.url, entry.pane) : result.kind === 'board' ? NiixyContentReferences.open(result.url, entry.pane) : openDetail(result.url, entry.pane));
       } else if (form.dataset.listOperation === 'delete') {
         entry.close.click();
       } else if (form.dataset.listOperation === 'pick') {
