@@ -4,7 +4,7 @@
     <button class="icon-button" type="button" data-close-module-list aria-label="{% if profile_mode %}Profile{% else %}MyPage{% endif %}に戻る">×</button>
   </header>
 
-  <div class="account-feature-content" data-module-public data-integrated-fetch="{{ module_fetch_url }}" data-integrated-kind="interface">
+  <div class="account-feature-content" data-module-public data-integrated-fetch="{{ request.get_full_path }}" data-integrated-kind="interface">
   <div class="ui-tabs module-filter" role="tablist" aria-label="Moduleの種類" data-module-type-filter>
     <button class="is-active" type="button" role="tab" aria-selected="true" data-module-type="element">Element</button>
     <button type="button" role="tab" aria-selected="false" data-module-type="interface">Interface</button>
@@ -18,6 +18,7 @@
   </div>
   <div class="ui-tabs module-filter module-subtype-filter" role="tablist" aria-label="Interfaceの種類" data-module-subtypes="interface" hidden>
     <button type="button" role="tab" aria-selected="false" data-module-subtype="account">AccountIF</button>
+    <button type="button" role="tab" aria-selected="false" data-module-subtype="room">RoomIF</button>
     <button class="is-active" type="button" role="tab" aria-selected="true" data-module-subtype="thread">ThreadIF</button>
     <button type="button" role="tab" aria-selected="false" data-module-subtype="thread_post">ResponseIF</button>
   </div>
@@ -34,7 +35,10 @@
   <div class="module-list-content">
     {% for group in module_collections %}<section class="module-list-panel account-feature-column{% if forloop.first %} is-active{% endif %}" data-module-public-panel="{{ group.key }}">
       {% if group.list_id %}<p><button class="button secondary" type="button" data-module-list-detail data-reference-fetch="{{ group.detail_url }}" data-reference-base="{{ group.detail_url }}" data-reference-title="{{ group.name }}">Listの詳細・管理</button></p>{% endif %}
-      <div class="ui-summary-list">{% for summary in group.summaries %}<div data-module-summary-type="{{ summary.module_type }}" data-module-summary-subtype="{{ summary.module_subtype }}">{% include 'shared/content_summary.html' %}</div>{% endfor %}</div>
+      {% for category in group.pages %}<div data-module-public-page data-module-page-type="{{ category.type }}" data-module-page-subtype="{{ category.subtype }}" data-page-number="{{ category.page.number }}">
+        <div class="ui-summary-list">{% for summary in category.page %}<div data-module-summary-type="{{ summary.module_type }}" data-module-summary-subtype="{{ summary.module_subtype }}">{% include 'shared/content_summary.html' %}</div>{% endfor %}</div>
+        {% include 'shared/summary_pagination.html' with summary_page=category.page summary_page_url=module_fetch_url summary_page_query=category.query summary_page_label="Module一覧のページ" %}
+      </div>{% endfor %}
       <p class="empty" data-module-public-empty>表示できるModuleはありません。</p>
     </section>{% endfor %}
   </div>

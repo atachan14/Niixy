@@ -8,6 +8,8 @@ from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from config.pagination import paginate_summary_list
+from urllib.parse import urlencode
 from django.views.decorators.http import require_POST
 
 from events.idempotency import run_once, submission_id_from
@@ -236,11 +238,25 @@ def room_boards(request, room_id=None, username=None):
             Board(), room, conditions=default_board_policy_conditions(Board(), _scope_room(room), account=_scope_account(room)),
             target_prefix=f'board-policy-create-{collection.pk}',
         )
+    self_boards = [describe_target('board', board, request.user) for board in filter_muted(Board.objects.filter(creator=room).select_related('placement__collection__room').prefetch_related('policy_conditions'), request.user)] if username else []
+    ratings = _rated_boards(request, room) if username else {}
+    active = request.GET.get('tab', 'self')
+    if username:
+        self_boards = paginate_summary_list(self_boards, request.GET.get('page') if active == 'self' else 1)
+        ratings = {key: paginate_summary_list(values, request.GET.get('page') if active == key else 1) for key, values in ratings.items()}
+        for collection in collections:
+            selected = request.GET.get('collection') == str(collection.pk)
+            collection.board_count = len(collection.visible_boards)
+            collection.visible_boards = paginate_summary_list(collection.visible_boards, request.GET.get('boards_page') if selected else 1)
+            collection.reference_summaries = paginate_summary_list(collection.reference_summaries, request.GET.get('page') if selected else 1)
+            base = {'collection': collection.pk}
+            collection.reference_page_query = urlencode({**base, 'boards_page': collection.visible_boards.number})
+            collection.board_page_query = urlencode({**base, 'page': collection.reference_summaries.number})
     return render(request, 'rooms/partials/board_list.html', {
         **_scope_context(room),
         'collections': collections,
-        'rating_boards': _rated_boards(request, room) if username else {},
-        'self_boards': [describe_target('board', board, request.user) for board in filter_muted(Board.objects.filter(creator=room).select_related('placement__collection__room').prefetch_related('policy_conditions'), request.user)] if username else [],
+        'rating_boards': ratings, 'self_boards': self_boards,
+        'summary_page_url': request.path, 'summary_page_label': 'Board一覧のページ',
     })
 
 
@@ -384,13 +400,15 @@ def board_threads(request, board_id, room_id=None, username=None):
         for thread in board_threads:
             prepare_thread_for_view(thread, request.user, muted)
         threads = board_threads
+    thread_page = paginate_summary_list(threads, request.GET.get('thread_page')) if username else None
     return render(request, 'rooms/partials/board_threads.html', {
         **_scope_context(room),
         'board_edit_url': _scope_url(room, 'board-edit', board.pk) if room else '',
         'board_delete_url': _scope_url(room, 'board-delete', board.pk) if room else '',
         'board_thread_create_url': _scope_url(room, 'board-thread-create', board.pk),
         'board': board,
-        'threads': threads,
+        'threads': thread_page if thread_page is not None else threads,
+        'board_thread_page': thread_page, 'summary_page_url': request.path,
         'board_policy_rows': board_policy_rows(board),
         'board_policy_editor_rows': board_policy_editor_rows(board, room),
         'view_policy': view_policy,

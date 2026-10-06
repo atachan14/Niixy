@@ -10,6 +10,7 @@ from django.db.models.functions import Concat
 from django.http import JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from config.pagination import paginate_summary_list
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -345,9 +346,17 @@ def my_page(request):
 def account_applied(request, username):
     from interfaces.account_applications import application_payload
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
+    edit = request.GET.get('edit') == '1' and request.user.is_authenticated and request.user.pk == account.pk
+    applied = application_payload(account)
+    active = request.GET.get('tab', 'applied-field')
+    pages = {}
+    if not edit:
+        for key, tab in [('fields', 'applied-field'), ('interfaces', 'applied-interface')]:
+            pages[key] = paginate_summary_list(applied[key], request.GET.get('page') if active == tab else 1)
+            applied[key] = pages[key]
     return render(request, 'accounts/partials/applied_list.html', {
-        'account': account, 'applied': application_payload(account),
-        'edit_mode': request.GET.get('edit') == '1' and request.user.is_authenticated and request.user.pk == account.pk,
+        'account': account, 'applied': applied, 'edit_mode': edit, 'applied_pages': pages,
+        'summary_page_url': request.path, 'summary_page_label': 'Applied一覧のページ',
     })
 
 

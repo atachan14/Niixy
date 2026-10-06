@@ -1,4 +1,4 @@
-<div class="room-collection-browser"{% if account_boards %} data-integrated-kind="board" data-integrated-fetch="{{ request.path }}"{% endif %}>
+<div class="room-collection-browser"{% if account_boards %} data-integrated-kind="board" data-integrated-fetch="{{ request.get_full_path }}"{% endif %}>
   {% if collections or board_is_owner or account_boards %}
     <div class="ui-tabs room-collection-tabs" role="tablist" aria-label="BoardList一覧">
       {% if account_boards %}<button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="self">自作</button><button type="button" role="tab" aria-selected="false" data-ui-tab="fav">fav</button><button type="button" role="tab" aria-selected="false" data-ui-tab="bad">bad</button>{% endif %}
@@ -7,7 +7,7 @@
     </div>
   {% endif %}
 
-  {% if account_boards %}<section class="ui-tab-panel room-collection-panel is-active" data-ui-tab-panel="self"><div class="ui-summary-list">{% for summary in self_boards %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">自作のBoardはありません。</p>{% endfor %}</div></section>{% endif %}
+  {% if account_boards %}<section class="ui-tab-panel room-collection-panel is-active" data-ui-tab-panel="self"><div class="ui-summary-list" data-board-summaries data-page-number="{{ self_boards.number }}">{% for summary in self_boards %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">自作のBoardはありません。</p>{% endfor %}{% include "shared/summary_pagination.html" with summary_page=self_boards summary_page_query="tab=self" %}</div></section>{% endif %}
   {% for collection in collections %}
     <section class="ui-tab-panel room-collection-panel{% if forloop.first and not account_boards %} is-active{% endif %}" data-ui-tab-panel="collection-{{ collection.pk }}" data-collection-panel-id="{{ collection.pk }}">
       <div class="room-board-list ui-summary-list">
@@ -23,7 +23,7 @@
                 <dl class="room-board-information-list">
                   <div><dt>BoardList名</dt><dd>{{ collection.name }}</dd></div>
                   {% if account_boards %}<div><dt>自由な参照</dt><dd><a class="content-reference-summary" href="{% url 'references:board-list-page' collection.pk %}">Listの詳細・管理</a></dd></div>{% endif %}
-                  <div><dt>Board数</dt><dd>{{ collection.visible_boards|length }}</dd></div>
+                  <div><dt>Board数</dt><dd>{% if account_boards %}{{ collection.board_count }}{% else %}{{ collection.visible_boards|length }}{% endif %}</dd></div>
                 </dl>
               </section>
               {% if board_is_owner and not collection.is_uncategorized %}
@@ -66,7 +66,8 @@
           </div>
         {% endif %}
 
-        <div data-collection-references>{% if collection.reference_summaries %}<p>自由な参照</p>{% for summary in collection.reference_summaries %}{% include 'shared/content_summary.html' %}{% endfor %}<p>配置されているBoard</p>{% endif %}</div>
+        <div data-collection-references data-page-number="{{ collection.reference_summaries.number }}">{% if collection.reference_summaries %}<p>自由な参照</p>{% for summary in collection.reference_summaries %}{% include 'shared/content_summary.html' %}{% endfor %}<p>配置されているBoard</p>{% endif %}{% if account_boards %}{% include "shared/summary_pagination.html" with summary_page=collection.reference_summaries summary_page_query=collection.reference_page_query %}{% endif %}</div>
+        <div data-collection-boards data-page-number="{{ collection.visible_boards.number }}">
         {% for board in collection.visible_boards %}
           <button class="ui-summary-item" type="button" data-open-board="{{ board.pk }}" data-board-title="{{ board.name }}" data-board-url="{{ board.detail_url }}" data-board-collection="{{ collection.pk }}" data-summary-kind="board">
             <span class="ui-summary-item-context"{% if board.can_view %} aria-hidden="true"{% endif %}>{% if not board.can_view %}閲覧不可{% endif %}</span>
@@ -76,6 +77,7 @@
         {% empty %}
           <p class="empty">Boardはありません。</p>
         {% endfor %}
+        {% if account_boards %}{% include "shared/summary_pagination.html" with summary_page=collection.visible_boards summary_page_query=collection.board_page_query summary_page_param="boards_page" %}{% endif %}</div>
       </div>
     </section>
   {% empty %}
@@ -83,8 +85,8 @@
   {% endfor %}
 
   {% if account_boards %}
-    <section class="ui-tab-panel room-collection-panel{% if not collections %} is-active{% endif %}" data-ui-tab-panel="fav"><div class="ui-summary-list">{% for summary in rating_boards.fav %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">favはありません。</p>{% endfor %}</div></section>
-    <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="bad"><div class="ui-summary-list">{% for summary in rating_boards.bad %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">badはありません。</p>{% endfor %}</div></section>
+    <section class="ui-tab-panel room-collection-panel{% if not collections %} is-active{% endif %}" data-ui-tab-panel="fav"><div class="ui-summary-list" data-board-summaries data-page-number="{{ rating_boards.fav.number }}">{% for summary in rating_boards.fav %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">favはありません。</p>{% endfor %}{% include "shared/summary_pagination.html" with summary_page=rating_boards.fav summary_page_query="tab=fav" %}</div></section>
+    <section class="ui-tab-panel room-collection-panel" data-ui-tab-panel="bad"><div class="ui-summary-list" data-board-summaries data-page-number="{{ rating_boards.bad.number }}">{% for summary in rating_boards.bad %}{% include 'shared/content_summary.html' %}{% empty %}<p class="empty">badはありません。</p>{% endfor %}{% include "shared/summary_pagination.html" with summary_page=rating_boards.bad summary_page_query="tab=bad" %}</div></section>
   {% endif %}
 
   {% if board_is_owner and not account_boards %}

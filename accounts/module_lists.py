@@ -1,6 +1,8 @@
 """Public definition collections. No Applied values, drafts, or placement writes."""
 from .content_lists import MODULE_KINDS, KINDS, describe_target, public_modules, prepare_list, route
 from .mutes import muted_account_ids
+from config.pagination import paginate_summary_list
+from urllib.parse import urlencode
 
 
 def module_collections(request, account):
@@ -26,5 +28,16 @@ def module_collections(request, account):
             refs = KINDS[kind].reference.objects.filter(interface_list=item).select_related('target__current_version')
             group['summaries'] += summaries(kind, [r.target for r in refs if r.target])
         groups.append(group)
+    active = (request.GET.get('collection', 'self'), request.GET.get('type', 'element'), request.GET.get('subtype', 'field'))
+    categories = [('element', 'field'), ('element', 'computed_field'), ('element', 'action'),
+                  ('interface', 'account'), ('interface', 'room'), ('interface', 'thread'), ('interface', 'thread_post'),
+                  ('layout', 'account'), ('layout', 'thread_post'), ('layout', 'room')]
+    for group in groups:
+        group['pages'] = []
+        for type_, subtype in categories:
+            values = [s for s in group['summaries'] if s['module_type'] == type_ and s['module_subtype'] == subtype]
+            group['pages'].append({'type': type_, 'subtype': subtype,
+                'page': paginate_summary_list(values, request.GET.get('page') if active == (group['key'], type_, subtype) else 1),
+                'query': urlencode({'type': type_, 'subtype': subtype, 'collection': group['key']})})
     return {'module_collections': groups, 'module_fetch_url': request.path,
             'module_lists_url': route('interface', 'list-index', account.username)}

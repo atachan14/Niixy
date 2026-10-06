@@ -41,6 +41,7 @@
 .account-feature-content .summary-item-header { padding-inline: max(8px, var(--summary-list-gutter, 0px)); }
 .account-feature-content .summary-item { min-width: 0; }
 .account-feature-content .people-list-actions { margin: 0 0 12px; }
+.account-feature-content [data-module-public-page][hidden],
 .account-feature-content [data-module-subtypes][hidden] { display: none; }
 .account-feature-content .module-list-panel { display: none; }
 .account-feature-content .module-list-panel.is-active { display: block; }

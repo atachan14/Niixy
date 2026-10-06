@@ -1,5 +1,5 @@
 {% if summary_page.has_other_pages %}<nav class="summary-pagination" aria-label="{{ summary_page_label }}">
-  {% if summary_page.has_previous %}<a class="button secondary" href="{{ summary_page_url }}?{% if summary_page_query %}{{ summary_page_query }}&amp;{% endif %}page={{ summary_page.previous_page_number }}" data-summary-page>前へ</a>{% endif %}
+  {% if summary_page.has_previous %}<a class="button secondary" href="{{ summary_page_url }}?{% if summary_page_query %}{{ summary_page_query }}&amp;{% endif %}{{ summary_page_param|default:"page" }}={{ summary_page.previous_page_number }}" data-summary-page>前へ</a>{% endif %}
   <span>{{ summary_page.number }} / {{ summary_page.paginator.num_pages }}</span>
-  {% if summary_page.has_next %}<a class="button secondary" href="{{ summary_page_url }}?{% if summary_page_query %}{{ summary_page_query }}&amp;{% endif %}page={{ summary_page.next_page_number }}" data-summary-page>次へ</a>{% endif %}
+  {% if summary_page.has_next %}<a class="button secondary" href="{{ summary_page_url }}?{% if summary_page_query %}{{ summary_page_query }}&amp;{% endif %}{{ summary_page_param|default:"page" }}={{ summary_page.next_page_number }}" data-summary-page>次へ</a>{% endif %}
 </nav>{% endif %}

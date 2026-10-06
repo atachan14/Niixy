@@ -50,6 +50,35 @@ window.NiixyContentReferences = (() => {
     } catch (error) {if(form.isConnected){alert.textContent=error.message;alert.hidden=false;}}
     finally {pending.delete(key);controls.forEach(control => {control.disabled=false;});}
   });
+  function replaceIntegrated(root, fresh, kind) {
+    root.dataset.integratedFetch = fresh.dataset.integratedFetch;
+    if (kind === 'interface') {
+      const state = {type:root.dataset.moduleSelectedType, subtype:root.dataset.moduleSelectedSubtype, collection:root.dataset.moduleSelectedCollection};
+      root.querySelector('[data-module-collection-filter]').replaceWith(fresh.querySelector('[data-module-collection-filter]'));
+      root.querySelector('.module-list-content').replaceWith(fresh.querySelector('.module-list-content'));
+      NiixyUI.bindModuleFilters(root,state);
+    } else {
+      const selected = root.querySelector('[data-ui-tab][aria-selected=true]')?.dataset.uiTab || 'self';
+      root.querySelector('.room-collection-tabs').replaceWith(fresh.querySelector('.room-collection-tabs'));
+      const panels = new Map(Array.from(root.querySelectorAll('[data-ui-tab-panel]'),p=>[p.dataset.uiTabPanel,p]));
+      for (const next of fresh.querySelectorAll('[data-ui-tab-panel]')) {
+        const old = panels.get(next.dataset.uiTabPanel); panels.delete(next.dataset.uiTabPanel);
+        if (!old) { root.append(next); continue; }
+        if (!old.dataset.collectionPanelId) { old.replaceWith(next); continue; }
+        const refs = old.querySelector('[data-collection-references]');
+        if (refs) refs.replaceWith(next.querySelector('[data-collection-references]'));
+        const boards = old.querySelector('[data-collection-boards]');
+        if (boards) boards.replaceWith(next.querySelector('[data-collection-boards]'));
+        const oldName = old.querySelector('.room-collection-information dd'), newName = next.querySelector('.room-collection-information dd');
+        if (oldName && newName) oldName.textContent = newName.textContent;
+        const name = old.querySelector('.room-collection-edit input[name=name]');
+        if (name && name.value === name.defaultValue) name.value = name.defaultValue = newName.textContent;
+      }
+      panels.forEach(p=>p.remove());
+      NiixyUI.bindTabs(root, {selected});
+      root.dispatchEvent(new CustomEvent('niixy:collections-refreshed',{bubbles:true}));
+    }
+  }
   async function refreshIntegrated(kind) {
     for (const root of document.querySelectorAll(`[data-integrated-kind="${kind}"]`)) {
       const generation = (root.integratedGeneration || 0) + 1; root.integratedGeneration = generation;
@@ -58,31 +87,7 @@ window.NiixyContentReferences = (() => {
         if (!response.ok) throw new Error('List一覧を更新できませんでした。');
         const fresh = new DOMParser().parseFromString(await response.text(),'text/html').querySelector('[data-integrated-kind]');
         if (!root.isConnected || root.integratedGeneration !== generation || !fresh) continue;
-        if (kind === 'interface') {
-          const state = {type:root.dataset.moduleSelectedType, subtype:root.dataset.moduleSelectedSubtype, collection:root.dataset.moduleSelectedCollection};
-          root.querySelector('[data-module-collection-filter]').replaceWith(fresh.querySelector('[data-module-collection-filter]'));
-          root.querySelector('.module-list-content').replaceWith(fresh.querySelector('.module-list-content'));
-          NiixyUI.bindModuleFilters(root,state);
-        } else {
-          const selected = root.querySelector('[data-ui-tab][aria-selected=true]')?.dataset.uiTab || 'self';
-          root.querySelector('.room-collection-tabs').replaceWith(fresh.querySelector('.room-collection-tabs'));
-          const panels = new Map(Array.from(root.querySelectorAll('[data-ui-tab-panel]'),p=>[p.dataset.uiTabPanel,p]));
-          for (const next of fresh.querySelectorAll('[data-ui-tab-panel]')) {
-            const old = panels.get(next.dataset.uiTabPanel); panels.delete(next.dataset.uiTabPanel);
-            if (!old) { root.append(next); continue; }
-            if (!old.dataset.collectionPanelId) { old.replaceWith(next); continue; }
-            const refs = old.querySelector('[data-collection-references]');
-            if (refs) refs.replaceWith(next.querySelector('[data-collection-references]'));
-            const oldName = old.querySelector('.room-collection-information dd'), newName = next.querySelector('.room-collection-information dd');
-            if (oldName && newName) oldName.textContent = newName.textContent;
-            const name = old.querySelector('.room-collection-edit input[name=name]');
-            if (name && name.value === name.defaultValue) name.value = name.defaultValue = newName.textContent;
-          }
-          panels.forEach(p=>p.remove());
-          NiixyUI.bindTabs(root);
-          (root.querySelector(`[data-ui-tab="${CSS.escape(selected)}"]`) || root.querySelector('[data-ui-tab=self]'))?.click();
-          root.dispatchEvent(new CustomEvent('niixy:collections-refreshed',{bubbles:true}));
-        }
+        replaceIntegrated(root, fresh, kind);
         root.querySelector('[data-integrated-error]')?.remove();
       } catch (error) {
         if (!root.isConnected) continue;
@@ -97,5 +102,5 @@ window.NiixyContentReferences = (() => {
   if (direct) open(direct.dataset.directListUrl,direct.querySelector('.reference-origin'));
   const board = document.querySelector('[data-direct-board-id]');
   if (board) open(location.href,board.querySelector('.reference-origin'));
-  return {open};
+  return {open, replaceIntegrated};
 })();

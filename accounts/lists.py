@@ -71,7 +71,12 @@ def listing(request, username):
     muted = muted_account_ids(request.user)
     references = AccountListReference.objects.select_related('target__niixy_profile').exclude(target_id__in=muted)
     lists = AccountList.objects.filter(owner=account).order_by('created_at','pk').prefetch_related(Prefetch('references',queryset=references,to_attr='visible_references'))
+    active = request.GET.get('people_tab', 'love')
+    for item in lists:
+        key = 'list-' + str(item.pk)
+        item.visible_references = paginate_summary_list(item.visible_references, request.GET.get('page') if active == key else 1)
     reviewed = {sentiment: AccountReview.objects.filter(author=account,sentiment=sentiment).exclude(target_id__in=muted).select_related('target__niixy_profile') for sentiment in ('love','hate')}
+    reviewed = {kind: paginate_summary_list(rows.order_by('-updated_at', '-pk'), request.GET.get('page') if active == kind else 1) for kind, rows in reviewed.items()}
     return render(request, 'accounts/partials/account_lists.html', {
         **list_context(request, account), 'people_lists': lists, 'loved_accounts': reviewed['love'], 'hated_accounts': reviewed['hate'],
     })

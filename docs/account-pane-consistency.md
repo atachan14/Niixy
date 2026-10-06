@@ -1,5 +1,7 @@
 # AccountPage Paneの切替と表示統一
 
+> 前工程 `d5b53a8`は2026-10-06に公開済み。最新の未公開local後続修正（RoomIF・分類tab・一覧pagination）は[AccountPage一覧・分類tabの整合](account-list-consistency.md)を参照。以下は前工程のlocal修正時点の記録として保持する。
+
 2026-10-06。基準はlocal `9011a00`（`209c6ef`にRoom Review / Muteを追加）。前workerの未commit変更を保持して継続した。修正とQAはlocalのみ。通常runserver、共有Neon、push、public反映はこの工程の対象外。既存のroot READMEとdocs/memo/inbox.mdには編集・stageを行わない。
 
 ## 復旧時の状態と原因

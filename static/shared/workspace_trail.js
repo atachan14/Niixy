@@ -176,7 +176,7 @@ window.NiixyWorkspaceTrail = (() => {
     return template.replace('/0/', `/${id}/`);
   }
 
-  async function fetchInto(entry, url, selector = null) {
+  async function fetchInto(entry, url, selector = null, merge = null) {
     entry.request?.abort();
     const request = new AbortController();
     entry.request = request;
@@ -198,7 +198,8 @@ window.NiixyWorkspaceTrail = (() => {
     const parsed = new DOMParser().parseFromString(text, 'text/html');
     const fragment = parsed.querySelector(selector);
     if (!fragment) throw new Error('Paneの内容が見つかりませんでした。');
-    entry.body.replaceChildren(fragment);
+    if (merge) merge(entry.body, fragment);
+    else entry.body.replaceChildren(fragment);
     return fragment;
   }
 
@@ -265,13 +266,29 @@ window.NiixyWorkspaceTrail = (() => {
     }
     const [title, listUrl] = definition;
     let roomListUrl = listUrl;
+    const bindFeature = (params = new URLSearchParams(new URL(entry.url).search)) => {
+      const key = kind === 'room' ? 'room_tab' : 'tab';
+      NiixyUI.bindTabs(entry.body, {selected:params.get(key) || ({room:'owner', 'account-if':'applied-field'}[kind] || 'created'), onChange:tab => {
+        params.set(key, tab);
+        if (kind === 'account-if') params.set('page', entry.body.querySelector(`[data-ui-tab-panel="${tab}"]`)?.dataset.pageNumber || '1');
+        entry.url = childUrl(account.dataset.accountPageUrl, {pane:kind, ...Object.fromEntries(params)}).href;
+        selectCategory(entry, entry.url);
+      }});
+      const modules = entry.body.querySelector('[data-module-public]');
+      if (modules) NiixyUI.bindModuleFilters(modules, {type:params.get('type') || 'element', subtype:params.get('subtype') || 'field', collection:params.get('collection') || 'self'}, {onChange:state => {
+        entry.url = childUrl(account.dataset.accountPageUrl, {pane:'module', ...state}).href;
+        const fetchUrl = new URL(listUrl,location.origin); fetchUrl.search = new URL(entry.url).search;
+        modules.dataset.integratedFetch = fetchUrl.href;
+        selectCategory(entry, entry.url);
+      }});
+    };
     const entry = trail.push({title, width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind}), after: origin});
     if (kind === 'room') window.addEventListener('niixy:room-review-changed', (event) => {
       if (event.detail.actor !== account.dataset.accountId) return;
       const url = new URL(roomListUrl, location.origin);
       url.searchParams.set('room_tab', entry.body.querySelector('[data-ui-tab][aria-selected="true"]')?.dataset.uiTab || 'owner');
       roomListUrl = url.href;
-      fetchInto(entry, roomListUrl).then(() => NiixyUI.bindTabs(entry.body)).catch((error) => showError(entry, error));
+      fetchInto(entry, roomListUrl).then(() => bindFeature()).catch((error) => showError(entry, error));
     }, {signal: entry.abort.signal});
     if (kind === 'account-if') entry.body.addEventListener('focusin', (event) => {
       const tab = event.target;
@@ -282,8 +299,12 @@ window.NiixyWorkspaceTrail = (() => {
       const pagination = event.target.closest('[data-pane-pagination], [data-room-pagination], [data-summary-page]');
       if (pagination) {
         event.preventDefault();
-        if (kind === 'room') roomListUrl = pagination.href;
-        fetchInto(entry, pagination.href).then(() => NiixyUI.bindTabs(entry.body)).catch((error) => showError(entry, error));
+        const params = new URL(pagination.href).searchParams;
+        entry.url = childUrl(account.dataset.accountPageUrl, {pane:kind, ...Object.fromEntries(params)}).href;
+        selectCategory(entry, entry.url);
+        const fetchUrl = new URL(listUrl, location.origin); fetchUrl.search = params;
+        if (kind === 'room') roomListUrl = fetchUrl.href;
+        fetchInto(entry, fetchUrl, kind === 'account-if' ? '.applied-list-content' : kind === 'module' ? '[data-module-public]' : null).then(() => bindFeature(params)).catch((error) => showError(entry, error));
         return;
       }
       const detail = event.target.closest('[data-thread-detail]');
@@ -302,12 +323,7 @@ window.NiixyWorkspaceTrail = (() => {
       }
     });
     fetchInto(entry, listUrl, kind === 'account-if' ? '.applied-list-content' : kind === 'module' ? '[data-module-public]' : null).then(() => {
-      NiixyUI.bindTabs(entry.body);
-      const modules = entry.body.querySelector('[data-module-public]');
-      if (modules) NiixyUI.bindModuleFilters(modules, {type:'element', subtype:'field', collection:'self'}, {onChange:state => {
-        entry.url = childUrl(account.dataset.accountPageUrl, {pane:'module', ...state}).href;
-        history.replaceState(history.state, '', entry.url);
-      }});
+      bindFeature();
     }).catch((error) => showError(entry, error));
   }
 
@@ -403,7 +419,9 @@ window.NiixyWorkspaceTrail = (() => {
     const loadBoard = async () => {
       accountConditions?.destroy();
       accountConditions = null;
-      await fetchInto(boardEntry, boardUrl);
+      const fetchUrl = new URL(boardUrl, location.origin);
+      if (accountScope && new URL(location.href).searchParams.has('thread_page')) fetchUrl.searchParams.set('thread_page', new URL(location.href).searchParams.get('thread_page'));
+      await fetchInto(boardEntry, fetchUrl);
       boardEntry.heading.textContent = boardEntry.body.querySelector('[data-board-name]')?.dataset.boardName || board.dataset.boardTitle;
         const focusStage = (stage) => {
           if (stage === 'thread-list') {
@@ -469,6 +487,17 @@ window.NiixyWorkspaceTrail = (() => {
     };
 
     boardEntry.body.addEventListener('click', (event) => {
+      const pagination = accountScope && event.target.closest('[data-summary-page]');
+      if (pagination) {
+        event.preventDefault();
+        const url = new URL(boardEntry.url); url.searchParams.delete('thread'); url.searchParams.delete('post');
+        url.searchParams.set('thread_page', new URL(pagination.href).searchParams.get('thread_page'));
+        boardEntry.url = url.href; selectCategory(boardEntry, url);
+        fetchInto(boardEntry, pagination.href, '[data-board-thread-results]', (body, fresh) => {
+          body.querySelector('[data-board-thread-results]').replaceWith(fresh);
+        }).catch(error => showError(boardEntry,error));
+        return;
+      }
       const thread = event.target.closest('[data-room-thread]');
       if (thread) openThreadDetail(trail, threadSource, thread.dataset.roomThread, null, boardEntry);
     });
@@ -508,7 +537,7 @@ window.NiixyWorkspaceTrail = (() => {
     });
     // Child Close snapshots the list URL, including when restoring a deep link.
     if (nativeEntry && (initial.has('board') || initial.has('thread'))) {
-      entry.url = childUrl(pageUrl, {...listParams, collection:initial.get('collection'), tab:initial.get('tab')}).href;
+      entry.url = childUrl(pageUrl, {...listParams, collection:initial.get('collection'), tab:initial.get('tab'), page:initial.get('page'), boards_page:initial.get('boards_page')}).href;
       history.replaceState(history.state, '', entry.url);
     }
     const listUrl = boards ? room.dataset.boardsUrl : room.dataset.membersUrl;
@@ -521,7 +550,10 @@ window.NiixyWorkspaceTrail = (() => {
     const loadList = async (collectionId = null) => {
       listAccountConditions?.destroy();
       listAccountConditions = null;
-      await fetchInto(entry, listUrl);
+      const fetchUrl = new URL(listUrl, location.origin);
+      const params = new URL(entry.url).searchParams;
+      ['collection','tab','page','boards_page'].forEach(key => {if (params.has(key)) fetchUrl.searchParams.set(key,params.get(key));});
+      await fetchInto(entry, fetchUrl);
       NiixyUI.bindTabs(entry.body);
       initializeCollectionControls(entry.body);
       const selectedId = collectionId || new URL(entry.url).searchParams.get('collection');
@@ -569,7 +601,16 @@ window.NiixyWorkspaceTrail = (() => {
     };
 
     entry.body.addEventListener('niixy:collections-refreshed', () => initializeCollectionControls(entry.body), {signal:entry.abort.signal});
-    const openBoard = (board) => openBoardPane(trail, room, board, entry.native ? entry.pane : entry, () => loadList().catch((error) => showError(entry, error)));
+    const openBoard = (board, threadPage = null) => {
+      if (accountScope) {
+        const url = new URL(entry.url); url.searchParams.set('board',board.dataset.openBoard);
+        url.searchParams.delete('thread'); url.searchParams.delete('post');
+        if (threadPage) url.searchParams.set('thread_page',threadPage);
+        else url.searchParams.delete('thread_page');
+        board.dataset.boardPageUrl = url.href;
+      }
+      return openBoardPane(trail, room, board, entry.native ? entry.pane : entry, () => loadList().catch(error => showError(entry,error)));
+    };
 
     entry.body.addEventListener('focusin', (event) => {
       const input = event.target;
@@ -583,8 +624,28 @@ window.NiixyWorkspaceTrail = (() => {
       const tab = event.target.closest('[data-ui-tab]');
       if (tab) {
         const url = childUrl(pageUrl, {...listParams, collection: tab.dataset.collectionId || null, tab: tab.dataset.collectionId ? null : tab.dataset.uiTab});
+        const panel = entry.body.querySelector(`[data-ui-tab-panel="${tab.dataset.uiTab}"]`);
+        const page = panel?.querySelector('[data-collection-references], [data-board-summaries]')?.dataset.pageNumber;
+        const boardsPage = panel?.querySelector('[data-collection-boards]')?.dataset.pageNumber;
+        if (page) url.searchParams.set('page',page);
+        if (boardsPage) url.searchParams.set('boards_page',boardsPage);
+        entry.request?.abort();
         entry.url = url.href;
-        history.replaceState(history.state, '', url);
+        const fetchUrl = new URL(listUrl,location.origin); fetchUrl.search = url.search;
+        entry.body.querySelector('[data-integrated-kind=board]').dataset.integratedFetch = fetchUrl.href;
+        selectCategory(entry.native ? entry.pane : entry, url);
+      }
+      const pagination = accountScope && event.target.closest('[data-summary-page]');
+      if (pagination) {
+        event.preventDefault();
+        const params = new URL(pagination.href).searchParams;
+        entry.url = childUrl(pageUrl, {...listParams, ...Object.fromEntries(params)}).href;
+        selectCategory(entry.native ? entry.pane : entry, entry.url);
+        fetchInto(entry, pagination.href, '.room-collection-browser', (body, fresh) => {
+          const root = body.querySelector('.room-collection-browser');
+          NiixyContentReferences.replaceIntegrated(root, fresh, 'board');
+        }).catch(error => showError(entry,error));
+        return;
       }
       const board = event.target.closest('[data-open-board]');
       if (board) openBoard(board);
@@ -612,7 +673,7 @@ window.NiixyWorkspaceTrail = (() => {
       const threadId = initial.get('thread');
       const board = boardId && entry.body.querySelector(`[data-open-board="${boardId}"]`);
       if (board) {
-        const boardEntry = await openBoard(board);
+        const boardEntry = await openBoard(board, initial.get('thread_page'));
         if (threadId && boardEntry) openThreadDetail(trail, threadSource, threadId, null, boardEntry);
       }
     }).catch((error) => showError(entry, error));
@@ -720,7 +781,7 @@ window.NiixyWorkspaceTrail = (() => {
   document.addEventListener('click', (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const anchor = event.target.closest('a[href]');
-    if (anchor?.hasAttribute('data-detail-url')) return;
+    if (anchor?.matches('[data-detail-url], [data-pane-pagination], [data-room-pagination], [data-summary-page]')) return;
     const entity = entityLink(anchor);
     if (!entity) return;
     event.preventDefault();
@@ -745,7 +806,14 @@ window.NiixyWorkspaceTrail = (() => {
     return entry;
   }
 
-  return {openReferenceBoard, openContentPane, openReviewEditor, openMapBoard, openBoards, loadAccountBoards:(account,entry,params) => openRoomList(trail,account,'boards',null,params,entry), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
+  function selectCategory(source, url) {
+    const retained = trail.prepare(source?.native ? source.pane : source);
+    if (retained) {retained.request?.abort(); retained.url = String(url); trail.align(retained);}
+    else trail.track.niixyWorkspace?.align();
+    history.replaceState(history.state, '', url);
+    return retained;
+  }
+  return {selectCategory, openReferenceBoard, openContentPane, openReviewEditor, openMapBoard, openBoards, loadAccountBoards:(account,entry,params) => openRoomList(trail,account,'boards',null,params,entry), prepare: (source) => trail.prepare(source), clear: ({preserveUrl = false} = {}) => {
     const url = location.href;
     trail.discardAfter();
     if (preserveUrl) history.replaceState(history.state, '', url);

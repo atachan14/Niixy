@@ -87,18 +87,24 @@ window.NiixyUI = (() => {
     pane.append(status);
   }
 
-  function bindTabs(root) {
+  function bindTabs(root, {selected = null, onChange = null} = {}) {
+    if (onChange) root.tabOnChange = onChange;
+    const apply = (tab) => {
+      root.querySelectorAll('[data-ui-tab]').forEach(item => {
+        item.classList.toggle('is-active', item === tab);
+        item.setAttribute('aria-selected', String(item === tab));
+      });
+      root.querySelectorAll('[data-ui-tab-panel]').forEach(panel => {
+        panel.classList.toggle('is-active', panel.dataset.uiTabPanel === tab.dataset.uiTab);
+      });
+    };
+    if (selected) apply(root.querySelector(`[data-ui-tab="${CSS.escape(selected)}"]`) || root.querySelector('[data-ui-tab]'));
+
     root.querySelectorAll('[data-ui-tab]:not([data-ui-tab-bound])').forEach((tab) => {
       tab.dataset.uiTabBound = 'true';
       tab.addEventListener('click', () => {
-        root.querySelectorAll('[data-ui-tab]').forEach((item) => {
-          const selected = item === tab;
-          item.classList.toggle('is-active', selected);
-          item.setAttribute('aria-selected', String(selected));
-        });
-        root.querySelectorAll('[data-ui-tab-panel]').forEach((panel) => {
-          panel.classList.toggle('is-active', panel.dataset.uiTabPanel === tab.dataset.uiTab);
-        });
+        apply(tab);
+        root.tabOnChange?.(tab.dataset.uiTab);
       });
     });
   }
@@ -225,7 +231,7 @@ window.NiixyUI = (() => {
     onChange = list.moduleFilterOnChange || null;
     const subtypeByType = {
       element: new Set(['field', 'computed_field', 'action']),
-      interface: new Set(['account', 'thread', 'thread_post']),
+      interface: new Set(['account', 'room', 'thread', 'thread_post']),
       layout: new Set(['thread_post', 'account', 'room']),
     };
     const allowedCollections = new Set(Array.from(list.querySelectorAll('[data-module-collection]'), button => button.dataset.moduleCollection));
@@ -285,6 +291,9 @@ window.NiixyUI = (() => {
       });
       list.querySelectorAll('[data-module-public-panel]').forEach(panel => {
         panel.classList.toggle('is-active', panel.dataset.modulePublicPanel === state.collection);
+        panel.querySelectorAll('[data-module-public-page]').forEach(page => {
+          page.hidden = page.dataset.modulePageType !== state.type || page.dataset.modulePageSubtype !== state.subtypes[state.type];
+        });
         const rows = Array.from(panel.querySelectorAll('[data-module-summary-type]'));
         rows.forEach(row => { row.hidden = row.dataset.moduleSummaryType !== state.type || row.dataset.moduleSummarySubtype !== state.subtypes[state.type]; });
         panel.querySelector('[data-module-public-empty]').hidden = rows.some(row => !row.hidden);
@@ -306,6 +315,7 @@ window.NiixyUI = (() => {
         type: state.type,
         subtype: state.subtypes[state.type],
         collection: state.collection,
+        page: list.querySelector(`[data-module-public-panel="${state.collection}"] [data-module-public-page]:not([hidden])`)?.dataset.pageNumber || '1',
       });
     };
 

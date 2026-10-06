@@ -40,27 +40,28 @@ window.NiixyAccountLists = (() => {
   }
   function bind(root, entry) {
     entries.set(root, entry);
-    NiixyUI.bindTabs(root);
+    NiixyUI.bindTabs(root, {selected:entry.selectedTab});
     // Replacing a saved List must preserve the selected fixed/List tab without
     // reopening a child Pane as a side effect of refreshing this index.
-    const selected = root.querySelector(`[data-ui-tab="${entry.selectedTab || ''}"]`);
-    selected?.click();
+    entry.selectedTab = root.querySelector('[data-ui-tab][aria-selected=true]')?.dataset.uiTab || entry.selectedTab;
     showSelectedTab(root.querySelector('[data-ui-tab][aria-selected=true]'));
     root.addEventListener('click', event => {
       const tab = event.target.closest('[data-ui-tab]');
       if (!tab) return;
+      if (root.hasAttribute('data-account-lists-index') && !root.dataset.contentListKind) entry.request?.abort();
       entry.selectedTab = tab.dataset.uiTab;
       showSelectedTab(tab);
       if (tab.dataset.listTabUrl) {
         const url = tab.dataset.listTabUrl;
         if (root.dataset.contentListKind === 'interface') window.NiixyContentReferences.open(url, root);
         else openDetail(url, root);
-      } else NiixyWorkspaceTrail.prepare(root);
-      // Prepare restores the retained parent's URL. Apply the selected People
-      // tab afterward so Close/reload cannot revert to the previous child tab.
+      } else if (!root.hasAttribute('data-account-lists-index') || root.dataset.contentListKind) NiixyWorkspaceTrail.prepare(root);
+      // The shared category path closes descendants before saving the tab URL.
       if (root.hasAttribute('data-account-lists-index') && !root.dataset.contentListKind) {
         const url=new URL(root.dataset.listPageUrl,location.origin);url.searchParams.set('people_tab',entry.selectedTab);
-        entry.url=url.href;history.replaceState(history.state,'',entry.url);
+        url.searchParams.set('page', root.querySelector(`[data-ui-tab-panel="${entry.selectedTab}"]`)?.dataset.pageNumber || '1');
+        entry.url=url.href;NiixyWorkspaceTrail.selectCategory(root,entry.url);
+        const fetchUrl=new URL(root.dataset.listFetchUrl,location.origin);fetchUrl.search=url.search;fetchUrl.searchParams.delete('pane');entry.fetchUrl=fetchUrl.href;
       }
     });
     if (locked) lockControls(root);
@@ -114,13 +115,14 @@ window.NiixyAccountLists = (() => {
       const root = new DOMParser().parseFromString(html,'text/html').querySelector('.account-list-content');
       if (!root) throw new Error('Listを読み込めませんでした。');
       entry.body.replaceChildren(root); entry.heading.textContent = root.dataset.listTitle;
+      const params = new URL(fetchUrl, location.origin).searchParams;
+      if (params.has('people_tab')) entry.selectedTab = params.get('people_tab');
       bind(root, entry);
       entry.fetchUrl = String(fetchUrl);
       if (updateUrl && root.dataset.listPageUrl) {
         const pageUrl = new URL(root.dataset.listPageUrl, location.origin);
-        const page = new URL(fetchUrl, location.origin).searchParams.get('page');
-        if (page) pageUrl.searchParams.set('page', page);
-        entry.url = pageUrl.href; history.replaceState(history.state, '', entry.url);
+        params.forEach((value,key) => pageUrl.searchParams.set(key,value));
+        entry.url = pageUrl.href; NiixyWorkspaceTrail.selectCategory(root, entry.url);
       }
     } catch (exception) {
       if (!current() || exception.name === 'AbortError') return;
@@ -154,7 +156,7 @@ window.NiixyAccountLists = (() => {
   }
   async function mountIndex(account, entry, params) {
     const url = new URL(account.dataset.accountListsUrl, location.origin);
-    if (params.get('page')) url.searchParams.set('page',params.get('page'));
+    ['page','people_tab'].forEach(key => {if (params.get(key)) url.searchParams.set(key,params.get(key));});
     entry.selectedTab = params.get('people_tab') || 'love';
     return load(entry,url);
   }
@@ -187,6 +189,7 @@ window.NiixyAccountLists = (() => {
     if (pagination && entry) {
       event.preventDefault();
       root.querySelectorAll('[data-account-list-form]').forEach(remember);
+      NiixyWorkspaceTrail.prepare(root);
       return load(entry,pagination.href,{updateUrl:true});
     }
     const copy = event.target.closest('[data-copy-list-url]');

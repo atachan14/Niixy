@@ -61,6 +61,7 @@
       </div>
     </div>{% endif %}
 
-    <div class="ui-summary-list">{% for thread in threads %}<button class="ui-summary-item" type="button" data-room-thread="{{ thread.pk }}" data-summary-kind="thread"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{% if not thread.can_view %}閲覧不可 · {% endif %}{{ thread.title }}{% if thread.can_view %} ({{ thread.posts.all|length }}){% endif %}</strong><small class="ui-summary-item-updated">最終更新 {{ thread.last_activity_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">まだThreadはありません。</p>{% endfor %}</div>
+    <div data-board-thread-results><div class="ui-summary-list">{% for thread in threads %}<button class="ui-summary-item" type="button" data-room-thread="{{ thread.pk }}" data-summary-kind="thread"><span class="ui-summary-item-context" aria-hidden="true"></span><strong class="ui-summary-item-title">{% if not thread.can_view %}閲覧不可 · {% endif %}{{ thread.title }}{% if thread.can_view %} ({{ thread.posts.all|length }}){% endif %}</strong><small class="ui-summary-item-updated">最終更新 {{ thread.last_activity_at|date:'Y/m/d H:i' }}</small></button>{% empty %}<p class="empty">まだThreadはありません。</p>{% endfor %}</div>
+    {% if board_thread_page %}{% include "shared/summary_pagination.html" with summary_page=board_thread_page summary_page_param="thread_page" summary_page_label="Board Threadのページ" %}{% endif %}</div>
   {% endif %}
 </div>

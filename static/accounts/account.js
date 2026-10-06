@@ -129,8 +129,9 @@ function detailUrl(threadId) {
 
 function paneQueryFromParams(params, pane = activePane) {
   const key = pane === 'response' ? 'response_page' : 'created_page';
-  const page = params.get(key);
-  return page ? `?${key}=${encodeURIComponent(page)}` : '';
+  const query = new URLSearchParams();
+  [key, 'tab'].forEach(name => {if (params.get(name)) query.set(name, params.get(name));});
+  return query.size ? `?${query}` : '';
 }
 
 function updateUrl(params, replace = false) {
@@ -148,13 +149,23 @@ function paneParams({pane = activePane, threadId = null, postNumber = null, quer
   return params;
 }
 
+function bindConversationTabs(query) {
+  const params = new URLSearchParams(query);
+  NiixyUI.bindTabs(paneContainer, {selected:params.get('tab') || 'created', onChange:tab => {
+    params.set('tab', tab);
+    const url = new URL(accountPage.dataset.accountPageUrl, location.origin);
+    url.search = paneParams({query:String(params)});
+    NiixyWorkspaceTrail.selectCategory(paneContainer, url);
+  }});
+}
+
 async function loadPane(pane, query = '') {
   const requestId = ++paneRequestId;
   const cacheKey = `${pane}:${query}`;
   requestedPaneKey = cacheKey;
   if (paneCache.has(cacheKey)) {
     paneContainer.innerHTML = paneCache.get(cacheKey);
-    NiixyUI.bindTabs(paneContainer);
+    bindConversationTabs(query);
     return true;
   }
   paneContainer.innerHTML = '<p class="account-pane-loading">読み込み中...</p>';
@@ -166,7 +177,7 @@ async function loadPane(pane, query = '') {
     paneCache.set(cacheKey, html);
     if (requestedPaneKey === cacheKey) {
       paneContainer.innerHTML = html;
-      NiixyUI.bindTabs(paneContainer);
+      bindConversationTabs(query);
     }
     return true;
   } catch {
@@ -181,16 +192,23 @@ function openPane(pane, query = '', shouldUpdateUrl = true) {
 }
 
 let appliedRequestId = 0;
-async function openStaticFeature(pane, stage, shouldUpdateUrl = true) {
-  activateProfileFeature(pane, stage, new URLSearchParams({pane}), shouldUpdateUrl);
+async function openStaticFeature(pane, stage, shouldUpdateUrl = true, query = '') {
+  const params = new URLSearchParams(query); params.set('pane', pane);
+  activateProfileFeature(pane, stage, params, shouldUpdateUrl);
   const request = appliedRequestId;
   if (pane === 'account-if') {
     const container = document.querySelector('[data-account-applied-container]');
     container.innerHTML = '<p class="empty">読み込み中...</p>';
     try {
-      const content = await NiixyUI.fetchFragment(accountPage.dataset.appliedUrl, '.applied-list-content');
+      const content = await NiixyUI.fetchFragment(accountPage.dataset.appliedUrl + (query ? '?' + new URLSearchParams(query) : ''), '.applied-list-content');
       if (request !== appliedRequestId || activePane !== pane || !profileStack.is(stage)) return;
-      container.replaceChildren(content); NiixyUI.bindTabs(container);
+      container.replaceChildren(content);
+      NiixyUI.bindTabs(container, {selected:params.get('tab') || 'applied-field', onChange:tab => {
+        params.set('tab', tab);
+        params.set('page', content.querySelector(`[data-ui-tab-panel="${tab}"]`)?.dataset.pageNumber || '1');
+        const url = new URL(accountPage.dataset.accountPageUrl, location.origin); url.search = params;
+        NiixyWorkspaceTrail.selectCategory(container, url);
+      }});
     } catch { if (request === appliedRequestId && activePane === pane) renderPaneError(container); }
   }
 }
@@ -203,7 +221,7 @@ function moduleStateFromParams(params = new URLSearchParams(window.location.sear
     subtype: requestedType === 'field'
       ? 'field'
       : params.get('subtype') || ({element: 'field', interface: 'thread', layout: 'thread_post'}[type]),
-    collection: params.get('collection') || 'self',
+    collection: params.get('collection') || 'self', page:params.get('page') || '1',
   };
 }
 
@@ -214,6 +232,7 @@ function moduleParams(state = activeModuleState, detail = {}) {
     subtype: state.subtype,
   });
   if (state.collection !== 'self') params.set('collection', state.collection);
+  if (state.page && state.page !== '1') params.set('page', state.page);
   if (detail.field) params.set('field', detail.field);
   if (detail.interface) params.set('interface', detail.interface);
   return params;
@@ -242,7 +261,7 @@ async function openProfileModule(initialState = moduleStateFromParams(), shouldU
   activateProfileFeature('module', 'module-list', moduleParams(initialState), shouldUpdateUrl, management);
   let list;
   try {
-    list = await NiixyUI.fetchFragment(modulePaneUrl);
+    list = await NiixyUI.fetchFragment(modulePaneUrl + '?' + moduleParams(initialState));
   } catch {
     NiixyUI.showPaneError(loading);
     return false;
@@ -256,12 +275,31 @@ async function openProfileModule(initialState = moduleStateFromParams(), shouldU
 function bindProfileModuleList(list, initialState) {
   NiixyUI.bindModuleFilters(list.querySelector('[data-module-public]') || list, initialState, {
     onChange: (state) => {
+      list.pageGeneration = (list.pageGeneration || 0) + 1;
       activeModuleState = state;
-      updateUrl(moduleParams(state), true);
+      const fetchUrl = new URL(modulePaneUrl,location.origin); fetchUrl.search = moduleParams(state);
+      list.querySelector('[data-module-public]').dataset.integratedFetch = fetchUrl.href;
+      const url = new URL(accountPage.dataset.accountPageUrl, location.origin); url.search = moduleParams(state);
+      NiixyWorkspaceTrail.selectCategory(list, url);
     },
   });
   list.querySelector('[data-close-module-list]')?.addEventListener('click', closePane);
   list.addEventListener('click', (event) => {
+    const pagination = event.target.closest('[data-summary-page]');
+    if (pagination) {
+      event.preventDefault();
+      const params = new URL(pagination.href).searchParams;
+      activeModuleState = moduleStateFromParams(params);
+      const url = new URL(accountPage.dataset.accountPageUrl, location.origin); url.search = moduleParams(activeModuleState);
+      NiixyWorkspaceTrail.selectCategory(list, url);
+      const state = activeModuleState;
+      const generation = (list.pageGeneration || 0) + 1; list.pageGeneration = generation;
+      NiixyUI.fetchFragment(pagination.href).then(fresh => {
+        if (!list.isConnected || list.pageGeneration !== generation) return;
+        list.replaceWith(fresh); bindProfileModuleList(fresh, state);
+      }).catch(() => {if (list.isConnected && list.pageGeneration === generation) renderPaneError(list);});
+      return;
+    }
     const item = event.target.closest('[data-detail-url]');
     if (!item) return;
     event.preventDefault();
@@ -338,7 +376,12 @@ function resetAccountRoomDetail() {
 }
 
 function bindAccountRoomList(query = '') {
-  NiixyUI.bindTabs(accountRoomListContainer);
+  NiixyUI.bindTabs(accountRoomListContainer, {onChange:tab => {
+    const params = new URLSearchParams(query); params.set('room_tab', tab);
+    activeRoomQuery = '?' + params;
+    const url = new URL(accountPage.dataset.accountPageUrl, location.origin); url.search = accountRoomParams(activeRoomQuery);
+    NiixyWorkspaceTrail.selectCategory(accountRoomListContainer, url);
+  }});
 }
 
 async function loadAccountRoomPane(query = '') {
@@ -528,6 +571,11 @@ document.getElementById('close-account-if-list').addEventListener('click', close
 ['board','people'].forEach(pane => document.getElementById(`close-account-${pane}-list`).addEventListener('click', closePane));
 
 
+document.querySelector('[data-account-applied-container]').addEventListener('click', event => {
+  const pagination = event.target.closest('[data-summary-page]');
+  if (pagination) {event.preventDefault(); openStaticFeature('account-if', 'account-if-list', true, new URL(pagination.href).search);}
+});
+
 paneContainer.addEventListener('click', (event) => {
   const pagination = event.target.closest('[data-pane-pagination]');
   if (pagination) {
@@ -591,7 +639,7 @@ function applyStateFromUrl() {
       if (roomId) openAccountRoomDetail(roomId, false);
     });
   } else if (pane === 'account-if') {
-    openStaticFeature('account-if', 'account-if-list', false);
+    openStaticFeature('account-if', 'account-if-list', false, params.toString());
   } else if (pane === 'people') {
     openAccountPeople(params, false);
   } else if (pane === 'module') {
@@ -641,7 +689,7 @@ if (accountPage.dataset.accountListDirect) {
     if (roomId) openAccountRoomDetail(roomId, false);
   });
 } else if (initialParams.get('pane') === 'account-if') {
-  openStaticFeature('account-if', 'account-if-list', false);
+  openStaticFeature('account-if', 'account-if-list', false, initialParams.toString());
 } else if (initialParams.get('pane') === 'people') {
   openAccountPeople(initialParams, false);
 } else if (initialParams.get('pane') === 'module') {
