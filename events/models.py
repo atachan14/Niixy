@@ -206,3 +206,68 @@ class Locality(models.Model):
 
     class Meta:
         ordering = ['kind', 'full_name']
+
+
+class ConversationRating(models.Model):
+    """Public desired sentiment; no introduction body and one vote per author."""
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='%(class)s_written')
+    sentiment = models.CharField(max_length=3, choices=[('fav', 'fav'), ('bad', 'bad')])
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-updated_at', '-pk']
+        constraints = [
+            models.UniqueConstraint(fields=['author', 'target'], name='unique_%(class)s'),
+            models.CheckConstraint(condition=models.Q(sentiment__in=['fav', 'bad']), name='%(class)s_sentiment'),
+        ]
+
+
+class ThreadRating(ConversationRating):
+    target = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='ratings')
+
+
+class ResponseRating(ConversationRating):
+    target = models.ForeignKey(ThreadPost, on_delete=models.CASCADE, related_name='ratings')
+
+
+class ConversationList(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='%(class)ss')
+    name = models.CharField(max_length=80)
+    submission_id = models.UUIDField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['owner', 'submission_id'], name='unique_%(class)s_submission')]
+
+
+class ThreadList(ConversationList):
+    pass
+
+
+class ResponseList(ConversationList):
+    pass
+
+
+class ThreadListReference(models.Model):
+    thread_list = models.ForeignKey(ThreadList, on_delete=models.CASCADE, related_name='references')
+    target = models.ForeignKey(Thread, null=True, on_delete=models.SET_NULL, related_name='list_references')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['thread_list', 'target'], name='unique_thread_list_reference')]
+
+
+class ResponseListReference(models.Model):
+    response_list = models.ForeignKey(ResponseList, on_delete=models.CASCADE, related_name='references')
+    target = models.ForeignKey(ThreadPost, null=True, on_delete=models.SET_NULL, related_name='list_references')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['response_list', 'target'], name='unique_response_list_reference')]

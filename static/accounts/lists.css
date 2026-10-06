@@ -49,3 +49,9 @@
   .account-feature-content { --account-pane-gutter: 16px; }
   .account-feature-content .account-feature-column { padding: 16px; }
 }
+
+/* Compact text beneath the body, retaining a usable touch target. */
+.content-feedback-compact { font-size: .75rem; margin: .3rem 0 0; }
+.content-feedback-compact .button.secondary { font-size: inherit; padding: 2px 6px; min-height: 28px; }
+.content-feedback-compact .content-rating-counts { margin: .2rem 0; font-size: .7rem; }
+@media (pointer: coarse) { .content-feedback-compact .button.secondary { min-width: 44px; min-height: 44px; } }

@@ -1,17 +1,1 @@
-<div class="account-feature-content">
-<div class="ui-tabs account-thread-tabs" role="tablist" aria-label="Threadの種類">
-  <button class="is-active" type="button" role="tab" aria-selected="true" data-ui-tab="created">作成</button>
-  <button type="button" role="tab" aria-selected="false" data-ui-tab="fav">fav</button>
-  <button type="button" role="tab" aria-selected="false" data-ui-tab="bad">bad</button>
-  <button type="button" role="tab" aria-selected="false" data-ui-tab="bookmark">bookmark</button>
-</div>
-<div class="account-thread-lists">
-  <section class="ui-tab-panel account-thread-column account-feature-column is-active" data-ui-tab-panel="created">
-    <div class="summary-list">{% for thread in created_page %}<article class="summary-item" data-thread-id="{{ thread.pk }}"><button class="ui-summary-item summary-item-header" type="button" data-thread-detail="{{ thread.pk }}" data-summary-kind="thread"><span class="ui-summary-item-context" aria-hidden="true"></span><span class="ui-summary-item-title">{% if not thread.can_view %}閲覧不可 · {% endif %}{{ thread.title }}{% if thread.can_view %} ({{ thread.posts.all|length }}){% endif %}</span><small class="ui-summary-item-updated">最終更新 {{ thread.last_activity_at|date:'Y/m/d H:i' }}</small></button></article>{% empty %}<p class="empty">まだThreadはありません。</p>{% endfor %}</div>
-    {% if created_page.has_other_pages %}<nav class="thread-pagination" aria-label="作成したThreadのページ">{% if created_page.has_previous %}<a data-pane-pagination href="{% url 'accounts:thread-pane' account.username %}?created_page={{ created_page.previous_page_number }}">前へ</a>{% endif %}<span>{{ created_page.number }} / {{ created_page.paginator.num_pages }}</span>{% if created_page.has_next %}<a data-pane-pagination href="{% url 'accounts:thread-pane' account.username %}?created_page={{ created_page.next_page_number }}">次へ</a>{% endif %}</nav>{% endif %}
-  </section>
-  <section class="ui-tab-panel account-thread-column account-feature-column is-future" data-ui-tab-panel="fav"><p class="empty">未実装</p></section>
-  <section class="ui-tab-panel account-thread-column account-feature-column is-future" data-ui-tab-panel="bad"><p class="empty">未実装</p></section>
-  <section class="ui-tab-panel account-thread-column account-feature-column is-future" data-ui-tab-panel="bookmark"><p class="empty">未実装</p></section>
-</div>
-</div>
+{% include 'accounts/partials/conversation_pane.html' %}

@@ -59,12 +59,12 @@ def resolve_internal_url(request, value):
         elif match.view_name.startswith('references:'):
             from .content_lists import get_target, list_query, route
             name = match.view_name.removeprefix('references:')
-            if name in {'board-page', 'interface-page', 'field-page', 'layout-page'}:
+            if name in {'board-page', 'interface-page', 'field-page', 'layout-page', 'thread-page', 'response-page'}:
                 kind = name.removesuffix('-page')
                 instance = get_target(kind, match.kwargs['target_id'], request.user, require_view=False)
                 path = route(kind, 'page', instance.pk)
                 target = InternalTarget(kind, instance, path)
-            elif name in {'board-list-page', 'interface-list-page'}:
+            elif name in {'board-list-page', 'interface-list-page', 'thread-list-page', 'response-list-page'}:
                 kind = name.removesuffix('-list-page')
                 instance = list_query(kind).filter(pk=match.kwargs['list_id']).first()
                 if instance is None:

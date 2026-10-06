@@ -3,10 +3,11 @@ window.NiixyContentReferences = (() => {
   function open(pageUrl, source) {
     const url = new URL(pageUrl, location.origin);
     const pane = new URL(url); pane.pathname += 'pane/';
-    if (/\/(board|interface)-lists\//.test(url.pathname)) return NiixyAccountLists.open(pane, url, source, 'List');
+    if (/\/(board|interface|thread|response)-lists\//.test(url.pathname)) return NiixyAccountLists.open(pane, url, source, 'List');
     const board = url.pathname.match(/^\/boards\/(\d+)\/$/);
     if (board) return NiixyWorkspaceTrail.openReferenceBoard(board[1], source, url.searchParams.get('thread'), url.searchParams.get('post'));
-    const entry = NiixyWorkspaceTrail.openContentPane({title:'読み込み中...', width:'fixed', url, source});
+    const conversation = /^\/(threads|responses)\/\d+\/$/.test(url.pathname);
+    const entry = NiixyWorkspaceTrail.openContentPane({title:'読み込み中...', width:conversation ? 'remaining' : 'fixed', url, source});
     if (!entry) return;
     fetch(pane, {cache:'no-store', signal:entry.abort.signal}).then(async response => {
       if (!response.ok) throw new Error('コンテンツを読み込めませんでした。');
@@ -14,11 +15,25 @@ window.NiixyContentReferences = (() => {
       if (!entry.pane.isConnected || entry.abort.signal.aborted) return;
       entry.body.innerHTML = html;
       const summary = source?.querySelector?.('.ui-summary-item-title');
-      entry.heading.textContent = entry.body.querySelector('[data-interface-name]')?.dataset.interfaceName || summary?.textContent || entry.body.querySelector('h2')?.textContent || 'Module詳細';
+      entry.heading.textContent = entry.body.querySelector('[data-thread-title]')?.dataset.threadTitle || entry.body.querySelector('[data-interface-name]')?.dataset.interfaceName || summary?.textContent || entry.body.querySelector('h2')?.textContent || 'Module詳細';
       NiixyUI.bindTabs(entry.body);
+      const targetPost = entry.body.querySelector('[data-target-post]')?.dataset.targetPost;
+      if (targetPost) {
+        const target = entry.body.querySelector(`[data-thread-post-number="${targetPost}"]`);
+        if (target) { target.classList.add('is-response-target'); entry.body.scrollTop += target.getBoundingClientRect().top - entry.body.getBoundingClientRect().top - entry.body.clientHeight / 2; }
+      }
       const layout = entry.body.querySelector('[data-layout-detail]');
       if (layout) window.NiixyAccountLayouts?.bind(layout, {inline:true});
     }).catch(error => {if (entry.pane.isConnected && error.name !== 'AbortError') NiixyUI.showPaneError(entry.body,error.message);});
+    if (conversation) entry.body.addEventListener('submit', async event => {
+      const form = event.target.closest('.thread-reply-form');
+      if (!form) return;
+      event.preventDefault();
+      const result = await NiixyUI.submitThreadReply(form, event.submitter);
+      if (!result || !entry.pane.isConnected || entry.abort.signal.aborted) return;
+      try { const fragment = await NiixyUI.fetchFragment(pane); if (entry.pane.isConnected && !entry.abort.signal.aborted) entry.body.replaceChildren(fragment); }
+      catch (error) { if (entry.pane.isConnected) NiixyUI.showPaneError(entry.body,error.message); }
+    });
     return entry;
   }
   document.addEventListener('click', event => {
@@ -39,14 +54,16 @@ window.NiixyContentReferences = (() => {
     controls.forEach(control => {control.disabled=true;}); pending.set(key,true);
     const alert = form.querySelector('.account-list-error'); alert.hidden=true;
     try {
-      const response = await fetch(key,{method:'POST',body:data}); const result = await response.json();
+      const response = await fetch(key,{method:'POST',body:data}); const result = await NiixyUI.readJsonResponse(response);
       if (!response.ok) throw new Error(result.error || Object.values(result.errors || {}).flat().join(' ') || '評価を保存できませんでした。');
       document.querySelectorAll(`[data-rating-url="${key}"]`).forEach(section => {
         section.dataset.contentSentiment=result.sentiment;
         section.querySelectorAll('[data-content-rate]').forEach(control => {control.setAttribute('aria-pressed',String(control.dataset.contentRate === result.sentiment));});
         ['fav','bad'].forEach(sentiment => {section.querySelector(`[data-content-count="${sentiment}"]`).textContent = `${sentiment} (${result[sentiment+'_count']})`;});
       });
-      refreshIntegrated(result.kind === 'board' ? 'board' : 'interface');
+      const kind = ['thread','response','board'].includes(result.kind) ? result.kind : 'interface';
+      document.dispatchEvent(new CustomEvent('niixy:content-rating-changed',{detail:result}));
+      refreshIntegrated(kind);
     } catch (error) {if(form.isConnected){alert.textContent=error.message;alert.hidden=false;}}
     finally {pending.delete(key);controls.forEach(control => {control.disabled=false;});}
   });
@@ -57,6 +74,11 @@ window.NiixyContentReferences = (() => {
       root.querySelector('[data-module-collection-filter]').replaceWith(fresh.querySelector('[data-module-collection-filter]'));
       root.querySelector('.module-list-content').replaceWith(fresh.querySelector('.module-list-content'));
       NiixyUI.bindModuleFilters(root,state);
+    } else if (['thread','response'].includes(kind)) {
+      const selected = root.querySelector('[data-ui-tab][aria-selected=true]')?.dataset.uiTab || 'created';
+      root.replaceChildren(...fresh.childNodes);
+      root.dispatchEvent(new CustomEvent('niixy:conversations-refreshed',{bubbles:true}));
+      NiixyUI.bindTabs(root, {selected});
     } else {
       const selected = root.querySelector('[data-ui-tab][aria-selected=true]')?.dataset.uiTab || 'self';
       root.querySelector('.room-collection-tabs').replaceWith(fresh.querySelector('.room-collection-tabs'));
@@ -100,6 +122,8 @@ window.NiixyContentReferences = (() => {
   document.addEventListener('niixy:content-list-changed', event => refreshIntegrated(event.detail.kind));
   const direct = document.querySelector('[data-direct-list-url]');
   if (direct) open(direct.dataset.directListUrl,direct.querySelector('.reference-origin'));
+  const conversation = document.querySelector('[data-direct-conversation-url]');
+  if (conversation) open(conversation.dataset.directConversationUrl,conversation.querySelector('.reference-origin'));
   const board = document.querySelector('[data-direct-board-id]');
   if (board) open(location.href,board.querySelector('.reference-origin'));
   return {open, replaceIntegrated};

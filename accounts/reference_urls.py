@@ -3,7 +3,7 @@ from . import content_lists as views
 
 app_name = 'references'
 urlpatterns = []
-for kind, plural in [('board', 'boards'), ('interface', 'interfaces'), ('field', 'fields'), ('layout', 'layouts')]:
+for kind, plural in [('board', 'boards'), ('interface', 'interfaces'), ('field', 'fields'), ('layout', 'layouts'), ('thread', 'threads'), ('response', 'responses')]:
     kwargs = {'kind': kind}
     paths = [
         path(plural + '/<int:target_id>/', views.target_page, kwargs, name=kind + '-page'),

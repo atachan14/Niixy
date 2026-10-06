@@ -182,6 +182,17 @@ window.NiixyAccountLists = (() => {
       event.preventDefault();
       return open(picker.dataset.accountListPickerUrl,location.href,picker,'追加先を選択');
     }
+    const copy = event.target.closest('[data-copy-list-url]');
+    if (copy) {
+      const details = copy.closest('.account-list-share');
+      const input = details.querySelector('[data-list-share-url]');
+      const status = details.querySelector('[data-list-share-status]');
+      input.value = new URL(input.value, location.origin).href;
+      try { await navigator.clipboard.writeText(input.value); status.textContent = 'URLをコピーしました。'; }
+      catch { input.select(); status.textContent = 'URLを選択しました。コピーしてください。'; }
+      status.hidden = false;
+      return;
+    }
     const root = event.target.closest('.account-list-content');
     if (!root) return;
     const entry = entries.get(root);
@@ -192,15 +203,7 @@ window.NiixyAccountLists = (() => {
       NiixyWorkspaceTrail.prepare(root);
       return load(entry,pagination.href,{updateUrl:true});
     }
-    const copy = event.target.closest('[data-copy-list-url]');
-    if (copy) {
-      const details = copy.closest('.account-list-share');
-      const input = details.querySelector('[data-list-share-url]');
-      const status = details.querySelector('[data-list-share-status]');
-      try { await navigator.clipboard.writeText(input.value); status.textContent = 'URLをコピーしました。'; }
-      catch { input.select(); status.textContent = 'URLを選択しました。コピーしてください。'; }
-      status.hidden = false;
-    }
+
   });
   document.addEventListener('submit', async event => {
     const form = event.target.closest('[data-account-list-form]');
@@ -236,7 +239,7 @@ window.NiixyAccountLists = (() => {
           const parent = entries.get(index);
           if (parent && parent !== entry && index.dataset.listFetchUrl === result.index_url) load(parent,parent.fetchUrl);
         });
-        if (entry.pane.isConnected && !entry.abort.signal.aborted) await (result.kind === 'interface' ? NiixyContentReferences.open(result.url, entry.pane) : result.kind === 'board' ? NiixyContentReferences.open(result.url, entry.pane) : openDetail(result.url, entry.pane));
+        if (entry.pane.isConnected && !entry.abort.signal.aborted) await (['board','interface','thread','response'].includes(result.kind) ? NiixyContentReferences.open(result.url, entry.pane) : openDetail(result.url, entry.pane));
       } else if (form.dataset.listOperation === 'delete') {
         entry.close.click();
       } else if (form.dataset.listOperation === 'pick') {

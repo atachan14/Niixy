@@ -311,7 +311,7 @@ class AccountPageTests(TestCase):
         self.assertNotContains(response, '>AccountListB</button>')
         self.assertContains(response, 'data-review-edit="love"')
         self.assertContains(response, 'data-review-edit="hate"')
-        self.assertContains(response, 'account.js?v=20261006-room-review')
+        self.assertContains(response, 'account.js?v=20261006-conversation-feedback')
         self.assertContains(response, 'reviews.js?v=20261006-room-review')
         self.assertContains(response, 'class="account-overview-content identity-overview-content"')
         self.assertContains(response, 'class="account-hero identity-overview-hero"')

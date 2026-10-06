@@ -192,44 +192,16 @@ def account_pane(request, username):
 
 @never_cache
 def account_thread_pane(request, username):
+    from .conversations import pane_context
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
-    created_threads = prepare_threads(Thread.objects.filter(creator=account).order_by('-created_at'), request.user)
-    created_page = Paginator(created_threads, 10).get_page(request.GET.get('created_page'))
-    return render(request, 'accounts/partials/thread_pane.html', {
-        'account': account,
-        'created_page': created_page,
-    })
+    return render(request, 'accounts/partials/thread_pane.html', pane_context(request, account, 'thread'))
 
 
 @never_cache
 def account_response_pane(request, username):
+    from .conversations import pane_context
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
-    posts = list(
-        filter_muted(ThreadPost.objects.filter(creator=account, number__gt=1), request.user, 'thread__creator_id')
-        .select_related('thread', 'creator__niixy_profile')
-        .prefetch_related(
-            'thread__access_rules',
-            'thread__policy_conditions',
-            Prefetch('thread__posts', queryset=ThreadPost.objects.select_related('creator__niixy_profile')),
-        )
-        .order_by('-created_at')
-    )
-    prepare_muted_posts(posts, request.user)
-    visible_posts = []
-    denied_threads = set()
-    for post in posts:
-        post.thread.can_view = post.thread.allows(request.user, ThreadAccessRule.VIEW)
-        if not post.thread.can_view:
-            # Repeated denied summaries and pagination must not reveal reply counts.
-            if post.thread_id in denied_threads:
-                continue
-            denied_threads.add(post.thread_id)
-        visible_posts.append(post)
-    response_page = Paginator(visible_posts, 10).get_page(request.GET.get('response_page'))
-    return render(request, 'accounts/partials/response_pane.html', {
-        'account': account,
-        'response_page': response_page,
-    })
+    return render(request, 'accounts/partials/response_pane.html', pane_context(request, account, 'response'))
 
 
 @never_cache
@@ -306,7 +278,7 @@ def account_module_interface_detail(request, username, interface_id):
 def account_thread_detail(request, username, thread_id):
     account = get_object_or_404(User.objects.select_related('niixy_profile'), username__iexact=username)
     thread = get_object_or_404(
-        thread_queryset().filter(Q(creator=account) | Q(posts__creator=account, posts__number__gt=1)).distinct(),
+        thread_queryset().filter(Q(creator=account) | Q(posts__creator=account, posts__number__gt=1) | Q(ratings__author=account) | Q(posts__ratings__author=account, posts__number__gt=1) | Q(list_references__thread_list__owner=account) | Q(posts__list_references__response_list__owner=account, posts__number__gt=1)).distinct(),
         pk=thread_id,
     )
     prepare_thread_for_view(thread, request.user)

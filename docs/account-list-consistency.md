@@ -1,6 +1,6 @@
 # AccountPage一覧・分類tabの整合
 
-> 一覧整合のlocal checkpointは`dfcec66`。続いて優先した[AccountIF適用エラーとSummary Color](account-if-implementation-fix.md)は別checkpoint。Thread / Response評価・ユーザーListは調査段階で保全している。
+> 一覧整合のlocal checkpointは`dfcec66`。続いて優先した[AccountIF適用エラーとSummary Color](account-if-implementation-fix.md)は別checkpoint。Thread / Response評価・ユーザーListは[後続checkpointで実装](conversation-feedback.md)。以下は一覧整合checkpoint時点の記録。
 
 2026-10-06。公開済み `d5b53a8073e3e6b992b43fa946fe21df27acc169`を基準とする後続local修正。Room Review / Mute `9011a00`とrooms0012は公開済み。通常server pair `30348 → 5452`、8000 listenerは5452の1つ。この後続工程では通常serverのrestart / GET、共有Neonの書込み、push / public反映を行わない。
 
@@ -50,7 +50,7 @@ RoomIFのPC owner nativeとmobile Guest nested画像、smokeのdesktop-workspace
 
 ## 次checkpoint・残る判断
 
-Thread / Responseのfav・badと本文下の小さい操作、ユーザーList（bookmarkは旧名）の実装は次checkpointに分ける。将来用の空tabを削除したり、独立bookmark機能を追加したりしていない。
+Thread / Responseのfav・badと本文下の小さい操作、ユーザーList（bookmarkは旧名）の実装は[後続checkpoint](conversation-feedback.md)へ分けた。この一覧整合checkpointでは、将来用の空tabや独立bookmark機能を変更していない。
 
 List名tabの全件表示は今回の依頼どおり保持し、参照本文のpaginationとは分ける。大量tabの別UIへの置換やlazy loadingは新しい製品判断として採用していない。Room / NiiMap自身のBoard Thread全件表示、MyPageの編集・検索catalogはAccountPage公開一覧の今回の範囲外で変更しない。
 

@@ -22,7 +22,7 @@ window.NiixyWorkspaceTrail = (() => {
     const url = new URL(anchor.href, location.origin);
     if (url.origin !== location.origin) return null;
     if (url.pathname === '/' && /^\d+$/.test(url.searchParams.get('board') || '') && !url.searchParams.has('room')) return {kind: 'board', id: url.searchParams.get('board'), pageUrl: url};
-    const referenceMatch = url.pathname.match(/^\/(boards|interfaces|fields|layouts|board-lists|interface-lists)\/(\d+)\/$/);
+    const referenceMatch = url.pathname.match(/^\/(boards|interfaces|fields|layouts|threads|responses|board-lists|interface-lists|thread-lists|response-lists)\/(\d+)\/$/);
     if (referenceMatch) return {kind:'content-reference', pageUrl:url};
     let listMatch = url.pathname.match(/^\/accounts\/lists\/(\d+)\/$/);
     if (listMatch) return {kind:'account-list', id:listMatch[1], pageUrl:url};
@@ -270,6 +270,12 @@ window.NiixyWorkspaceTrail = (() => {
       const key = kind === 'room' ? 'room_tab' : 'tab';
       NiixyUI.bindTabs(entry.body, {selected:params.get(key) || ({room:'owner', 'account-if':'applied-field'}[kind] || 'created'), onChange:tab => {
         params.set(key, tab);
+        if (['thread','response'].includes(kind)) {
+          params.set(kind === 'response' ? 'response_page' : 'created_page',entry.body.querySelector(`[data-ui-tab-panel="${tab}"]`)?.dataset.pageNumber || '1');
+          const root = entry.body.querySelector('[data-integrated-kind]');
+          const fetchUrl = new URL(listUrl,location.origin); fetchUrl.search = params;
+          if (root) root.dataset.integratedFetch = fetchUrl.href;
+        }
         if (kind === 'account-if') params.set('page', entry.body.querySelector(`[data-ui-tab-panel="${tab}"]`)?.dataset.pageNumber || '1');
         entry.url = childUrl(account.dataset.accountPageUrl, {pane:kind, ...Object.fromEntries(params)}).href;
         selectCategory(entry, entry.url);
@@ -283,6 +289,7 @@ window.NiixyWorkspaceTrail = (() => {
       }});
     };
     const entry = trail.push({title, width: 'fixed', url: childUrl(account.dataset.accountPageUrl, {pane: kind}), after: origin});
+    if (['thread','response'].includes(kind)) entry.body.addEventListener('niixy:conversations-refreshed',() => bindFeature());
     if (kind === 'room') window.addEventListener('niixy:room-review-changed', (event) => {
       if (event.detail.actor !== account.dataset.accountId) return;
       const url = new URL(roomListUrl, location.origin);

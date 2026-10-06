@@ -153,11 +153,23 @@ function bindConversationTabs(query) {
   const params = new URLSearchParams(query);
   NiixyUI.bindTabs(paneContainer, {selected:params.get('tab') || 'created', onChange:tab => {
     params.set('tab', tab);
+    const pageKey = activePane === 'response' ? 'response_page' : 'created_page';
+    params.set(pageKey,paneContainer.querySelector(`[data-ui-tab-panel="${tab}"]`)?.dataset.pageNumber || '1');
+    const root = paneContainer.querySelector('[data-integrated-kind]');
+    if (root) root.dataset.integratedFetch = paneUrls[activePane] + '?' + params;
     const url = new URL(accountPage.dataset.accountPageUrl, location.origin);
     url.search = paneParams({query:String(params)});
     NiixyWorkspaceTrail.selectCategory(paneContainer, url);
   }});
 }
+
+paneContainer.addEventListener('niixy:conversations-refreshed', () => {
+  paneCache.clear();
+  bindConversationTabs(paneQueryFromParams(new URLSearchParams(location.search)));
+});
+['niixy:content-rating-changed','niixy:content-list-changed'].forEach(type => document.addEventListener(type,event => {
+  if (['thread','response'].includes(event.detail.kind)) paneCache.clear();
+}));
 
 async function loadPane(pane, query = '') {
   const requestId = ++paneRequestId;

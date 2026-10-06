@@ -15,6 +15,9 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from config.pagination import paginate_summary_list
+from events.models import Thread, ThreadPost, ThreadAccessRule, ThreadList, ResponseList, ThreadListReference, ResponseListReference, ThreadRating, ResponseRating
+from events.services import thread_queryset, prepare_thread_for_view
+from rooms.mutes import muted_thread_ids
 from interfaces.models import (
     Interface, InterfaceList, InterfaceListReference, InterfaceRating,
     FieldDefinition, FieldListReference, FieldRating, AccountLayout, LayoutListReference, LayoutRating,
@@ -40,6 +43,8 @@ class ListKind:
 
 
 KINDS = {
+    'thread': ListKind('ThreadList', ThreadList, ThreadListReference, ThreadRating, 'owner', 'thread_list', 'submission_id', 80),
+    'response': ListKind('ResponseList', ResponseList, ResponseListReference, ResponseRating, 'owner', 'response_list', 'submission_id', 80),
     'board': ListKind('BoardList', Collection, BoardListReference, BoardRating, 'account', 'board_list', 'list_submission_id', 120),
     'interface': ListKind('ModuleList', InterfaceList, InterfaceListReference, InterfaceRating, 'owner', 'interface_list', 'submission_id', 80),
     'field': ListKind('ModuleList', InterfaceList, FieldListReference, FieldRating, 'owner', 'interface_list', 'submission_id', 80),
@@ -88,7 +93,7 @@ def target_kind(target):
 
 
 def reference_count(item, kind):
-    if kind == 'board':
+    if kind not in MODULE_KINDS:
         return item.references.count()
     return sum(getattr(item, relation).count() for relation in ('references', 'field_references', 'layout_references'))
 
@@ -105,7 +110,25 @@ def board_can_view(board, user):
     return bool(user.is_authenticated and owner_id == user.pk) or board.evaluate_policy(user, BoardPolicyCondition.VIEW).allowed
 
 
+def conversation_can_view(kind, target, user):
+    thread = target if kind == 'thread' else target.thread
+    return thread.allows(user, ThreadAccessRule.VIEW)
+
+
+def conversation_is_muted(kind, target, user):
+    muted = set(muted_account_ids(user))
+    if kind == 'thread':
+        return target.creator_id in muted or target.pk in set(muted_thread_ids(user))
+    return target.creator_id in muted or target.thread.creator_id in muted
+
+
 def get_target(kind, target_id, user, *, require_view=True):
+    if kind in {'thread', 'response'}:
+        query = thread_queryset() if kind == 'thread' else ThreadPost.objects.filter(number__gt=1).select_related('thread', 'creator__niixy_profile').prefetch_related('thread__access_rules', 'thread__policy_conditions')
+        target = get_object_or_404(query, pk=target_id)
+        if require_view and not conversation_can_view(kind, target, user):
+            raise PermissionDenied
+        return target
     if kind in MODULE_KINDS:
         return get_object_or_404(public_modules(kind), pk=target_id)
     board = get_object_or_404(Board.objects.select_related('placement__collection__room').prefetch_related('policy_conditions'), pk=target_id)
@@ -122,6 +145,14 @@ def resolve_target(request, kind, value):
 
 
 def describe_target(kind, target, user):
+    if kind in {'thread', 'response'}:
+        if conversation_is_muted(kind, target, user):
+            return None
+        thread = target if kind == 'thread' else target.thread
+        visible = conversation_can_view(kind, target, user)
+        return {'kind': kind, 'name': thread.title, 'url': route(kind, 'page', target.pk),
+                'context': ('Thread' if kind == 'thread' else 'Response #' + str(target.number)) if visible else '閲覧不可',
+                'updated_at': thread.last_activity_at if kind == 'thread' or not visible else target.created_at}
     if kind in MODULE_KINDS:
         if not module_is_public(kind, target):
             return None
@@ -184,14 +215,20 @@ def detail(request, kind, list_id):
     references = []
     muted = set(muted_account_ids(request.user))
     muted_boards = set(muted_board_ids(request.user)) if kind == 'board' else set()
-    for ref_kind in (MODULE_KINDS if kind in MODULE_KINDS else ('board',)):
+    for ref_kind in (MODULE_KINDS if kind in MODULE_KINDS else (kind,)):
         query = KINDS[ref_kind].reference.objects.filter(**{KINDS[ref_kind].list_field: item}).select_related('target')
         if ref_kind == 'board':
             query = query.select_related('target__placement__collection__room').prefetch_related('target__policy_conditions')
-        else:
+        elif ref_kind in MODULE_KINDS:
             query = query.select_related('target__current_version')
+        elif ref_kind == 'thread':
+            query = query.prefetch_related('target__access_rules', 'target__policy_conditions')
+        else:
+            query = query.select_related('target__thread').prefetch_related('target__thread__access_rules', 'target__thread__policy_conditions')
         for ref in query:
             if ref.target and (ref.target.creator_id in muted or (ref_kind == 'board' and ref.target_id in muted_boards)):
+                continue
+            if ref.target and ref_kind in {'thread', 'response'} and conversation_is_muted(ref_kind, ref.target, request.user):
                 continue
             ref.summary = describe_target(ref_kind, ref.target, request.user) if ref.target else None
             # A filtered Module tab shows only matching published definitions.
@@ -208,7 +245,7 @@ def detail(request, kind, list_id):
         boards = filter_muted(boards, request.user)
         placed = [describe_target(kind, board, request.user) for board in boards]
     return render(request, 'shared/content_list_detail.html', {
-        'kind': kind, 'list_label': spec.label, 'target_label': 'Board' if kind == 'board' else 'Module', 'content_list': item, 'placed_boards': placed,
+        'kind': kind, 'list_label': spec.label, 'target_label': {'board':'Board', 'thread':'Thread', 'response':'Response'}.get(kind, 'Module'), 'content_list': item, 'placed_boards': placed,
         'is_list_owner': request.user.pk == item.owner_account.pk, 'max_length': spec.max_length,
         'can_manage_name': kind != 'board' or not item.is_uncategorized,
         'add_url': item.add_url, 'rename_url': route(kind, 'list-rename', list_id), 'delete_url': route(kind, 'list-delete', list_id),
@@ -324,7 +361,7 @@ def feedback_context(kind, target, user):
     sentiment = rating.objects.filter(target=target, author=user).values_list('sentiment', flat=True).first() if user.is_authenticated else ''
     return {'kind': kind, 'target_id': target.pk, 'sentiment': sentiment or '', 'fav_count': counts.get('fav', 0), 'bad_count': counts.get('bad', 0),
             'rating_url': route(kind, 'rating', target.pk), 'picker_url': route(kind, 'picker', target.pk), 'ratings_url': route(kind, 'ratings', target.pk),
-            'can_rate': user.is_authenticated}
+            'can_rate': user.is_authenticated, 'target_url': route(kind, 'page', target.pk)}
 
 
 @require_POST
@@ -336,7 +373,7 @@ def rate(request, kind, target_id):
     form = type('RatingForm', (forms.Form,), {'sentiment': forms.ChoiceField(required=False, choices=[('', ''), ('fav', 'fav'), ('bad', 'bad')])})(request.POST)
     if not form.is_valid():
         return invalid(form)
-    model = {'board': Board, 'interface': Interface, 'field': FieldDefinition, 'layout': AccountLayout}[kind]
+    model = {'board': Board, 'interface': Interface, 'field': FieldDefinition, 'layout': AccountLayout, 'thread': Thread, 'response': ThreadPost}[kind]
     get_object_or_404(model.objects.select_for_update(), pk=target_id)
     target = get_target(kind, target_id, request.user)
     rating = KINDS[kind].rating
@@ -365,6 +402,12 @@ def ratings(request, kind, target_id):
 @require_GET
 @never_cache
 def target_pane(request, kind, target_id):
+    if kind in {'thread', 'response'}:
+        target = get_target(kind, target_id, request.user, require_view=False)
+        thread = target if kind == 'thread' else get_object_or_404(thread_queryset(), pk=target.thread_id)
+        prepare_thread_for_view(thread, request.user)
+        return render(request, 'events/partials/thread_detail.html', {'thread':thread,
+                      'target_post_number':target.number if kind == 'response' and thread.can_view else None})
     if kind == 'board':
         from rooms.views import board_threads
         target = get_target(kind, target_id, request.user, require_view=False)
@@ -391,7 +434,7 @@ def target_pane(request, kind, target_id):
 def target_page(request, kind, target_id):
     response = target_pane(request, kind, target_id)
     target = get_target(kind, target_id, request.user, require_view=False)
-    title = target.name if kind == 'board' else target.current_version.name
+    title = target.title if kind == 'thread' else target.thread.title if kind == 'response' else target.name if kind == 'board' else target.current_version.name
     from interfaces.services import thread_field_catalog, thread_interface_catalog
     return render(request, 'shared/reference_page.html', {'title': title, 'content_html': mark_safe(response.content.decode()),
         'kind': kind, 'target_id': target_id, 'thread_field_catalog': thread_field_catalog() if kind == 'board' and board_can_view(target, request.user) else [],
