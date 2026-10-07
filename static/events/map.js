@@ -125,7 +125,7 @@ threadMotion.onRetain = (stage) => {
     roomRequestId += 1;
     const panes = ['.niimap-room-list-pane', '.niimap-room-thread-list-pane', '.niimap-room-thread-detail-pane'];
     const keep = {room: 0, 'room-list': 1, 'room-board': 2, 'room-thread': 3}[stage] || 0;
-    panes.slice(keep).forEach((selector) => document.querySelector(selector)?.remove());
+    panes.slice(keep).forEach((selector) => removeEmbeddedRoomPane(document.querySelector(selector)));
     threadStack.set(stage);
   }
 };
@@ -837,9 +837,16 @@ function showThreadMarker(id) {
 function roomTemplateUrl(template, id) {
   return template.replace('/0/', `/${id}/`);
 }
+function removeEmbeddedRoomPane(pane) {
+  if (!pane) return;
+  document.querySelectorAll('.thread-create-module-selector-pane').forEach((selector) => {
+    if (selector.workspaceOwner === pane || pane.contains(selector.workspaceOwner)) selector.remove();
+  });
+  pane.remove();
+}
 function removeEmbeddedRoomPanes(includeOverview = true) {
   roomRequestId += 1;
-  document.querySelectorAll('.niimap-room-list-pane, .niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach((pane) => pane.remove());
+  document.querySelectorAll('.niimap-room-list-pane, .niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach(removeEmbeddedRoomPane);
   if (includeOverview) document.querySelector('.thread-detail-pane [data-room-fragment]')?.remove();
   activeRoomBoard = null;
   if (includeOverview) activeRoomId = null;
@@ -908,12 +915,12 @@ async function openRoom(id, shouldUpdateUrl = true) {
 }
 async function openEmbeddedRoomList(title, url, kind, shouldUpdateUrl = true) {
   const current = ++roomRequestId;
-  document.querySelectorAll('.niimap-room-list-pane, .niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach((pane) => pane.remove());
+  document.querySelectorAll('.niimap-room-list-pane, .niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach(removeEmbeddedRoomPane);
   activeRoomBoard = null;
   const ui = createRoomPane('niimap-room-list-pane', title, 'Roomに戻る');
   ui.close.addEventListener('click', () => {
     roomRequestId += 1;
-    ui.pane.remove();
+    removeEmbeddedRoomPane(ui.pane);
     setThreadStage('room');
     updateRoomUrl(activeRoomId);
   });
@@ -936,13 +943,13 @@ async function openEmbeddedRoomList(title, url, kind, shouldUpdateUrl = true) {
 }
 async function openEmbeddedBoard(boardId, title, url, shouldUpdateUrl = true) {
   const current = ++roomRequestId;
-  document.querySelectorAll('.niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach((pane) => pane.remove());
+  document.querySelectorAll('.niimap-room-thread-list-pane, .niimap-room-thread-detail-pane').forEach(removeEmbeddedRoomPane);
   activeRoomBoard = {id: String(boardId), title, url};
   const ui = createRoomPane('niimap-room-thread-list-pane', title, 'Board一覧に戻る');
   ui.close.addEventListener('click', () => {
     roomRequestId += 1;
-    ui.pane.remove();
-    document.querySelector('.niimap-room-thread-detail-pane')?.remove();
+    removeEmbeddedRoomPane(ui.pane);
+    removeEmbeddedRoomPane(document.querySelector('.niimap-room-thread-detail-pane'));
     activeRoomBoard = null;
     setThreadStage('room-list');
     updateRoomUrl(activeRoomId, {room_list: 'boards'});
@@ -981,13 +988,13 @@ async function openEmbeddedRoomThread(threadId, shouldUpdateUrl = true) {
   const fragment = activeRoomFragment();
   if (!fragment || !activeRoomBoard) return;
   const current = ++roomRequestId;
-  document.querySelector('.niimap-room-thread-detail-pane')?.remove();
+  removeEmbeddedRoomPane(document.querySelector('.niimap-room-thread-detail-pane'));
   const ui = createRoomPane('niimap-room-thread-detail-pane', '', 'Thread一覧に戻る');
   ui.pane.classList.remove('ui-list-pane');
   ui.pane.classList.add('ui-detail-pane');
   ui.close.addEventListener('click', () => {
     roomRequestId += 1;
-    ui.pane.remove();
+    removeEmbeddedRoomPane(ui.pane);
     setThreadStage('room-board');
     updateRoomUrl(activeRoomId, {room_list: 'boards', board: activeRoomBoard.id});
   });
