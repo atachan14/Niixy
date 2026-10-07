@@ -89,6 +89,11 @@ function removeModuleDetailPanes() {
   );
 }
 
+function bindBasicPane(pane) {
+  pane.querySelector('#close-basic-info')?.addEventListener('click', showOverview);
+  setTimeout(() => pane.querySelector('#id_display_name')?.focus(), 260);
+}
+
 async function openBasic(updateHistory = true) {
   closeApplied();
   moduleNavigationGeneration += 1;
@@ -103,8 +108,7 @@ async function openBasic(updateHistory = true) {
   let pane;
   try { pane = await NiixyUI.fetchFragment(url, '.basic-info-pane'); } catch { NiixyUI.showPaneError(loading); return; }
   loading.replaceWith(pane);
-  pane.querySelector('#close-basic-info')?.addEventListener('click', showOverview);
-  setTimeout(() => pane.querySelector('#id_display_name')?.focus(), 260);
+  bindBasicPane(pane);
 }
 
 function currentModuleState(defaultType = 'element', search = location.search) {
@@ -483,5 +487,11 @@ if (initialParams.get('section') === 'applied') {
     if (initialParams.get('draft')) await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${initialParams.get('draft')}/`);
     else if (initialParams.get('interface')) await openInterfaceDetail(`/mypage/interfaces/manage/${initialParams.get('interface')}/`);
   });
-} else if (myPage.dataset.initialSection === 'basic') openBasic(false);
-else updateHeaderNavigation();
+} else if (myPage.dataset.initialSection === 'basic') {
+  const pane = workspace.querySelector('.basic-info-pane');
+  if (pane) {
+    pageStack.set('basic');
+    updateHeaderNavigation('basic');
+    bindBasicPane(pane);
+  } else openBasic(false);
+} else updateHeaderNavigation();
