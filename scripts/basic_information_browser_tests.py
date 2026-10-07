@@ -28,7 +28,9 @@ class BasicInformationBrowserTests(StaticLiveServerTestCase):
         self.session = self.client.cookies[settings.SESSION_COOKIE_NAME].value
         phase = os.environ.get('NIIXY_BASIC_QA_PHASE', 'after')
         self.assertIn(phase, ('before', 'after'))
-        self.output = Path(settings.BASE_DIR) / '.artifacts' / 'basic-information-2026-10-07' / phase
+        group = os.environ.get('NIIXY_BASIC_QA_GROUP', 'basic-information-2026-10-07')
+        self.assertIn(group, ('basic-information-2026-10-07', 'basic-section-2026-10-07'))
+        self.output = Path(settings.BASE_DIR) / '.artifacts' / group / phase
         self.output.mkdir(parents=True, exist_ok=True)
         self.records = []
 
@@ -170,3 +172,62 @@ class BasicInformationBrowserTests(StaticLiveServerTestCase):
             finally:
                 browser.close()
         self.assertEqual(get_user_model().objects.get(pk=self.owner.pk).niixy_profile.display_name, '修正済み携帯')
+
+    def test_basic_section_url_and_reload_desktop_mobile(self):
+        from playwright.sync_api import sync_playwright, expect
+        self.output = Path(settings.BASE_DIR) / '.artifacts/basic-section-2026-10-07' / self.output.name
+        self.output.mkdir(parents=True, exist_ok=True)
+        def snapshot(page):
+            pane = page.locator('.basic-info-pane')
+            box = pane.bounding_box() if pane.count() else None
+            field = page.locator('#id_display_name')
+            return {
+                'url': page.url,
+                'url_selects_basic': parse_qs(urlsplit(page.url).query).get('section') == ['basic'],
+                'stage': page.locator('.mypage-workspace').evaluate('el=>el.niixyWorkspace.stage'),
+                'pane_count': pane.count(),
+                'value': field.input_value() if field.count() else None,
+                'right_edge': box['x'] + box['width'] if box else None,
+                'overflow': page.evaluate('document.scrollingElement.scrollWidth-innerWidth'),
+                'focused': field.evaluate('el=>el===document.activeElement') if field.count() else False,
+            }
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(channel='msedge', headless=True)
+            try:
+                for viewport, size in VIEWPORTS:
+                    for entry in ('direct', 'rendered', 'button'):
+                        with self.subTest(viewport=viewport, entry=entry):
+                            context, page, errors, requests = self.context(browser, viewport, size)
+                            try:
+                                query = '?section=basic' if entry == 'direct' else '?_panes=1&section=basic' if entry == 'rendered' else ''
+                                page.goto(self.live_server_url + '/mypage/' + query, wait_until='networkidle')
+                                expect(page.locator('.mypage')).to_have_attribute('data-current-account', self.owner.username)
+                                if entry == 'button':
+                                    page.locator('#open-basic-info').click()
+                                    expect(page.locator('#id_display_name')).to_have_value('保存済み')
+                                    page.wait_for_timeout(350)
+                                observations = [snapshot(page)]
+                                for _ in range(3):
+                                    page.reload(wait_until='networkidle')
+                                    observations.append(snapshot(page))
+                                checks = {
+                                    'url_selects_basic': all(x['url_selects_basic'] for x in observations),
+                                    'basic_restored_once': all(x['stage']=='basic' and x['pane_count']==1 for x in observations),
+                                    'saved_input_and_focus': all(x['value']=='保存済み' and x['focused'] for x in observations),
+                                    'aligned_and_not_overflowing': all(x['right_edge'] is not None and abs(x['right_edge']-size['width'])<=1 and x['overflow']<=2 for x in observations),
+                                    'no_browser_errors': not errors,
+                                }
+                                page.screenshot(path=self.output / f'{viewport}-{entry}.png', full_page=True)
+                                self.record({'viewport':viewport, 'entry':entry, 'reloads':3, 'observations':observations,
+                                             'checks':checks, 'browser_errors':errors,
+                                             'result':'passed' if all(checks.values()) else 'failed'})
+                                self.assertTrue(all(checks.values()), json.dumps({'observations':observations,'checks':checks},ensure_ascii=False))
+                                page.locator('#close-basic-info').click()
+                                expect(page.locator('.mypage-workspace')).to_have_attribute('data-ui-workspace-stage','overview')
+                                self.assertEqual(urlsplit(page.url).query,'')
+                                self.assertEqual(errors,[])
+                            finally:
+                                context.close()
+            finally:
+                browser.close()
+        self.assertEqual(get_user_model().objects.get(pk=self.owner.pk).niixy_profile.display_name,'保存済み')

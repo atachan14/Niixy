@@ -329,6 +329,7 @@ def run_viewport(browser, base_url: str, output_dir: Path, name: str, size: dict
     except PlaywrightTimeoutError as error:
         raise AssertionError(f"Timed out while testing the {name} viewport: {error}") from error
     finally:
+        page.wait_for_timeout(350)
         page.screenshot(path=output_dir / f"{name}.png", full_page=True)
         context.close()
 

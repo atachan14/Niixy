@@ -104,7 +104,7 @@ async function openBasic(updateHistory = true) {
   workspace.append(loading);
   pageStack.set('basic');
   updateHeaderNavigation('basic');
-  if (updateHistory) history.pushState({}, '', myPage.dataset.paneUrl);
+  if (updateHistory) history.pushState({}, '', `${myPage.dataset.paneUrl}?section=basic`);
   let pane;
   try { pane = await NiixyUI.fetchFragment(url, '.basic-info-pane'); } catch { NiixyUI.showPaneError(loading); return; }
   loading.replaceWith(pane);
@@ -487,7 +487,7 @@ if (initialParams.get('section') === 'applied') {
     if (initialParams.get('draft')) await openInterfaceDetail(`/mypage/interfaces/manage/drafts/${initialParams.get('draft')}/`);
     else if (initialParams.get('interface')) await openInterfaceDetail(`/mypage/interfaces/manage/${initialParams.get('interface')}/`);
   });
-} else if (myPage.dataset.initialSection === 'basic') {
+} else if (initialParams.get('section') === 'basic' || myPage.dataset.initialSection === 'basic') {
   const pane = workspace.querySelector('.basic-info-pane');
   if (pane) {
     pageStack.set('basic');
