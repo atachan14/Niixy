@@ -31,8 +31,12 @@ Initial smoke fixture was outside default map bounds; RoomPlacement and map Thre
 
 ## Local preview
 
-`http://127.0.0.1:8000/threads/1/` is running against **disposable** `.artifacts/feedback-dev.sqlite3`, not the shared PostgreSQL DB. No test writes went to the shared DB. Dummy login: `conversation_owner` / `niixy-feedback-local` (only this disposable DB).
+QA used **disposable** `.artifacts/feedback-dev.sqlite3` at port 8000. No test writes went to the shared DB. Dummy login `conversation_owner` / `niixy-feedback-local` belongs only to that disposable DB; it is not a normal-environment login.
+
+After parent review, port 8000 was restored to the repository's existing normal `.env` configuration (PostgreSQL) by removing the temporary process DATABASE_URL override. `.env` and application settings were never edited; no connection value was inferred or changed. Current normal preview: `http://127.0.0.1:8000/`. Original process inherited environment is no longer inspectable, but its recorded command is identical to this normal startup and the unmodified repository/default configuration resolved PostgreSQL before QA.
 
 AGENTS restart procedure was followed: verified original launcher PID 37728 and base-Python child 23144 with executable paths/command lines/start times; stopped only that pair; confirmed no runserver/no 8000 listener; started hidden `.venv/Scripts/python.exe manage.py runserver 127.0.0.1:8000 --noreload` with DATABASE_URL pointing to disposable SQLite. Replacement launcher PID 27544, child 32460, single listener 127.0.0.1:8000. Representative Thread GET returned HTTP 200 and `20261009-feedback-controls` asset version. Logs are `.artifacts/feedback-server.log` and `feedback-server-errors.log`.
+
+Restoration followed AGENTS: verified QA launcher 27544 / child 32460 and their paths/start times; stopped only that pair; confirmed both no runserver and no listener; restarted hidden with the same command and no DATABASE_URL override. Restored launcher 12992 / child 20312 (2026-10-09 07:17:12), single 127.0.0.1:8000 listener. Normal-environment validation is read-only GET; no browser smoke or test writes were run against normal DB. Restore logs: `.artifacts/normal-server-restored.log`, `normal-server-restored-errors.log`.
 
 No push/publication. No remaining implementation blockers. Full unrelated QA was not run.
