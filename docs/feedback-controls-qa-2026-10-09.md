@@ -40,3 +40,14 @@ AGENTS restart procedure was followed: verified original launcher PID 37728 and 
 Restoration followed AGENTS: verified QA launcher 27544 / child 32460 and their paths/start times; stopped only that pair; confirmed both no runserver and no listener; restarted hidden with the same command and no DATABASE_URL override. Restored launcher 12992 / child 20312 (2026-10-09 07:17:12), single 127.0.0.1:8000 listener. Normal-environment validation is read-only GET; no browser smoke or test writes were run against normal DB. Restore logs: `.artifacts/normal-server-restored.log`, `normal-server-restored-errors.log`.
 
 No push/publication. No remaining implementation blockers. Full unrelated QA was not run.
+
+
+## Follow-up: remove direct post sharing
+
+User requested removal of the direct URL sharing shown under each ThreadPost. Removed only the compact sharing details from `templates/shared/content_feedback.html`; the same template is used by Thread and Response bodies in canonical, Account and Room/detail Pane views. Content-list Picker sharing, list sharing, canonical URLs, and direct Thread/Response viewing remain unchanged.
+
+Validation: focused `scripts.feedback_controls_browser_tests` passed (24 PC/mobile Account/Guest combinations, absence of direct share controls, Picker copies the exact canonical URL for all six kinds). Existing `ConversationFeedbackBrowserTests.test_desktop_mobile_rating_picker_lists_history_and_guest_policy` passed, including canonical Response viewing and Account-origin detail. Target measurement tests now allow 0.01px floating-point rounding, because Workspace transforms can report 43.99997px for a 44px CSS target; no CSS change was made in this follow-up.
+
+`browser_smoke.py --base-url http://127.0.0.1:8001 --output-dir .artifacts/post-share-smoke` passed on separate disposable SQLite QA process, with zero browser errors. Same fixture-only standalone Room Thread skip warning as above. PC/mobile direct-post screenshots in `.artifacts/feedback-controls/desktop-thread.png`, `mobile-thread.png`, and Account/Response evidence in `.artifacts/conversation-feedback/` were refreshed. Final Workspace renders `.artifacts/post-share-smoke/desktop-workspace.png` and `mobile-workspace.png` were visually reviewed.
+
+QA launcher 16976 / child 38324 on 8001 were identity-checked and stopped, and the port/process absence verified. Normal launcher 12992 / child 20312 were identity-checked and restarted after confirming no runserver and no 8000 listener. Normal configuration stayed in unmodified `.env`; 8000 was never pointed to QA DB in this follow-up. Current launcher 37780 / child 19708 (2026-10-09 07:31:43) is the only server pair, with one 127.0.0.1:8000 listener. Read-only `GET http://127.0.0.1:8000/threads/1/pane/` returned HTTP 200, contained feedback controls and no direct `data-copy-list-url`. No shared-DB test writes, settings changes, push, or publication.

@@ -51,6 +51,7 @@ class FeedbackControlsBrowserTests(StaticLiveServerTestCase):
                             page.goto(self.live_server_url + route(kind,'page',target.pk))
                             feedback = page.locator(f'[data-content-kind="{kind}"]').first
                             expect(feedback).to_be_visible()
+                            self.assertEqual(feedback.locator('.account-list-share, [data-list-share-url], [data-copy-list-url]').count(),0)
                             base = page.locator('.ui-workspace-trail-pane').count()
                             fav = feedback.locator('[data-content-rate=fav]')
                             bad = feedback.locator('[data-content-rate=bad]')
@@ -60,7 +61,8 @@ class FeedbackControlsBrowserTests(StaticLiveServerTestCase):
                             boxes = controls.evaluate_all('els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})')
                             self.assertEqual(len(boxes),5)
                             self.assertLess(max(b['y'] for b in boxes)-min(b['y'] for b in boxes),2,boxes)
-                            if viewport=='mobile':self.assertTrue(all(b['width']>=44 and b['height']>=44 for b in boxes),boxes)
+                            # Workspace transforms can round a 44px target to 43.99997px.
+                            if viewport=='mobile':self.assertTrue(all(b['width']>=43.99 and b['height']>=43.99 for b in boxes),boxes)
                             self.assertFalse(feedback.evaluate('el=>el.scrollWidth>el.clientWidth+1'))
                             # Zero count opens an empty Pane, never posts a rating; close returns to origin.
                             writes = []
@@ -83,7 +85,12 @@ class FeedbackControlsBrowserTests(StaticLiveServerTestCase):
                                 fav.focus();page.keyboard.press('Tab');expect(count).to_be_focused()
                                 self.assertNotEqual(count.evaluate('el=>getComputedStyle(el).outlineStyle'),'none')
                                 feedback.locator('[data-account-list-picker-url]').click();wait_for_trail_count(page,base+1)
-                                expect(page.locator('[data-account-list-picker]')).to_be_visible()
+                                picker = page.locator('[data-account-list-picker]')
+                                expect(picker).to_be_visible()
+                                page.evaluate("navigator.clipboard.writeText=async value=>{window.qaSharedUrl=value;}")
+                                picker.locator('.account-list-share summary').click()
+                                picker.locator('[data-copy-list-url]').click()
+                                self.assertEqual(page.evaluate('window.qaSharedUrl'),self.live_server_url+route(kind,'page',target.pk))
                                 page.locator('.ui-workspace-trail-header .icon-button').last.click();wait_for_trail_count(page,base)
                             else:
                                 expect(fav).to_be_disabled();expect(bad).to_be_disabled();expect(feedback.locator('[data-account-list-picker-url]')).to_be_disabled()

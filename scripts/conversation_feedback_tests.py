@@ -199,12 +199,9 @@ class ConversationFeedbackBrowserTests(StaticLiveServerTestCase):
                     if name=='mobile':
                         self.assertTrue(page.evaluate("matchMedia('(pointer: coarse)').matches"))
                         dimensions=feedback.locator('[data-content-rate], [data-account-list-picker-url]').evaluate_all('els=>els.map(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}))')
-                        self.assertTrue(all(row['width']>=44 and row['height']>=44 for row in dimensions),dimensions)
+                        self.assertTrue(all(row['width']>=43.99 and row['height']>=43.99 for row in dimensions),dimensions)
                     page.evaluate("navigator.clipboard.writeText=async value=>{window.qaSharedUrl=value;}")
-                    feedback.locator('.account-list-share summary').click()
-                    feedback.locator('[data-copy-list-url]').click()
-                    self.assertEqual(page.evaluate('window.qaSharedUrl'),self.live_server_url+route('thread','page',self.thread.pk))
-                    feedback.locator('.account-list-share summary').click()
+                    self.assertEqual(feedback.locator('.account-list-share, [data-list-share-url], [data-copy-list-url]').count(),0)
                     count=[]
                     def track(request):
                         if request.method=='POST' and request.url.endswith(route('thread','rating',self.thread.pk)):count.append(request.url)
@@ -220,6 +217,10 @@ class ConversationFeedbackBrowserTests(StaticLiveServerTestCase):
                     page.wait_for_function("document.querySelector('.ui-workspace-trail-pane [data-content-kind=thread]').dataset.contentSentiment==='fav'")
                     feedback.locator('[data-account-list-picker-url]').click()
                     picker=page.locator('.ui-workspace-trail-pane').last
+                    picker.locator('.account-list-share summary').click()
+                    picker.locator('[data-copy-list-url]').click()
+                    self.assertEqual(page.evaluate('window.qaSharedUrl'),self.live_server_url+route('thread','page',self.thread.pk))
+                    picker.locator('.account-list-share summary').click()
                     picker.locator('[data-list-operation="create"] input[name=name]').fill(f'{name} Saved Thread')
                     picker.locator('[data-list-operation="create"] [type=submit]').click()
                     listing=page.locator('.ui-workspace-trail-pane').last
