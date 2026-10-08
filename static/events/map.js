@@ -83,6 +83,7 @@ let appliedBoardSearchIds = null;
 let mapReady = false;
 let mapFailed = false;
 let searchReady = false;
+let initialSearchError = '';
 let searchRequestId = 0;
 let appliedSortKind = 'near';
 let appliedSpotOrder = null;
@@ -587,6 +588,15 @@ function closeInterfaceSelector() {
   previewInterfaceId = null;
   setThreadStage(selectorReturnStage);
   synchronizeThreadFieldControls();
+}
+function updateSpotListStatus() {
+  const status = document.getElementById('niimap-list-status');
+  const mapError = !mapReady && mapFailed;
+  const waiting = !mapReady || !searchReady;
+  status.hidden = !mapError && !initialSearchError && !waiting;
+  status.textContent = mapError ? '地図の読み込みに失敗しました。'
+    : initialSearchError || (waiting ? '読み込み中...' : '');
+  document.getElementById('niimap-list-retry').hidden = !mapError && !initialSearchError;
 }
 function applyFilters() {
   if (!mapReady || !searchReady) return;
@@ -1166,9 +1176,9 @@ async function runSpotSearch(initial = false) {
   if (!pending) return;
   const current = ++searchRequestId;
   const error = document.getElementById('niimap-search-error'); error.hidden = true; error.textContent = '';
-  const status = document.getElementById('niimap-list-status');
-  const retry = document.getElementById('niimap-list-retry');
-  if (initial) { list.hidden = true; status.hidden = false; status.textContent = '読み込み中...'; retry.hidden = true; }
+  initialSearchError = '';
+  if (initial) { searchReady = false; list.hidden = true; }
+  updateSpotListStatus();
   const data = new FormData(searchForm); const conditions = searchConditions();
   data.append('creator_include_groups', JSON.stringify(conditions.creator_include_groups));
   data.append('creator_exclude_groups', JSON.stringify(conditions.creator_exclude_groups));
@@ -1188,12 +1198,13 @@ async function runSpotSearch(initial = false) {
     appliedSpotOrder = (result.spot_order || []).map((spot) => ({kind: spot.kind, id: String(spot.id)}));
     appliedSortKind = data.get('sort_kind'); searchReady = true;
     applyFilters();
-    retry.hidden = mapReady || !mapFailed;
+    updateSpotListStatus();
     if (!initial) spotControlWindows.set('search', false);
   } catch (exception) {
     if (current !== searchRequestId) return;
     error.textContent = exception.message || '検索に失敗しました。'; error.hidden = false;
-    if (initial) { status.hidden = false; status.textContent = error.textContent; retry.hidden = false; }
+    if (initial) initialSearchError = error.textContent;
+    updateSpotListStatus();
   } finally { pending.restore(); }
 }
 searchForm.addEventListener('submit', (event) => { event.preventDefault(); runSpotSearch(!searchReady); });
@@ -1398,16 +1409,21 @@ map.on('click', (event) => {
   openBoardCreate.disabled = false;
   openRoomCreate.disabled = workspace.dataset.authenticated !== 'true';
 });
-map.on('error', () => {
+map.on('error', (event) => {
   if (mapReady) return;
+  // The SDK can finish loading after a missing vector source-layer warning.
+  // Keep this exception narrow: HTTP, style and other initialization errors fail.
+  const error = event.error;
+  const missingSourceLayer = !error?.status
+    && /^Source layer "[^"]+" does not exist on source "[^"]+" as specified by style layer "[^"]+"\.$/.test(error?.message || '');
+  if (missingSourceLayer) return;
   mapFailed = true;
-  const status = document.getElementById('niimap-list-status');
-  status.hidden = false; status.textContent = '地図の読み込みに失敗しました。';
-  document.getElementById('niimap-list-retry').hidden = false;
+  updateSpotListStatus();
 });
 map.on('load', () => {
   mapReady = true;
   mapFailed = false;
+  updateSpotListStatus();
   if (!focusMapFromUrl()) restoreMapView();
   markers.forEach((thread) => {
     const marker = new geolonia.Marker({color: threadMarkerColor}).setLngLat([thread.longitude, thread.latitude]).addTo(map);

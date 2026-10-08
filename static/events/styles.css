@@ -935,6 +935,8 @@ a.ui-summary-item:hover, .ui-summary-item.is-selected { color: var(--accent-dark
 .account-page.is-workspace-trail-open .account-track,
 .room-page.is-workspace-trail-open .room-track,
 .mypage.is-workspace-trail-open .mypage-workspace { display: flex !important; width: max-content !important; }
+/* A trail from Spot keeps the list, without the unused native detail column. */
+.thread-workspace.is-workspace-trail-open:not(:is(.is-detail-open, .is-room-open, .is-room-list-open, .is-room-board-open, .is-room-thread-open)) > .thread-track > .thread-detail-pane { display: none; }
 .ui-workspace-trail-pane { background: var(--panel); border-left: 1px solid var(--line); box-sizing: border-box; display: flex; flex-direction: column; height: 100%; min-width: 0; overflow: hidden; }
 .ui-workspace-trail-pane[data-workspace-trail-width="full"] { flex: 0 0 100vw; width: 100vw; }
 .ui-workspace-trail-pane[data-workspace-trail-width="fixed"] { flex: 0 0 var(--ui-workspace-fixed-width, 360px); width: var(--ui-workspace-fixed-width, 360px); }
