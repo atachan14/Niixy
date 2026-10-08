@@ -17,11 +17,18 @@
 .account-list-content summary { cursor: pointer; padding: 8px 0; }
 
 .content-feedback { margin: .75rem 0; }
-.content-feedback form { display:flex; flex-wrap:wrap; align-items:center; gap:.25rem; }
+.content-feedback form { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
 .content-feedback .button.secondary { background:var(--panel); border:1px solid var(--line); color:var(--text); }
 .content-feedback [aria-pressed="true"][data-content-rate="fav"] { background:#d7efdf; color:#17492b; }
 .content-feedback [aria-pressed="true"][data-content-rate="bad"] { background:#f8dce0; color:#732433; }
-.content-rating-counts button { border:0; background:transparent; cursor:pointer; text-decoration:underline; color:inherit; }
+/* Paired appearance, independent keyboard and touch targets. */
+.content-rating-control { display:inline-flex; flex:none; }
+.content-feedback .content-rating-label { border-radius:6px 0 0 6px; }
+.content-feedback .content-rating-count { border-radius:0 6px 6px 0; margin-left:-1px; font-variant-numeric:tabular-nums; }
+.content-feedback .content-rating-control .button { min-height:32px; padding:4px 8px; white-space:nowrap; }
+.content-feedback .content-feedback-add { min-height:32px; }
+.content-feedback .button.secondary:not(:disabled):hover { border-color:var(--text); box-shadow:inset 0 0 0 1px var(--text); }
+.content-feedback .button.secondary:focus-visible { position:relative; z-index:1; outline:2px solid var(--text); outline-offset:2px; }
 .content-reference-summary { text-decoration:none; color:inherit; }
 .reference-main { flex:1; min-height:0; overflow:hidden; }
 .reference-workspace { overflow:hidden; width:100%; height:calc(100dvh - 65px); }
@@ -53,5 +60,4 @@
 /* Compact text beneath the body, retaining a usable touch target. */
 .content-feedback-compact { font-size: .75rem; margin: .3rem 0 0; }
 .content-feedback-compact .button.secondary { font-size: inherit; padding: 2px 6px; min-height: 28px; }
-.content-feedback-compact .content-rating-counts { margin: .2rem 0; font-size: .7rem; }
-@media (pointer: coarse) { .content-feedback-compact .button.secondary { min-width: 44px; min-height: 44px; } }
+@media (pointer: coarse), (max-width: 780px) { .content-feedback .button.secondary { min-width: 45px; min-height: 44px; } }

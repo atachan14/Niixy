@@ -1,0 +1,4 @@
+<span class="content-rating-control">
+  <button class="button secondary content-rating-label" type="submit" value="{{ rating }}" name="sentiment" data-content-rate="{{ rating }}" aria-pressed="{% if sentiment == rating %}true{% else %}false{% endif %}"{% if not can_rate %} disabled{% endif %}>{{ rating }}</button>
+  <button class="button secondary content-rating-count" type="button" data-reference-fetch="{{ ratings_url }}?sentiment={{ rating }}" data-reference-title="{{ rating }}" data-content-count="{{ rating }}" aria-label="{{ rating }} の評価者一覧 ({{ count }})">({{ count }})</button>
+</span>

@@ -7,7 +7,7 @@
   <title>{% block title %}NiiMap{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'events/styles.css' %}?v=20261005-account-layout">
   <link rel="stylesheet" href="{% static 'accounts/reviews.css' %}?v=20261005-mute">
-  <link rel="stylesheet" href="{% static 'accounts/lists.css' %}?v=20261006-conversation-feedback">
+  <link rel="stylesheet" href="{% static 'accounts/lists.css' %}?v=20261009-feedback-controls">
   {% block extra_head %}{% endblock %}
   <link rel="stylesheet" href="{% static 'shared/controls.css' %}?v=20261006-ui-density">
 </head>
@@ -68,7 +68,7 @@
   <script src="{% static 'shared/workspace_trail.js' %}?v=20261006-conversation-feedback"></script>
   <script src="{% static 'accounts/reviews.js' %}?v=20261006-room-review"></script>
   <script src="{% static 'accounts/lists.js' %}?v=20261006-conversation-feedback"></script>
-  <script src="{% static 'shared/content_references.js' %}?v=20261006-conversation-feedback"></script>
+  <script src="{% static 'shared/content_references.js' %}?v=20261009-feedback-controls"></script>
   {% block scripts %}{% endblock %}
   {% if not user.is_authenticated %}
     <script src="{% static 'accounts/auth.js' %}?v=20261003-1"></script>

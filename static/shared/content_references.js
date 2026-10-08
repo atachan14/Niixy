@@ -59,7 +59,7 @@ window.NiixyContentReferences = (() => {
       document.querySelectorAll(`[data-rating-url="${key}"]`).forEach(section => {
         section.dataset.contentSentiment=result.sentiment;
         section.querySelectorAll('[data-content-rate]').forEach(control => {control.setAttribute('aria-pressed',String(control.dataset.contentRate === result.sentiment));});
-        ['fav','bad'].forEach(sentiment => {section.querySelector(`[data-content-count="${sentiment}"]`).textContent = `${sentiment} (${result[sentiment+'_count']})`;});
+        ['fav','bad'].forEach(sentiment => {const control = section.querySelector(`[data-content-count="${sentiment}"]`); const count = result[sentiment+'_count']; control.textContent = `(${count})`; control.setAttribute('aria-label', `${sentiment} の評価者一覧 (${count})`);});
       });
       const kind = ['thread','response','board'].includes(result.kind) ? result.kind : 'interface';
       document.dispatchEvent(new CustomEvent('niixy:content-rating-changed',{detail:result}));
